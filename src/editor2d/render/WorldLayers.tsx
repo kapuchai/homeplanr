@@ -189,10 +189,11 @@ function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: Derive
         const hinge = worldPoint(solid, hingeU, vJamb)
         const leafEnd = worldPoint(solid, hingeU, vJamb + swingSign * width)
         const far = worldPoint(solid, farU, vJamb)
-        // The world group now renders with negative y-scale (y-up), which
-        // mirrors SVG arc sweep direction — flip relative to the M2-verified
-        // y-down value.
-        const sweep = (model.hinge === 'a') === (model.swing === 'front') ? 1 : 0
+        // Empirically pinned by TWO user checks (M2 y-down, M6 y-up): the
+        // y-flip mirrors both the sweep sense AND the leaf side, so the
+        // original value stands. Do not re-derive from theory — check the
+        // rendered arc.
+        const sweep = (model.hinge === 'a') === (model.swing === 'front') ? 0 : 1
         els.push(
           <g key={`${op.openingId}-d`}>
             <line x1={hinge.x} y1={hinge.y} x2={leafEnd.x} y2={leafEnd.y} {...hair} />

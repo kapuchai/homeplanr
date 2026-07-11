@@ -104,10 +104,17 @@ export function Editor2D() {
     el.addEventListener('gesturestart', onGestureStart)
     el.addEventListener('gesturechange', onGestureChange)
     el.addEventListener('gestureend', onGestureEnd)
-    // and keep pinch anywhere else from zooming the app chrome
+    // and keep pinch anywhere else from zooming the app chrome — WebKitGTK
+    // may express pinch as ctrl+wheel OUTSIDE the editor too, so guard the
+    // whole window (tauri.conf zoomHotkeysEnabled:false disables the
+    // native webview zoom underneath)
     const blockDocGesture = (e: Event) => e.preventDefault()
     document.addEventListener('gesturestart', blockDocGesture)
     document.addEventListener('gesturechange', blockDocGesture)
+    const blockCtrlWheel = (e: WheelEvent) => {
+      if (e.ctrlKey && !el.contains(e.target as Node)) e.preventDefault()
+    }
+    window.addEventListener('wheel', blockCtrlWheel, { passive: false })
 
     return () => {
       el.removeEventListener('wheel', onWheel)
@@ -116,6 +123,7 @@ export function Editor2D() {
       el.removeEventListener('gestureend', onGestureEnd)
       document.removeEventListener('gesturestart', blockDocGesture)
       document.removeEventListener('gesturechange', blockDocGesture)
+      window.removeEventListener('wheel', blockCtrlWheel)
     }
   }, [])
 
