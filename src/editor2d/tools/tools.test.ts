@@ -9,7 +9,7 @@ import { createToolRegistry } from './toolRegistry'
 import { handleKey, handleKeyUp, flushNudgeForTests, type KeyInput } from './keymap'
 import type { EditorPointerEvent, ToolContext } from './toolTypes'
 import { emptyDocument } from '../../model/types'
-import { newProjectId, type FurnitureId, type NodeId } from '../../model/ids'
+import { newProjectId, type FurnitureId } from '../../model/ids'
 import { vec, type Vec2 } from '../../geometry/vec'
 
 /**
