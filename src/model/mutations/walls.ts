@@ -133,6 +133,29 @@ export function moveWall(
   runPipeline(doc, opts.mode ?? 'commit')
 }
 
+/**
+ * Numeric length edit (properties panel). One deterministic rule
+ * (plan-pinned): node b moves along the a→b axis; a stays put.
+ */
+export function setWallLength(
+  doc: ProjectDocument,
+  wallId: WallId,
+  length: number,
+  opts: { mode?: MutationMode } = {},
+): void {
+  const w = doc.walls[wallId]
+  const na = w && doc.nodes[w.a]
+  const nb = w && doc.nodes[w.b]
+  if (!w || !na || !nb) return
+  const L = dist(na, nb)
+  if (L < GEOM_EPS) return
+  const target = Math.max(DEFAULTS.minWallLength * 5, length)
+  const s = target / L
+  nb.x = na.x + (nb.x - na.x) * s
+  nb.y = na.y + (nb.y - na.y) * s
+  runPipeline(doc, opts.mode ?? 'commit')
+}
+
 export function updateWall(
   doc: ProjectDocument,
   wallId: WallId,

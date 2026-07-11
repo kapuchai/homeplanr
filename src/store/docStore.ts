@@ -34,6 +34,7 @@ export interface DocState {
   moveNode: (id: NodeId, p: Vec2, opts?: { mode?: MutationMode }) => void
   moveWall: (id: WallId, delta: Vec2, opts?: { mode?: MutationMode }) => void
   updateWall: (id: WallId, patch: { thickness?: number; height?: number }, opts?: { mode?: MutationMode }) => void
+  setWallLength: (id: WallId, length: number, opts?: { mode?: MutationMode }) => void
   splitWall: (id: WallId, s: number, opts?: { mode?: MutationMode }) => NodeId | null
   mergeNodes: (survivor: NodeId, loser: NodeId, opts?: { mode?: MutationMode }) => void
   deleteEntities: (ids: readonly (WallId | NodeId | OpeningId | FurnitureId)[], opts?: { mode?: MutationMode }) => void
@@ -78,6 +79,7 @@ export const useDocStore = create<DocState>()(
           moveNode: (id, p, opts) => mutate((d) => walls.moveNode(d, id, p, opts)),
           moveWall: (id, delta, opts) => mutate((d) => walls.moveWall(d, id, delta, opts)),
           updateWall: (id, patch, opts) => mutate((d) => walls.updateWall(d, id, patch, opts)),
+          setWallLength: (id, length, opts) => mutate((d) => walls.setWallLength(d, id, length, opts)),
           splitWall: (id, s, opts) => mutate((d) => walls.splitWall(d, id, s, opts)),
           mergeNodes: (survivor, loser, opts) => mutate((d) => walls.mergeNodes(d, survivor, loser, opts)),
           deleteEntities: (ids, opts) => mutate((d) => walls.deleteEntities(d, ids, opts)),

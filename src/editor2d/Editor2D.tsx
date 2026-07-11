@@ -203,6 +203,7 @@ export function Editor2D() {
       <GridLayer ref={gridRef} />
       <svg
         ref={svgRef}
+        className="editor-canvas"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none' }}
       >
         <g ref={worldRef}>

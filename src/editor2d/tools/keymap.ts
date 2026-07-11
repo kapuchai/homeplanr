@@ -65,6 +65,28 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   const ui = ctx.ui()
   const key = e.key
 
+  // file operations (gated while a gesture is live)
+  if (e.ctrlKey && !isTxActive()) {
+    const k = key.toLowerCase()
+    if (k === 'n') {
+      e.preventDefault()
+      void import('../../store/persistence/controller').then((c) => c.newProject())
+      return
+    }
+    if (k === 'o') {
+      e.preventDefault()
+      void import('../../store/persistence/controller').then((c) => c.openProject())
+      return
+    }
+    if (k === 's') {
+      e.preventDefault()
+      void import('../../store/persistence/controller').then((c) =>
+        e.shiftKey ? c.saveProjectAs() : c.saveProject(),
+      )
+      return
+    }
+  }
+
   // undo/redo (gated inside safeUndo/safeRedo as well)
   if (e.ctrlKey && key.toLowerCase() === 'z') {
     e.preventDefault()
@@ -104,6 +126,16 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     }
     if (key.toLowerCase() === 'w') {
       registry.switchTo(ctx, 'draw-wall')
+      return
+    }
+    if (key.toLowerCase() === 'd') {
+      ui.setToolParams({ openingKind: 'door' })
+      registry.switchTo(ctx, 'place-opening')
+      return
+    }
+    if (key.toLowerCase() === 'n') {
+      ui.setToolParams({ openingKind: 'window' })
+      registry.switchTo(ctx, 'place-opening')
       return
     }
   }
