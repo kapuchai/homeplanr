@@ -61,28 +61,31 @@ export function reconcileRooms(doc: ProjectDocument): void {
     assignment.set(p.faceIdx, p.roomId)
   }
 
-  const nextRooms: Record<RoomId, Room> = {}
+  // Update in place — untouched rooms MUST keep object identity (the
+  // derived-geometry layer's per-entity reference stability depends on it;
+  // wholesale rebuilding would churn every room every commit).
+  const idsEq = (a: readonly WallId[], b: readonly WallId[]) =>
+    a.length === b.length && a.every((v, i) => v === b[i])
+  const cyclesEq = (a: readonly WallId[][], b: readonly WallId[][]) =>
+    a.length === b.length && a.every((v, i) => idsEq(v, b[i]!))
+
+  const seen = new Set<RoomId>()
   faces.forEach((face, fi) => {
     const matched = assignment.get(fi)
     if (matched) {
-      const prev = doc.rooms[matched]!
-      nextRooms[matched] = {
-        id: matched,
-        wallCycle: face.wallCycle,
-        holeCycles: face.holeCycles,
-        ...(prev.name !== undefined ? { name: prev.name } : {}),
-        ...(prev.floorMaterialId !== undefined
-          ? { floorMaterialId: prev.floorMaterialId }
-          : {}),
-      }
+      seen.add(matched)
+      const room = doc.rooms[matched]!
+      if (!idsEq(room.wallCycle, face.wallCycle)) room.wallCycle = face.wallCycle
+      if (!cyclesEq(room.holeCycles, face.holeCycles)) room.holeCycles = face.holeCycles
     } else {
       const id = newRoomId()
-      nextRooms[id] = { id, wallCycle: face.wallCycle, holeCycles: face.holeCycles }
+      seen.add(id)
+      doc.rooms[id] = { id, wallCycle: face.wallCycle, holeCycles: face.holeCycles }
     }
   })
-
-  // replace wholesale (unmatched rooms die here)
-  doc.rooms = nextRooms
+  for (const id of Object.keys(doc.rooms) as RoomId[]) {
+    if (!seen.has(id)) delete doc.rooms[id]
+  }
 }
 
 export function renameRoom(doc: ProjectDocument, id: RoomId, name: string): void {

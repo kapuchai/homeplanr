@@ -188,16 +188,24 @@ export function revalidateOpenings(doc: ProjectDocument): void {
     ops.sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1))
     let cursor = lo
     for (const op of ops) {
+      // NOTE: assign fields only when they actually change — spurious writes
+      // would mark the immer draft modified, churn opening identity, and
+      // defeat the derived layer's per-entity reference stability.
+      const assign = <K extends 't' | 'height' | 'sillHeight'>(key: K, value: number) => {
+        if (Math.abs((op as Record<K, number>)[key] - value) > 1e-12) {
+          ;(op as Record<K, number>)[key] = value
+        }
+      }
       // --- vertical clamps first (independent of position) ---
       if (op.kind === 'door') {
-        op.height = Math.min(op.height, H - DEFAULTS.openingHeadroom)
+        assign('height', Math.min(op.height, H - DEFAULTS.openingHeadroom))
         if (op.height <= 0) {
           delete doc.openings[op.id]
           continue
         }
       } else {
-        op.sillHeight = Math.min(Math.max(op.sillHeight, 0), H - DEFAULTS.openingHeadroom)
-        op.height = Math.min(op.height, H - DEFAULTS.openingHeadroom - op.sillHeight)
+        assign('sillHeight', Math.min(Math.max(op.sillHeight, 0), H - DEFAULTS.openingHeadroom))
+        assign('height', Math.min(op.height, H - DEFAULTS.openingHeadroom - op.sillHeight))
         if (op.height < DEFAULTS.minWindowHeight) {
           delete doc.openings[op.id]
           continue
@@ -216,7 +224,7 @@ export function revalidateOpenings(doc: ProjectDocument): void {
         delete doc.openings[op.id]
         continue
       }
-      op.t = u / L
+      assign('t', u / L)
       cursor = u + half + m
     }
   }
