@@ -449,3 +449,32 @@ textarea,
   padding: 1px 6px;
   font-family: inherit;
 }
+
+.catalog-section summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 4px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #9ca3af;
+  user-select: none;
+}
+
+.catalog-section summary::before {
+  content: '▸';
+  transition: transform 0.12s;
+}
+
+.catalog-section[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.catalog-section .count {
+  color: #d1d5db;
+  font-weight: 500;
+}

@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { CATALOG_BY_CATEGORY, CATEGORY_ORDER, type CatalogItem } from '../catalog'
+import { symbolFor } from '../catalog/symbolFromParts'
 import { SymbolRenderer } from '../editor2d/render/SymbolRenderer'
 import { useUiStore } from '../store/uiStore'
 import { useDocStore } from '../store/docStore'
@@ -113,7 +114,7 @@ function ItemCard({ item }: { item: CatalogItem }) {
     >
       <svg width={52} height={52} viewBox="-26 -26 52 52" aria-hidden>
         <g transform={`scale(${viewScale})`}>
-          <SymbolRenderer prims={item.symbol2d} />
+          <SymbolRenderer prims={symbolFor(item)} />
         </g>
       </svg>
       <span>{item.name}</span>
@@ -128,14 +129,16 @@ export function CatalogPanel() {
         const items = CATALOG_BY_CATEGORY[cat]
         if (!items.length) return null
         return (
-          <section key={cat}>
-            <h3>{cat}</h3>
+          <details key={cat} open className="catalog-section">
+            <summary>
+              {cat} <span className="count">{items.length}</span>
+            </summary>
             <div className="catalog-grid">
               {items.map((item) => (
                 <ItemCard key={item.id} item={item} />
               ))}
             </div>
-          </section>
+          </details>
         )
       })}
     </aside>

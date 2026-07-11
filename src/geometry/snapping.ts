@@ -1,6 +1,7 @@
 import type { NodeId, WallId } from '../model/ids'
 import type { Vec2 } from './vec'
 import { add, dist, dot, scale, sub } from './vec'
+import { segSegIntersection } from './segment'
 
 /**
  * THE snap resolver — the only place snap priorities live.
@@ -17,7 +18,16 @@ import { add, dist, dot, scale, sub } from './vec'
 
 export type SnapCandidate =
   | { kind: 'node'; point: Vec2; nodeId: NodeId }
-  | { kind: 'wallPoint'; point: Vec2; wallId: WallId; t: number }
+  | {
+      kind: 'wallPoint'
+      point: Vec2
+      wallId: WallId
+      t: number
+      /** Segment endpoints — lets an active angle ray snap to the RAY∩WALL
+       * intersection instead of the cursor's sliding foot point. */
+      a?: Vec2
+      b?: Vec2
+    }
   | {
       kind: 'wallBack'
       point: Vec2
@@ -142,33 +152,11 @@ export function resolveSnap(
   const toWorld = (px: number) => px * opts.pxToWorld
   const prevId = opts.prev?.primary ? candidateIdentity(opts.prev.primary) : null
 
-  // --- collect point-candidates (node/wallPoint/wallBack) within radius ---
-  interface Scored {
-    c: SnapCandidate & { point: Vec2 }
-    d: number
-    priority: number
-    sticky: boolean
-  }
-  const scored: Scored[] = []
-  for (const c of candidates) {
-    if (c.kind !== 'node' && c.kind !== 'wallPoint' && c.kind !== 'wallBack') continue
-    const d = dist(raw, c.point)
-    const radii = SNAP_RADII_PX[c.kind]
-    const sticky = prevId === candidateIdentity(c)
-    const within = d <= toWorld(sticky ? radii.release : radii.capture)
-    if (within) scored.push({ c, d, priority: PRIORITY[c.kind], sticky })
-  }
-  scored.sort(
-    (a, b) =>
-      a.priority - b.priority ||
-      Number(b.sticky) - Number(a.sticky) ||
-      a.d - b.d,
-  )
-  const winner = scored[0]
-
-  // --- active ray: external constraint wins; else an in-capture angleRay ---
-  let ray: SnapConstraint | undefined = opts.constraint
-  if (!ray) {
+  // --- active ray detection first (wallPoints project onto it) ---
+  let preRay: { origin: Vec2; dir: Vec2 } | null = null
+  if (opts.constraint) {
+    preRay = { origin: opts.constraint.origin, dir: opts.constraint.dir }
+  } else {
     let bestAng = ANGLE_RAY_CAPTURE
     for (const c of candidates) {
       if (c.kind !== 'angleRay') continue
@@ -179,10 +167,51 @@ export function resolveSnap(
       const ang = Math.acos(cos)
       if (ang <= bestAng) {
         bestAng = ang
-        ray = { kind: 'ray', origin: c.origin, dir: c.dir }
+        preRay = { origin: c.origin, dir: c.dir }
       }
     }
   }
+
+  // --- collect point-candidates (node/wallPoint/wallBack) within radius ---
+  interface Scored {
+    c: SnapCandidate & { point: Vec2 }
+    d: number
+    priority: number
+    sticky: boolean
+  }
+  const scored: Scored[] = []
+  for (const c of candidates) {
+    if (c.kind !== 'node' && c.kind !== 'wallPoint' && c.kind !== 'wallBack') continue
+    let cand = c
+    // Straight-attachment (M6 gate): with an angle ray active, a wall's
+    // snap point is the RAY∩SEGMENT intersection, not the sliding foot
+    // of the cursor — drawing along an axis lands ON the crossed wall.
+    if (preRay && c.kind === 'wallPoint' && c.a && c.b) {
+      const far = add(preRay.origin, scale(preRay.dir, 10_000))
+      const hit = segSegIntersection(preRay.origin, far, c.a, c.b)
+      if (!hit) continue // ray misses this wall — not a candidate under lock
+      cand = { ...c, point: hit.p, t: hit.u }
+    }
+    const d = dist(raw, cand.point)
+    const radii = SNAP_RADII_PX[cand.kind as keyof typeof SNAP_RADII_PX]
+    const sticky = prevId === candidateIdentity(cand)
+    const within = d <= toWorld(sticky ? radii.release : radii.capture)
+    if (within) scored.push({ c: cand, d, priority: PRIORITY[cand.kind], sticky })
+  }
+  scored.sort(
+    (a, b) =>
+      a.priority - b.priority ||
+      Number(b.sticky) - Number(a.sticky) ||
+      a.d - b.d,
+  )
+  const winner = scored[0]
+
+  // --- the active ray (computed above; external constraint already wins) ---
+  const ray: SnapConstraint | undefined = opts.constraint
+    ? opts.constraint
+    : preRay
+      ? { kind: 'ray', origin: preRay.origin, dir: preRay.dir }
+      : undefined
 
   // --- node/wallPoint escape: a point-winner beats the ray outright ---
   if (winner && (winner.c.kind === 'node' || PRIORITY[winner.c.kind] < PRIORITY.angleRay)) {

@@ -38,7 +38,14 @@ export function wallPointCandidates(
     if (!na || !nb) continue
     const { point, t } = closestPointOnSegment(raw, na, nb)
     if (t > 0.001 && t < 0.999) {
-      out.push({ kind: 'wallPoint', point, wallId: w.id, t })
+      out.push({
+        kind: 'wallPoint',
+        point,
+        wallId: w.id,
+        t,
+        a: { x: na.x, y: na.y },
+        b: { x: nb.x, y: nb.y },
+      })
     }
   }
   return out

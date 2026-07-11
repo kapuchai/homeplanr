@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CATALOG, CATEGORY_ORDER } from './index'
 import { PALETTE } from './palette'
 import { collectParts, partsBounds } from './builder'
+import { symbolFor } from './symbolFromParts'
 import type { SymbolPrim } from './types'
 
 /**
@@ -37,8 +38,32 @@ function symbolBounds(prims: SymbolPrim[]): { minX: number; minY: number; maxX: 
         grow(p.cx + p.r, p.cy + p.r)
         break
       case 'path': {
-        const nums = p.d.match(/-?\d*\.?\d+/g)?.map(Number) ?? []
-        for (let i = 0; i + 1 < nums.length; i += 2) grow(nums[i]!, nums[i + 1]!)
+        // command-aware walk — arc commands carry FLAGS that a naive
+        // number-pairing parser would misread as coordinates
+        const tokens = p.d.match(/[MLAZmlaz]|-?\d*\.?\d+(?:e-?\d+)?/g) ?? []
+        let i = 0
+        let cmd = ''
+        while (i < tokens.length) {
+          const t = tokens[i]!
+          if (/[MLAZmlaz]/.test(t)) {
+            cmd = t.toUpperCase()
+            i++
+            continue
+          }
+          if (cmd === 'A') {
+            // rx ry rot largeArc sweep x y — our ellipse pattern puts arc
+            // endpoints at the x-extremes, so only y needs the ±ry sweep
+            const ry = Number(tokens[i + 1]!)
+            const x = Number(tokens[i + 5]!)
+            const y = Number(tokens[i + 6]!)
+            grow(x, y - ry)
+            grow(x, y + ry)
+            i += 7
+          } else {
+            grow(Number(tokens[i]!), Number(tokens[i + 1]!))
+            i += 2
+          }
+        }
         break
       }
     }
@@ -66,19 +91,17 @@ describe('catalog conformance', () => {
         expect(item.dims.h).toBeLessThanOrEqual(2.5)
       })
 
-      it('symbol2d stays within the footprint (+1cm; swing ticks may poke front)', () => {
-        const b = symbolBounds(item.symbol2d)
-        const m = 0.011
+      it('derived symbol stays within the footprint (+2cm)', () => {
+        // symbols are DERIVED from the 3D parts (symbolFromParts) — this
+        // guards the deriver itself (projection math, ellipse paths)
+        const prims = symbolFor(item)
+        expect(prims.length).toBeGreaterThan(1)
+        const b = symbolBounds(prims)
+        const m = 0.021
         expect(b.minX).toBeGreaterThanOrEqual(-item.dims.w / 2 - m)
         expect(b.maxX).toBeLessThanOrEqual(item.dims.w / 2 + m)
-        // front (−y) allows a 15cm affordance zone for swing ticks/handles
-        expect(b.minY).toBeGreaterThanOrEqual(-item.dims.d / 2 - 0.15)
+        expect(b.minY).toBeGreaterThanOrEqual(-item.dims.d / 2 - m)
         expect(b.maxY).toBeLessThanOrEqual(item.dims.d / 2 + m)
-        // and the BODY prims must fill a sensible share of the footprint
-        const body = symbolBounds(item.symbol2d.filter((p) => p.role === 'body'))
-        const cover =
-          ((body.maxX - body.minX) * (body.maxY - body.minY)) / (item.dims.w * item.dims.d)
-        expect(cover).toBeGreaterThanOrEqual(0.5)
       })
 
       it('3D parts fit the dims box (+1cm) with correct height', () => {

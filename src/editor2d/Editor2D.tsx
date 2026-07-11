@@ -74,7 +74,49 @@ export function Editor2D() {
       vp.zoomAtPoint(cursor, wheelZoomFactor(e.deltaY, e.deltaMode, e.ctrlKey))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+
+    // WebKitGTK delivers touchpad pinch as Safari-style GESTURE events that
+    // bypass wheel handlers and drive native page zoom (zooming the whole
+    // window — M6 packaged-gate finding). Intercept them and feed the
+    // editor zoom instead.
+    interface GestureEvent extends Event {
+      scale: number
+      clientX: number
+      clientY: number
+    }
+    let lastGestureScale = 1
+    const onGestureStart = (e: Event) => {
+      e.preventDefault()
+      lastGestureScale = (e as GestureEvent).scale || 1
+    }
+    const onGestureChange = (e: Event) => {
+      e.preventDefault()
+      const g = e as GestureEvent
+      const rect = el.getBoundingClientRect()
+      const factor = (g.scale || 1) / lastGestureScale
+      lastGestureScale = g.scale || 1
+      useViewportStore.getState().zoomAtPoint(
+        { x: g.clientX - rect.left, y: g.clientY - rect.top },
+        Math.min(1.25, Math.max(1 / 1.25, factor)),
+      )
+    }
+    const onGestureEnd = (e: Event) => e.preventDefault()
+    el.addEventListener('gesturestart', onGestureStart)
+    el.addEventListener('gesturechange', onGestureChange)
+    el.addEventListener('gestureend', onGestureEnd)
+    // and keep pinch anywhere else from zooming the app chrome
+    const blockDocGesture = (e: Event) => e.preventDefault()
+    document.addEventListener('gesturestart', blockDocGesture)
+    document.addEventListener('gesturechange', blockDocGesture)
+
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', onGestureStart)
+      el.removeEventListener('gesturechange', onGestureChange)
+      el.removeEventListener('gestureend', onGestureEnd)
+      document.removeEventListener('gesturestart', blockDocGesture)
+      document.removeEventListener('gesturechange', blockDocGesture)
+    }
   }, [])
 
   // pointer pipeline: pan override → active tool (rAF-coalesced moves)

@@ -67,10 +67,11 @@ export function createDrawWallTool(): Tool {
         })
       }
       if (snap?.constraint?.kind === 'ray') {
-        const deg = Math.round(
+        const dataDeg = Math.round(
           ((Math.atan2(snap.constraint.dir.y, snap.constraint.dir.x) * 180) / Math.PI + 360) % 360,
         )
-        angleBadge = `${deg}°`
+        // screen renders y-up: displayed angle is the visual (mirrored) one
+        angleBadge = `${(360 - dataDeg) % 360}°`
       }
     }
     ctx.interaction().set({

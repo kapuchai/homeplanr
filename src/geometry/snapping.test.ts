@@ -93,6 +93,42 @@ describe('per-axis guides', () => {
   })
 })
 
+describe('ray∩wall straight attachment (M6 fix)', () => {
+  it('with an active ray, a crossed wall snaps at the INTERSECTION, not the sliding foot', () => {
+    // ray along +x from origin; a vertical wall at x=3 (y from −2 to 2);
+    // cursor slightly above the ray near the wall
+    const wall: SnapCandidate = {
+      kind: 'wallPoint',
+      point: vec(3, 0.05), // foot of the (offset) cursor — would "slide"
+      wallId: asWallId('w1'),
+      t: 0.51,
+      a: vec(3, -2),
+      b: vec(3, 2),
+    }
+    const r = resolveSnap(vec(2.98, 0.05), [ray(0, 0, 1, 0), wall], opts())
+    expect(r.primary?.kind).toBe('wallPoint')
+    expect(r.point.x).toBeCloseTo(3, 12)
+    expect(r.point.y).toBeCloseTo(0, 12) // ON the ray — perfectly straight
+    if (r.primary?.kind === 'wallPoint') {
+      expect(r.primary.t).toBeCloseTo(0.5, 9) // t recomputed at intersection
+    }
+  })
+
+  it('a wall the ray misses is not a candidate while locked', () => {
+    const wall: SnapCandidate = {
+      kind: 'wallPoint',
+      point: vec(2.9, 1.05),
+      wallId: asWallId('w1'),
+      t: 0.5,
+      a: vec(2, 1),
+      b: vec(4, 1), // parallel to the ray, above it
+    }
+    const r = resolveSnap(vec(2.9, 0.02), [ray(0, 0, 1, 0), wall], opts())
+    expect(r.primary).toBeUndefined()
+    expect(r.point.y).toBeCloseTo(0, 12) // stays on the ray
+  })
+})
+
 describe('angle ray composition', () => {
   it('ray captures within 7.5° and projects the point onto it', () => {
     // raw at ~3° above the +x ray from origin

@@ -16,12 +16,14 @@ import { vec } from '../../geometry/vec'
 
 const vp: Viewport = { k: 100, tx: 50, ty: 20, width: 800, height: 600 }
 
-describe('viewport transforms', () => {
-  it('world↔screen roundtrip', () => {
+describe('viewport transforms (y-up render)', () => {
+  it('world↔screen roundtrip; +world.y maps UP-screen (−y px)', () => {
     const w = vec(2.5, -1.25)
     const s = worldToScreen(w, vp)
-    expect(s).toEqual({ x: 300, y: -105 })
+    expect(s).toEqual({ x: 300, y: 145 }) // 20 − (−1.25)·100
     expect(screenToWorld(s, vp)).toEqual(w)
+    // chirality pin: growing world.y must DECREASE screen.y
+    expect(worldToScreen(vec(0, 1), vp).y).toBeLessThan(worldToScreen(vec(0, 0), vp).y)
   })
 
   it('pxToWorld scales with k', () => {

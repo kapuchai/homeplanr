@@ -12,7 +12,8 @@ const GUIDE_EXTENT = 2000 // world meters; effectively infinite lines
 function Pill({ at, text, k }: { at: Vec2; text: string; k: number }) {
   const w = text.length * 6.6 + 12
   return (
-    <g transform={`translate(${at.x} ${at.y}) scale(${1 / k})`} pointerEvents="none">
+    // counter-scale flips y back (world renders y-up) so text stays upright
+    <g transform={`translate(${at.x} ${at.y}) scale(${1 / k} ${-1 / k})`} pointerEvents="none">
       <rect
         x={-w / 2}
         y={-20}

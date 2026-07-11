@@ -20,7 +20,8 @@ export function useViewportTransform(
       const { k, tx, ty } = useViewportStore.getState()
       const rtx = Math.round(tx * dpr) / dpr
       const rty = Math.round(ty * dpr) / dpr
-      worldRef.current?.setAttribute('transform', `matrix(${k},0,0,${k},${rtx},${rty})`)
+      // y-up render: negative y scale (see viewportMath docblock)
+      worldRef.current?.setAttribute('transform', `matrix(${k},0,0,${-k},${rtx},${rty})`)
       const grid = gridRef.current
       if (grid) {
         const gridSize = useDocStore.getState().doc.settings.gridSize

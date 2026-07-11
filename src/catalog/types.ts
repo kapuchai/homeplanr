@@ -55,7 +55,12 @@ export interface CatalogItem {
   wallSnap: boolean
   /** Named material slots → default palette entries. */
   materials: Record<string, MaterialId>
-  /** Top-view symbol (2D editor). */
+  /**
+   * @deprecated Top-view symbols are DERIVED from build3d parts
+   * (symbolFromParts.ts) since the M6 gate — hand symbols drifted from the
+   * 3D look. This field is ignored by all renderers and kept only until the
+   * item files drop their legacy data.
+   */
   symbol2d: SymbolPrim[]
   /** Procedural 3D parts (see builder.ts). */
   build3d: (b: Builder, dims: Dims) => void

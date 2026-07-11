@@ -7,6 +7,7 @@ import type { ProjectDocument } from '../../model/types'
 import type { Vec2 } from '../../geometry/vec'
 import { add, perp, scale } from '../../geometry/vec'
 import { CATALOG } from '../../catalog'
+import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { rotateHandlePos } from '../tools/handles'
 import { theme } from './theme'
@@ -77,7 +78,7 @@ function RoomLabels({ derived }: { derived: DerivedGeometry }) {
         return (
           <g
             key={r.roomId}
-            transform={`translate(${r.labelAnchor.x} ${r.labelAnchor.y}) scale(${1 / k})`}
+            transform={`translate(${r.labelAnchor.x} ${r.labelAnchor.y}) scale(${1 / k} ${-1 / k})`}
             style={{ pointerEvents: 'none' }}
           >
             <text textAnchor="middle" fontSize={11} fill={theme.text} fontWeight={500}>
@@ -188,11 +189,10 @@ function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: Derive
         const hinge = worldPoint(solid, hingeU, vJamb)
         const leafEnd = worldPoint(solid, hingeU, vJamb + swingSign * width)
         const far = worldPoint(solid, farU, vJamb)
-        // SVG sweep=1 = increasing angle under y-down. For hinge-at-a +
-        // front-swing the short leafEnd→far arc runs 180°→90° (decreasing)
-        // → sweep 0; each flipped parameter flips the direction once.
-        // (User-verified in the M2 visual gate.)
-        const sweep = (model.hinge === 'a') === (model.swing === 'front') ? 0 : 1
+        // The world group now renders with negative y-scale (y-up), which
+        // mirrors SVG arc sweep direction — flip relative to the M2-verified
+        // y-down value.
+        const sweep = (model.hinge === 'a') === (model.swing === 'front') ? 1 : 0
         els.push(
           <g key={`${op.openingId}-d`}>
             <line x1={hinge.x} y1={hinge.y} x2={leafEnd.x} y2={leafEnd.y} {...hair} />
@@ -221,7 +221,7 @@ function FurnitureLayer({ doc }: { doc: ProjectDocument }) {
               <g
                 transform={`scale(${f.size.w / item.dims.w} ${f.size.d / item.dims.d})`}
               >
-                <SymbolRenderer prims={item.symbol2d} />
+                <SymbolRenderer prims={symbolFor(item)} />
               </g>
             ) : (
               <UnknownSymbol w={f.size.w} d={f.size.d} />

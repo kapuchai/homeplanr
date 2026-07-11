@@ -2,8 +2,16 @@ import type { Vec2 } from '../../geometry/vec'
 import type { Bounds } from '../../geometry/polygon'
 
 /**
- * Viewport transform: screen = world · k + t   (k in px per meter).
+ * Viewport transform (k in px per meter):
+ *   screen.x = world.x · k + tx
+ *   screen.y = ty − world.y · k     ← 2D renders Y-UP
  * All conversions live here — no other module may do px↔m math.
+ *
+ * WHY y-up (M6 packaged-gate finding): plan data is y-down, but a y-down
+ * SCREEN view is chirality-flipped relative to ANY above-ground 3D camera
+ * of the same world — no azimuth can undo a reflection, so 2D and 3D read
+ * as mirrored. Flipping the RENDER transform (this one matrix) makes both
+ * views agree; the document model, geometry, and 3D pipeline are untouched.
  */
 export interface Viewport {
   k: number
@@ -21,12 +29,12 @@ export const clampK = (k: number): number => Math.min(K_MAX, Math.max(K_MIN, k))
 
 export const worldToScreen = (p: Vec2, vp: Viewport): Vec2 => ({
   x: p.x * vp.k + vp.tx,
-  y: p.y * vp.k + vp.ty,
+  y: vp.ty - p.y * vp.k,
 })
 
 export const screenToWorld = (p: Vec2, vp: Viewport): Vec2 => ({
   x: (p.x - vp.tx) / vp.k,
-  y: (p.y - vp.ty) / vp.k,
+  y: (vp.ty - p.y) / vp.k,
 })
 
 /** Screen px → world meters at the current zoom (snap radii etc.). */
@@ -58,7 +66,7 @@ export function fitBounds(bounds: Bounds | null, vp: Viewport, padding = 0.1): V
     ...vp,
     k,
     tx: vp.width / 2 - cx * k,
-    ty: vp.height / 2 - cy * k,
+    ty: vp.height / 2 + cy * k, // y-up: screen.y = ty − y·k
   }
 }
 
