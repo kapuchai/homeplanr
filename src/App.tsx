@@ -1,23 +1,75 @@
-// App shell (M2): toolbar with 2D/3D toggle + the read-only editor and the
-// thin 3D slice, bootstrapped with the fixture apartment. Real tools,
-// panels, and file persistence land in M3a/M3b.
+// App shell (M3a): toolbar with tools + undo/redo + 2D/3D toggle.
+// Panels and file persistence land in M3b.
 import { useEffect, useState } from 'react'
+import { useStore } from 'zustand'
 import { Editor2D } from './editor2d/Editor2D'
 import { Slice3D } from './scene3d/Slice3D'
-import { useDocStore } from './store/docStore'
+import { useDocStore, docTemporal } from './store/docStore'
 import { useUiStore, initSelectionPruning } from './store/uiStore'
-import { clearHistory } from './store/transactions'
+import { clearHistory, safeRedo, safeUndo } from './store/transactions'
 import { buildFixtureDoc } from './test/fixtureDoc'
+
+function Toolbar() {
+  const viewMode = useUiStore((s) => s.viewMode)
+  const setViewMode = useUiStore((s) => s.setViewMode)
+  const activeTool = useUiStore((s) => s.activeTool)
+  const setActiveTool = useUiStore((s) => s.setActiveTool)
+  const name = useDocStore((s) => s.doc.name)
+  const canUndo = useStore(docTemporal, (s) => s.pastStates.length > 0)
+  const canRedo = useStore(docTemporal, (s) => s.futureStates.length > 0)
+  const is2d = viewMode === '2d'
+
+  return (
+    <header className="toolbar">
+      <span className="brand">homeplanr</span>
+      <span className="project-name">{name}</span>
+      <div className="segmented" style={{ marginLeft: 16 }}>
+        <button
+          type="button"
+          className={activeTool === 'select' ? 'active' : ''}
+          disabled={!is2d}
+          onClick={() => setActiveTool('select')}
+          title="Select (V)"
+        >
+          Select
+        </button>
+        <button
+          type="button"
+          className={activeTool === 'draw-wall' ? 'active' : ''}
+          disabled={!is2d}
+          onClick={() => setActiveTool('draw-wall')}
+          title="Draw walls (W)"
+        >
+          Wall
+        </button>
+      </div>
+      <div className="segmented">
+        <button type="button" disabled={!canUndo || !is2d} onClick={safeUndo} title="Undo (Ctrl+Z)">
+          ↩
+        </button>
+        <button type="button" disabled={!canRedo || !is2d} onClick={safeRedo} title="Redo (Ctrl+Shift+Z)">
+          ↪
+        </button>
+      </div>
+      <div className="spacer" />
+      <div className="segmented">
+        <button type="button" className={is2d ? 'active' : ''} onClick={() => setViewMode('2d')}>
+          2D
+        </button>
+        <button type="button" className={!is2d ? 'active' : ''} onClick={() => setViewMode('3d')}>
+          3D
+        </button>
+      </div>
+    </header>
+  )
+}
 
 export default function App() {
   const [ready, setReady] = useState(false)
   const viewMode = useUiStore((s) => s.viewMode)
-  const setViewMode = useUiStore((s) => s.setViewMode)
-  const name = useDocStore((s) => s.doc.name)
 
   useEffect(() => {
-    // M2 dev bootstrap: load the fixture apartment (M3b replaces this with
-    // recovery/recent-file launch logic)
+    // M3a dev bootstrap: fixture apartment (M3b replaces with launch logic)
     useDocStore.getState().replaceDocument(buildFixtureDoc())
     clearHistory()
     const unsub = initSelectionPruning()
@@ -27,30 +79,8 @@ export default function App() {
 
   return (
     <div className="app-root">
-      <header className="toolbar">
-        <span className="brand">homeplanr</span>
-        <span className="project-name">{name}</span>
-        <div className="spacer" />
-        <div className="segmented">
-          <button
-            type="button"
-            className={viewMode === '2d' ? 'active' : ''}
-            onClick={() => setViewMode('2d')}
-          >
-            2D
-          </button>
-          <button
-            type="button"
-            className={viewMode === '3d' ? 'active' : ''}
-            onClick={() => setViewMode('3d')}
-          >
-            3D
-          </button>
-        </div>
-      </header>
-      <main className="content">
-        {ready && (viewMode === '2d' ? <Editor2D /> : <Slice3D />)}
-      </main>
+      <Toolbar />
+      <main className="content">{ready && (viewMode === '2d' ? <Editor2D /> : <Slice3D />)}</main>
     </div>
   )
 }

@@ -29,8 +29,15 @@ export type SnapCandidate =
       slideDir: Vec2
     }
   | { kind: 'angleRay'; origin: Vec2; dir: Vec2; label: string }
-  | { kind: 'guideX'; value: number; refIds: string[] }
-  | { kind: 'guideY'; value: number; refIds: string[] }
+  | {
+      kind: 'guideX'
+      /** Snapped CENTER x for the dragged subject. */
+      value: number
+      refIds: string[]
+      /** Where the visual alignment line runs (edge/center of the pair). */
+      display?: number
+    }
+  | { kind: 'guideY'; value: number; refIds: string[]; display?: number }
   | { kind: 'grid'; step: number }
 
 export type SnapKind = SnapCandidate['kind']

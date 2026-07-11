@@ -1,33 +1,25 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
+import { useInteractionStore } from './session/interactionStore'
 import { getDerived } from '../store/derived'
 import { useViewportStore } from './viewport/viewportStore'
 import { screenToWorld, wheelZoomFactor } from './viewport/viewportMath'
 import { useViewportTransform } from './viewport/useViewportTransform'
 import { GridLayer } from './viewport/GridLayer'
 import { WorldLayers } from './render/WorldLayers'
+import { InteractionOverlay } from './render/InteractionOverlay'
 import { docContentBounds } from './render/bounds'
-import { hitTestTop } from './hit/hitTest'
 import { polygonBounds } from '../geometry/polygon'
-import { isTxActive } from '../store/transactions'
-import type { FurnitureId, NodeId, OpeningId, WallId } from '../model/ids'
+import { createToolRegistry } from './tools/toolRegistry'
+import { handleKey, handleKeyUp, toKeyInput } from './tools/keymap'
+import type { EditorPointerEvent, ToolContext } from './tools/toolTypes'
 
 /**
- * 2D editor shell (M2 scope): viewport interactions (wheel matrix, pan),
- * hover + click selection, Del, Esc, Shift+1 fit, and the app-shell input
- * hygiene (context menu, browser accelerators, middle-click autoscroll).
- * The full tool system (draw-wall, drags, snapping) lands in M3a.
+ * 2D editor shell: viewport interactions + the tool event pipeline.
+ * Order per plan: wheel/pan overrides → keymap globals → active tool.
+ * Pointer moves are rAF-coalesced (latest event per frame).
  */
-const isEditableTarget = (t: EventTarget | null): boolean => {
-  if (!(t instanceof HTMLElement)) return false
-  return (
-    t instanceof HTMLInputElement ||
-    t instanceof HTMLTextAreaElement ||
-    t.isContentEditable
-  )
-}
-
 export function Editor2D() {
   const rootRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -35,26 +27,36 @@ export function Editor2D() {
   const gridRef = useRef<HTMLDivElement>(null)
   useViewportTransform(worldRef, gridRef)
 
+  const registry = useMemo(() => createToolRegistry(), [])
+  const ctx = useMemo<ToolContext>(
+    () => ({
+      doc: () => useDocStore.getState().doc,
+      derived: () => getDerived(useDocStore.getState().doc),
+      actions: () => useDocStore.getState(),
+      ui: () => useUiStore.getState(),
+      interaction: () => useInteractionStore.getState(),
+      pxToWorld: () => 1 / useViewportStore.getState().k,
+    }),
+    [],
+  )
+
   // size tracking + first fit
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
-    const vp = useViewportStore.getState()
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect()
       useViewportStore.getState().setSize(r.width, r.height)
     })
     ro.observe(el)
     const r = el.getBoundingClientRect()
-    vp.setSize(r.width, r.height)
-    // initial zoom-to-fit of the loaded document
+    useViewportStore.getState().setSize(r.width, r.height)
     const doc = useDocStore.getState().doc
-    const bounds = polygonBounds(docContentBounds(doc, getDerived(doc)))
-    useViewportStore.getState().zoomToFit(bounds)
+    useViewportStore.getState().zoomToFit(polygonBounds(docContentBounds(doc, getDerived(doc))))
     return () => ro.disconnect()
   }, [])
 
-  // wheel matrix — non-passive listener so preventDefault always works
+  // wheel matrix
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
@@ -74,19 +76,26 @@ export function Editor2D() {
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  // pointer: pan (middle / Space+left), hover, click-select
+  // pointer pipeline: pan override → active tool (rAF-coalesced moves)
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
     let panning: { pointerId: number; lastX: number; lastY: number } | null = null
+    let pendingMove: PointerEvent | null = null
+    let rafId = 0
 
-    const toWorld = (e: PointerEvent) => {
+    const normalize = (e: PointerEvent): EditorPointerEvent => {
       const rect = el.getBoundingClientRect()
-      return screenToWorld(
-        { x: e.clientX - rect.left, y: e.clientY - rect.top },
-        useViewportStore.getState(),
-      )
+      const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      return {
+        world: screenToWorld(screen, useViewportStore.getState()),
+        screen,
+        mods: { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey },
+        button: e.button,
+        pointerId: e.pointerId,
+      }
     }
+    const activeTool = () => registry.get(useUiStore.getState().activeTool)
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button === 1 || (e.button === 0 && useUiStore.getState().spaceHeld)) {
@@ -95,97 +104,74 @@ export function Editor2D() {
         el.setPointerCapture(e.pointerId)
         return
       }
-      if (e.button !== 0) return
-      const ui = useUiStore.getState()
-      const doc = useDocStore.getState().doc
-      const vp = useViewportStore.getState()
-      const hit = hitTestTop(doc, getDerived(doc), toWorld(e), 1 / vp.k)
-      if (!hit) {
-        ui.clearSelection()
-        return
-      }
-      if (e.shiftKey) ui.toggleSelected(hit.id)
-      else ui.setSelection([hit.id])
+      el.setPointerCapture(e.pointerId)
+      activeTool().onPointerDown(normalize(e), ctx)
     }
-    const onPointerMove = (e: PointerEvent) => {
+    const flushMove = () => {
+      rafId = 0
+      if (!pendingMove) return
+      const e = pendingMove
+      pendingMove = null
       if (panning && e.pointerId === panning.pointerId) {
-        useViewportStore
-          .getState()
-          .panBy(e.clientX - panning.lastX, e.clientY - panning.lastY)
+        useViewportStore.getState().panBy(e.clientX - panning.lastX, e.clientY - panning.lastY)
         panning.lastX = e.clientX
         panning.lastY = e.clientY
         return
       }
-      const doc = useDocStore.getState().doc
-      const vp = useViewportStore.getState()
-      const hit = hitTestTop(doc, getDerived(doc), toWorld(e), 1 / vp.k)
-      const ui = useUiStore.getState()
-      if (ui.hoveredId !== (hit?.id ?? null)) ui.setHovered(hit?.id ?? null)
+      activeTool().onPointerMove(normalize(e), ctx)
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      pendingMove = e
+      if (!rafId) rafId = requestAnimationFrame(flushMove)
     }
     const onPointerUp = (e: PointerEvent) => {
+      if (pendingMove) flushMove()
       if (panning && e.pointerId === panning.pointerId) {
         el.releasePointerCapture(panning.pointerId)
         panning = null
+        return
       }
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      activeTool().onPointerUp(normalize(e), ctx)
+    }
+    const onPointerCancel = (e: PointerEvent) => {
+      panning = null
+      // pointercancel mid-gesture must abort (plan-pinned) — tools handle
+      // Escape identically
+      activeTool().onKeyDown?.('Escape', ctx)
+      void e
+    }
+    const onDblClick = (e: MouseEvent) => {
+      activeTool().onDoubleClick?.(normalize(e as PointerEvent), ctx)
     }
     el.addEventListener('pointerdown', onPointerDown)
     el.addEventListener('pointermove', onPointerMove)
     el.addEventListener('pointerup', onPointerUp)
-    el.addEventListener('pointercancel', onPointerUp)
+    el.addEventListener('pointercancel', onPointerCancel)
+    el.addEventListener('dblclick', onDblClick)
     return () => {
+      if (rafId) cancelAnimationFrame(rafId)
       el.removeEventListener('pointerdown', onPointerDown)
       el.removeEventListener('pointermove', onPointerMove)
       el.removeEventListener('pointerup', onPointerUp)
-      el.removeEventListener('pointercancel', onPointerUp)
+      el.removeEventListener('pointercancel', onPointerCancel)
+      el.removeEventListener('dblclick', onDblClick)
     }
-  }, [])
+  }, [ctx, registry])
 
-  // keyboard + input hygiene (window-level)
+  // keyboard + input hygiene
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      // suppress browser accelerators everywhere (desktop app, not a page)
-      if (
-        e.key === 'F5' ||
-        (e.ctrlKey && ['r', 'p', 'f', 'j'].includes(e.key.toLowerCase()))
-      ) {
-        e.preventDefault()
-        return
-      }
-      if (isEditableTarget(e.target)) return // focus guard
-      const ui = useUiStore.getState()
-      if (e.key === ' ') {
-        if (!ui.spaceHeld) ui.setSpaceHeld(true)
-        e.preventDefault()
-        return
-      }
-      if (e.key === 'Escape') {
-        ui.clearSelection()
-        return
-      }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !isTxActive()) {
-        const ids = ui.selection.filter((id) => !id.startsWith('r_')) as (
-          | WallId
-          | NodeId
-          | OpeningId
-          | FurnitureId
-        )[]
-        if (ids.length) useDocStore.getState().deleteEntities(ids)
-        return
-      }
-      if (e.key === '!' || (e.shiftKey && e.key === '1')) {
-        const doc = useDocStore.getState().doc
-        const bounds = polygonBounds(docContentBounds(doc, getDerived(doc)))
-        useViewportStore.getState().zoomToFit(bounds)
-      }
-    }
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === ' ') useUiStore.getState().setSpaceHeld(false)
-    }
+    const onKeyDown = (e: KeyboardEvent) => handleKey(toKeyInput(e), ctx, registry)
+    const onKeyUp = (e: KeyboardEvent) => handleKeyUp(e, ctx)
     const onContextMenu = (e: MouseEvent) => {
-      if (!isEditableTarget(e.target)) e.preventDefault()
+      const t = e.target
+      const editable =
+        t instanceof HTMLElement &&
+        (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable)
+      if (!editable) e.preventDefault()
     }
     const onAuxClick = (e: MouseEvent) => {
-      if (e.button === 1) e.preventDefault() // no middle-click autoscroll
+      if (e.button === 1) e.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -197,9 +183,11 @@ export function Editor2D() {
       window.removeEventListener('contextmenu', onContextMenu)
       window.removeEventListener('auxclick', onAuxClick)
     }
-  }, [])
+  }, [ctx, registry])
 
   const spaceHeld = useUiStore((s) => s.spaceHeld)
+  const activeToolId = useUiStore((s) => s.activeTool)
+  const cursor = spaceHeld ? 'grab' : registry.get(activeToolId).cursor(ctx)
 
   return (
     <div
@@ -208,7 +196,7 @@ export function Editor2D() {
         position: 'relative',
         flex: 1,
         overflow: 'hidden',
-        cursor: spaceHeld ? 'grab' : 'default',
+        cursor,
         background: '#FAFAF7',
       }}
     >
@@ -219,6 +207,7 @@ export function Editor2D() {
       >
         <g ref={worldRef}>
           <WorldLayers />
+          <InteractionOverlay />
         </g>
       </svg>
     </div>

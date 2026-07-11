@@ -8,6 +8,7 @@ import type { Vec2 } from '../../geometry/vec'
 import { add, perp, scale } from '../../geometry/vec'
 import { CATALOG } from '../../catalog'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
+import { rotateHandlePos } from '../tools/handles'
 import { theme } from './theme'
 import type { WallSolid } from '../../geometry/wallSolids'
 
@@ -235,6 +236,37 @@ function FurnitureLayer({ doc }: { doc: ProjectDocument }) {
 function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
   const selection = useUiStore((s) => s.selection)
   const hovered = useUiStore((s) => s.hoveredId)
+  const k = useViewportStore((s) => s.k)
+
+  // rotate handles: every selected furniture item shows one on its front side
+  const handles = selection
+    .map((id) => doc.furniture[id as never])
+    .filter((f) => !!f)
+    .map((f) => {
+      const pos = rotateHandlePos(f!, 1 / k)
+      return (
+        <g key={`h-${f!.id}`}>
+          <line
+            x1={f!.x}
+            y1={f!.y}
+            x2={pos.x}
+            y2={pos.y}
+            stroke={theme.accent}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle
+            cx={pos.x}
+            cy={pos.y}
+            r={7 / k}
+            fill="#fff"
+            stroke={theme.accent}
+            strokeWidth={1.5}
+            vectorEffect="non-scaling-stroke"
+          />
+        </g>
+      )
+    })
   const outline = (id: string, color: string, width: number) => {
     const wallPoly = derived.outlines.wallPolygons[id as never]
     if (wallPoly) {
@@ -311,6 +343,7 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
     <g style={{ pointerEvents: 'none' }}>
       {hovered && !selection.includes(hovered) && outline(hovered, theme.accentSoft, 1.5)}
       {selection.map((id) => outline(id, theme.accent, 1.5))}
+      {handles}
     </g>
   )
 }
