@@ -32,3 +32,22 @@ jobs:
           workspaces: src-tauri -> target
       - name: cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml
+
+  e2e:
+    name: E2E smoke (chromium + webkit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
