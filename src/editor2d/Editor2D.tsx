@@ -13,6 +13,7 @@ import { docContentBounds } from './render/bounds'
 import { polygonBounds } from '../geometry/polygon'
 import { createToolRegistry } from './tools/toolRegistry'
 import { handleKey, handleKeyUp, toKeyInput } from './tools/keymap'
+import { EmptyState, StatusHint } from '../app/StatusHint'
 import type { EditorPointerEvent, ToolContext } from './tools/toolTypes'
 
 /**
@@ -211,6 +212,8 @@ export function Editor2D() {
           <InteractionOverlay />
         </g>
       </svg>
+      <EmptyState />
+      <StatusHint />
     </div>
   )
 }
