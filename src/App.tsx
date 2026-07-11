@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
 import { Editor2D } from './editor2d/Editor2D'
-import { Slice3D } from './scene3d/Slice3D'
+import { PlannerCanvas } from './scene3d/PlannerCanvas'
 import { useDocStore, docTemporal } from './store/docStore'
 import { useUiStore, initSelectionPruning } from './store/uiStore'
 import { safeRedo, safeUndo } from './store/transactions'
@@ -166,6 +166,14 @@ function Toolbar() {
 export default function App() {
   const [ready, setReady] = useState(false)
   const viewMode = useUiStore((s) => s.viewMode)
+  // keep-alive (plan-pinned): mount the 3D canvas lazily on the first
+  // toggle, then keep it mounted but hidden — the WebGL context, compiled
+  // shaders, and uploaded geometry persist; useSceneDoc latches the doc so
+  // the hidden scene does zero work during 2D editing.
+  const [everShown3d, setEverShown3d] = useState(false)
+  useEffect(() => {
+    if (viewMode === '3d') setEverShown3d(true)
+  }, [viewMode])
 
   useEffect(() => {
     const unsub = initSelectionPruning()
@@ -173,18 +181,25 @@ export default function App() {
     return unsub
   }, [])
 
+  const is2d = viewMode === '2d'
   return (
     <div className="app-root">
       <Toolbar />
       <main className="content">
-        {ready && viewMode === '2d' && (
+        {ready && (
           <>
-            <CatalogPanel />
-            <Editor2D />
-            <PropertiesPanel />
+            <div className="view-2d" style={{ display: is2d ? 'flex' : 'none', flex: 1, minWidth: 0 }}>
+              <CatalogPanel />
+              <Editor2D />
+              <PropertiesPanel />
+            </div>
+            {everShown3d && (
+              <div className="view-3d" style={{ display: is2d ? 'none' : 'flex', flex: 1, minWidth: 0 }}>
+                <PlannerCanvas />
+              </div>
+            )}
           </>
         )}
-        {ready && viewMode === '3d' && <Slice3D />}
       </main>
       <ConfirmDialog />
     </div>

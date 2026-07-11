@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # dry-runnable before tagging (plan-pinned): builds all artifacts,
+  # skips release creation when there is no tag
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ubuntu-22.04 pins the glibc floor of the AppImage/.deb
+          - platform: ubuntu-22.04
+          - platform: windows-latest
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Build and (on tags) release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # only create a release when triggered by a tag
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && 'v__VERSION__' || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && 'homeplanr v__VERSION__' || '' }}
+          releaseDraft: true
+
+      - name: Upload dry-run artifacts
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*-setup.exe
+            src-tauri/target/release/bundle/**/*.msi
+          if-no-files-found: warn
+
+  windows-smoke:
+    needs: build
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundles-windows-latest
+          path: bundles
+      - name: Silent-install and launch smoke test
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Recurse bundles -Filter '*-setup.exe' | Select-Object -First 1
+          if (-not $setup) { Write-Error 'no NSIS installer found'; exit 1 }
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Join-Path $env:LOCALAPPDATA 'homeplanr\homeplanr.exe'
+          if (-not (Test-Path $exe)) { $exe = 'C:\Program Files\homeplanr\homeplanr.exe' }
+          if (-not (Test-Path $exe)) { Write-Error "installed exe not found"; exit 1 }
+          $proc = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($proc.HasExited) { Write-Error "app exited early (code $($proc.ExitCode))"; exit 1 }
+          Write-Output "app alive after 15s — smoke passed"
+          Stop-Process -Id $proc.Id -Force
