@@ -1,37 +1,56 @@
-// M0 WebGL smoke gate: a spinning cube rendered by react-three-fiber.
-// Its only job is to prove WebKitGTK (Tauri's Linux webview) can run three.js
-// before any real work is built on that assumption. Replaced in M2 by the
-// real editor shell + thin 3D slice.
-import { useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import type { Mesh } from 'three'
-
-function SpinningCube() {
-  const mesh = useRef<Mesh>(null)
-  useFrame((_, delta) => {
-    if (!mesh.current) return
-    mesh.current.rotation.x += delta * 0.7
-    mesh.current.rotation.y += delta * 1.1
-  })
-  return (
-    <mesh ref={mesh}>
-      <boxGeometry args={[1.4, 1.4, 1.4]} />
-      <meshStandardMaterial color="#2563eb" />
-    </mesh>
-  )
-}
+// App shell (M2): toolbar with 2D/3D toggle + the read-only editor and the
+// thin 3D slice, bootstrapped with the fixture apartment. Real tools,
+// panels, and file persistence land in M3a/M3b.
+import { useEffect, useState } from 'react'
+import { Editor2D } from './editor2d/Editor2D'
+import { Slice3D } from './scene3d/Slice3D'
+import { useDocStore } from './store/docStore'
+import { useUiStore, initSelectionPruning } from './store/uiStore'
+import { clearHistory } from './store/transactions'
+import { buildFixtureDoc } from './test/fixtureDoc'
 
 export default function App() {
+  const [ready, setReady] = useState(false)
+  const viewMode = useUiStore((s) => s.viewMode)
+  const setViewMode = useUiStore((s) => s.setViewMode)
+  const name = useDocStore((s) => s.doc.name)
+
+  useEffect(() => {
+    // M2 dev bootstrap: load the fixture apartment (M3b replaces this with
+    // recovery/recent-file launch logic)
+    useDocStore.getState().replaceDocument(buildFixtureDoc())
+    clearHistory()
+    const unsub = initSelectionPruning()
+    setReady(true)
+    return unsub
+  }, [])
+
   return (
-    <div className="smoke-root">
-      <div className="smoke-label">
-        homeplanr — M0 WebGL smoke test (spinning cube = WebKitGTK WebGL works)
-      </div>
-      <Canvas camera={{ position: [0, 1.5, 3.5], fov: 45 }}>
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[3, 5, 2]} intensity={1.4} />
-        <SpinningCube />
-      </Canvas>
+    <div className="app-root">
+      <header className="toolbar">
+        <span className="brand">homeplanr</span>
+        <span className="project-name">{name}</span>
+        <div className="spacer" />
+        <div className="segmented">
+          <button
+            type="button"
+            className={viewMode === '2d' ? 'active' : ''}
+            onClick={() => setViewMode('2d')}
+          >
+            2D
+          </button>
+          <button
+            type="button"
+            className={viewMode === '3d' ? 'active' : ''}
+            onClick={() => setViewMode('3d')}
+          >
+            3D
+          </button>
+        </div>
+      </header>
+      <main className="content">
+        {ready && (viewMode === '2d' ? <Editor2D /> : <Slice3D />)}
+      </main>
     </div>
   )
 }
