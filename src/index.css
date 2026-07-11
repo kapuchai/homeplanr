@@ -1,0 +1,48 @@
+/* Global reset + app frame. Theme tokens live in src/editor2d/render/theme.ts
+   (JS side) and are mirrored here as CSS custom properties when needed. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: #fafaf7; /* paper */
+  color: #1f2937;
+  /* Desktop-app input hygiene: no accidental text selection during drags.
+     Re-enabled explicitly for editable fields. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.smoke-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.smoke-label {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.smoke-root canvas {
+  flex: 1;
+}

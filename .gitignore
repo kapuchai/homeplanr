@@ -5,10 +5,15 @@ Desktop.ini
 
 # --- Editors / IDEs ---
 .idea/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 *.swp
 *.swo
 *~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
 # --- Environment / secrets ---
 .env
@@ -18,18 +23,23 @@ Desktop.ini
 # --- Logs ---
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
-# --- Dependencies / build output (common ecosystems) ---
+# --- Dependencies / build output ---
 node_modules/
 dist/
-build/
-target/
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+dist-ssr/
+*.local
 
-# --- Caches / temp ---
+# --- Tauri ---
+src-tauri/target/
+src-tauri/gen/
+
+# --- Caches / temp / test output ---
 .cache/
 tmp/
 coverage/
+playwright-report/
+test-results/
