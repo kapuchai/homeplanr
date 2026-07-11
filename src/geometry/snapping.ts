@@ -189,15 +189,43 @@ export function resolveSnap(
     const result: SnapResult = { point: winner.c.point, primary: winner.c }
     if (winner.c.kind === 'wallBack') {
       result.rotation = winner.c.rotation
-      result.constraint = {
-        kind: 'wallSlide',
+      const slide = {
+        kind: 'wallSlide' as const,
         origin: winner.c.slideOrigin,
         dir: winner.c.slideDir,
         wallId: winner.c.wallId,
       }
+      result.constraint = slide
       // Under an active external slide, project the capture point onto it.
       if (opts.constraint) {
         result.point = projectOnRay(result.point, opts.constraint.origin, opts.constraint.dir)
+      }
+      // CORNER COMPOSITION: guides (incl. the perpendicular wall's face)
+      // clamp the slide parameter — this is how furniture snaps into room
+      // corners while captured against one wall.
+      let bestCorner: { point: Vec2; cand: SnapCandidate; d: number } | null = null
+      for (const c of candidates) {
+        let p: Vec2 | null = null
+        if (c.kind === 'guideX' && Math.abs(slide.dir.x) > 1e-9) {
+          const u = (c.value - slide.origin.x) / slide.dir.x
+          p = add(slide.origin, scale(slide.dir, u))
+        } else if (c.kind === 'guideY' && Math.abs(slide.dir.y) > 1e-9) {
+          const u = (c.value - slide.origin.y) / slide.dir.y
+          p = add(slide.origin, scale(slide.dir, u))
+        }
+        if (!p) continue
+        const d = dist(result.point, p)
+        const r = toWorld(SNAP_RADII_PX.guideX.capture)
+        if (d <= r && (!bestCorner || d < bestCorner.d)) {
+          bestCorner = { point: p, cand: c, d }
+        }
+      }
+      if (bestCorner) {
+        result.point = bestCorner.point
+        result.axes =
+          bestCorner.cand.kind === 'guideX'
+            ? { x: bestCorner.cand }
+            : { y: bestCorner.cand }
       }
     } else if (ray && opts.constraint) {
       // External constraints are hard: even point snaps project onto them.

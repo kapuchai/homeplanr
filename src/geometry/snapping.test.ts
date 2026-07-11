@@ -121,6 +121,32 @@ describe('angle ray composition', () => {
   })
 })
 
+describe('wallBack corner composition', () => {
+  it('a guide along the slide axis clamps the capture point into the corner', () => {
+    // slide along +x at y=0; a guideX (perpendicular wall face, offset for
+    // the item's half-width) sits at x=2.03; cursor near it → corner snap
+    const cand: SnapCandidate[] = [
+      wallBack(2.0, 0.0),
+      { kind: 'guideX', value: 2.03, refIds: ['w2'] },
+    ]
+    const r = resolveSnap(vec(2.0, 0.1), cand, opts())
+    expect(r.primary?.kind).toBe('wallBack')
+    expect(r.point.x).toBeCloseTo(2.03, 12) // clamped along the slide
+    expect(r.point.y).toBeCloseTo(0, 12) // still on the wall face
+    expect(r.rotation).toBeCloseTo(Math.PI / 2, 12)
+    expect(r.axes?.x?.kind).toBe('guideX')
+  })
+
+  it('guides beyond capture radius do not disturb the slide', () => {
+    const cand: SnapCandidate[] = [
+      wallBack(2.0, 0.0),
+      { kind: 'guideX', value: 2.5, refIds: ['w2'] }, // 0.5m away ≫ 6px
+    ]
+    const r = resolveSnap(vec(2.0, 0.1), cand, opts())
+    expect(r.point.x).toBeCloseTo(2.0, 12)
+  })
+})
+
 describe('wallBack capture + slide constraint', () => {
   it('produces rotation and a wallSlide constraint', () => {
     const r = resolveSnap(vec(1.0, 0.1), [wallBack(1.0, 0.0)], opts())
