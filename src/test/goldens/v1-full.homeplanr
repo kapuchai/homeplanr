@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "id": "p_golden_full",
+  "name": "Golden full",
+  "createdAt": "2026-07-11T00:00:00.000Z",
+  "updatedAt": "2026-07-12T00:00:00.000Z",
+  "settings": {
+    "gridSize": 0.1,
+    "snapEnabled": true,
+    "unitDisplay": "cm",
+    "defaultWallThickness": 0.15,
+    "defaultWallHeight": 2.5
+  },
+  "nodes": {
+    "n_cPBQaFT7kX": {
+      "id": "n_cPBQaFT7kX",
+      "x": 0,
+      "y": 0
+    },
+    "n_iCyeAWbQFP": {
+      "id": "n_iCyeAWbQFP",
+      "x": 8,
+      "y": 0
+    },
+    "n_nJ6XVIQqS8": {
+      "id": "n_nJ6XVIQqS8",
+      "x": 8,
+      "y": 5
+    },
+    "n_r6lpKJ68px": {
+      "id": "n_r6lpKJ68px",
+      "x": 0,
+      "y": 5
+    },
+    "n_0DMpW02Kka": {
+      "id": "n_0DMpW02Kka",
+      "x": 5,
+      "y": 0
+    },
+    "n_p0nH9O8zVZ": {
+      "id": "n_p0nH9O8zVZ",
+      "x": 5,
+      "y": 5
+    },
+    "n_sprMP16lUJ": {
+      "id": "n_sprMP16lUJ",
+      "x": 9.6,
+      "y": -0.35
+    }
+  },
+  "walls": {
+    "w_9_EUHQNdkx": {
+      "id": "w_9_EUHQNdkx",
+      "a": "n_cPBQaFT7kX",
+      "b": "n_0DMpW02Kka",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_oiX0_W2vPX": {
+      "id": "w_oiX0_W2vPX",
+      "a": "n_iCyeAWbQFP",
+      "b": "n_nJ6XVIQqS8",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_ushbse-90V": {
+      "id": "w_ushbse-90V",
+      "a": "n_nJ6XVIQqS8",
+      "b": "n_p0nH9O8zVZ",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_ApkE0U9TW9": {
+      "id": "w_ApkE0U9TW9",
+      "a": "n_r6lpKJ68px",
+      "b": "n_cPBQaFT7kX",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_MHqH-eyhgu": {
+      "id": "w_MHqH-eyhgu",
+      "a": "n_0DMpW02Kka",
+      "b": "n_p0nH9O8zVZ",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_nEGu9b-qpr": {
+      "id": "w_nEGu9b-qpr",
+      "a": "n_0DMpW02Kka",
+      "b": "n_iCyeAWbQFP",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_tCLVRLFT3v": {
+      "id": "w_tCLVRLFT3v",
+      "a": "n_p0nH9O8zVZ",
+      "b": "n_r6lpKJ68px",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_o502ejSRzY": {
+      "id": "w_o502ejSRzY",
+      "a": "n_iCyeAWbQFP",
+      "b": "n_sprMP16lUJ",
+      "thickness": 0.15,
+      "height": 2.5
+    }
+  },
+  "openings": {
+    "o_Geq7XfKi02": {
+      "id": "o_Geq7XfKi02",
+      "wallId": "w_MHqH-eyhgu",
+      "t": 0.45,
+      "kind": "door",
+      "width": 0.9,
+      "height": 2,
+      "hinge": "a",
+      "swing": "front"
+    },
+    "o_W0pG6x6Shx": {
+      "id": "o_W0pG6x6Shx",
+      "wallId": "w_9_EUHQNdkx",
+      "t": 0.4,
+      "kind": "window",
+      "width": 1.2,
+      "height": 1.2,
+      "sillHeight": 0.9
+    }
+  },
+  "rooms": {
+    "r_WMt8oiOKHY": {
+      "id": "r_WMt8oiOKHY",
+      "wallCycle": [
+        "w_9_EUHQNdkx",
+        "w_MHqH-eyhgu",
+        "w_tCLVRLFT3v",
+        "w_ApkE0U9TW9"
+      ],
+      "holeCycles": [],
+      "name": "Living room",
+      "floorMaterialId": "darkFloor"
+    },
+    "r_JA4VKn6Cbw": {
+      "id": "r_JA4VKn6Cbw",
+      "wallCycle": [
+        "w_oiX0_W2vPX",
+        "w_ushbse-90V",
+        "w_MHqH-eyhgu",
+        "w_nEGu9b-qpr"
+      ],
+      "holeCycles": [],
+      "name": "Bedroom"
+    }
+  },
+  "furniture": {
+    "f_RcYL92Y91J": {
+      "id": "f_RcYL92Y91J",
+      "catalogItemId": "sofa-3",
+      "x": 2.2,
+      "y": 0.75,
+      "rotation": 0,
+      "size": {
+        "w": 2.2,
+        "d": 0.95,
+        "h": 0.85
+      },
+      "elevation": 0
+    },
+    "f_-2j3QkUL0X": {
+      "id": "f_-2j3QkUL0X",
+      "catalogItemId": "dining-table",
+      "x": 3.2,
+      "y": 3.2,
+      "rotation": 0,
+      "size": {
+        "w": 1.6,
+        "d": 0.9,
+        "h": 0.74
+      },
+      "elevation": 0
+    },
+    "f_Hn-HI4uFRw": {
+      "id": "f_Hn-HI4uFRw",
+      "catalogItemId": "dining-chair",
+      "x": 3.2,
+      "y": 2.4,
+      "rotation": 0,
+      "size": {
+        "w": 0.45,
+        "d": 0.52,
+        "h": 0.88
+      },
+      "elevation": 0
+    },
+    "f_Uy3J1cSRgT": {
+      "id": "f_Uy3J1cSRgT",
+      "catalogItemId": "bed-double",
+      "x": 6.5,
+      "y": 2.2,
+      "rotation": 1.5707963267948966,
+      "size": {
+        "w": 1.67,
+        "d": 2.12,
+        "h": 1
+      },
+      "elevation": 0
+    },
+    "f_BpfRJ8fWQE": {
+      "id": "f_BpfRJ8fWQE",
+      "catalogItemId": "wardrobe",
+      "x": 6.4,
+      "y": 4.6,
+      "rotation": 3.141592653589793,
+      "size": {
+        "w": 1.5,
+        "d": 0.6,
+        "h": 2.2
+      },
+      "elevation": 0
+    },
+    "f_6qXmN3FajM": {
+      "id": "f_6qXmN3FajM",
+      "catalogItemId": "toilet",
+      "x": 7.7,
+      "y": 0.5,
+      "rotation": -1.5707963267948966,
+      "size": {
+        "w": 0.38,
+        "d": 0.65,
+        "h": 0.78
+      },
+      "elevation": 0
+    }
+  }
+}
