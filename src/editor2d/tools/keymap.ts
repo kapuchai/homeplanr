@@ -1,6 +1,15 @@
 import type { ToolContext } from './toolTypes'
 import { switchTool, type ToolRegistry } from './toolRegistry'
-import { buildPasteParams, copyFurniture, hasClipboard, pasteTarget } from '../clipboard'
+import {
+  copySelection,
+  deleteSelection,
+  duplicateSelection,
+  flipSelection,
+  pasteClipboard,
+  rotateSelection,
+  selectAll,
+  zoomToSelection,
+} from '../commands'
 import { useConfirmStore } from '../../app/confirmStore'
 import {
   isTxActive,
@@ -14,11 +23,11 @@ import {
 } from '../../store/transactions'
 import { getDerived } from '../../store/derived'
 import { polygonBounds } from '../../geometry/polygon'
-import { docContentBounds, selectionContentBounds } from '../render/bounds'
+import { docContentBounds } from '../render/bounds'
 import { useViewportStore } from '../viewport/viewportStore'
 import { useAppSettings } from '../../store/appSettings'
 import { KEY_ZOOM_FACTOR } from '../viewport/viewportMath'
-import type { FurnitureId, NodeId, OpeningId, WallId } from '../../model/ids'
+import type { FurnitureId } from '../../model/ids'
 import type { ProjectDocument } from '../../model/types'
 
 /**
@@ -118,6 +127,12 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     }
     return
   }
+  // context menu: focused MenuList navigation never reaches here (it stops
+  // propagation); anything else while the menu is open only closes it
+  if (ctx.ui().contextMenu) {
+    if (e.key === 'Escape') ctx.ui().setContextMenu(null)
+    return
+  }
   if (e.editableTarget) {
     if (e.key === 'Escape') e.blurTarget?.()
     return
@@ -175,42 +190,26 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   // are manipulation targets, so bulk selection skips both (matches marquee)
   if (e.ctrlKey && key.toLowerCase() === 'a') {
     e.preventDefault()
-    if (isTxActive()) return
-    const d = ctx.doc()
-    ui.setSelection([
-      ...Object.keys(d.walls),
-      ...Object.keys(d.openings),
-      ...Object.keys(d.furniture),
-    ])
+    if (!isTxActive()) selectAll(ctx)
     return
   }
 
   // duplicate
   if (e.ctrlKey && key.toLowerCase() === 'd') {
     e.preventDefault()
-    if (isTxActive()) return
-    const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
-    if (ids.length) {
-      const copies = ctx.actions().duplicateFurniture(ids as FurnitureId[])
-      ui.setSelection(copies)
-    }
+    duplicateSelection(ctx)
     return
   }
 
   // copy/paste — module clipboard, survives New/Open (the focus guard above
   // keeps native copy/paste working inside text inputs)
   if (e.ctrlKey && key.toLowerCase() === 'c') {
-    if (isTxActive()) return
-    copyFurniture(ctx.doc(), ui.selection) // silent no-op without furniture
+    copySelection(ctx) // silent no-op without furniture
     return
   }
   if (e.ctrlKey && key.toLowerCase() === 'v') {
     e.preventDefault()
-    if (isTxActive() || !hasClipboard()) return
-    const ids = ctx
-      .actions()
-      .addFurnitureBatch(buildPasteParams(pasteTarget(ctx.interaction().pointerWorld)))
-    ui.setSelection(ids)
+    pasteClipboard(ctx)
     return
   }
 
@@ -259,33 +258,12 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
 
   // rotate selected furniture ±90° — one transaction, one undo entry
   if (!isTxActive() && key.toLowerCase() === 'r' && !e.ctrlKey) {
-    const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
-    if (ids.length) {
-      const dir = e.shiftKey ? -1 : 1
-      const tx = beginTx()
-      for (const id of ids) {
-        const f = ctx.doc().furniture[id as FurnitureId]!
-        ctx.actions().transformFurniture(id as FurnitureId, {
-          rotation: f.rotation + (dir * Math.PI) / 2,
-        })
-      }
-      commitTx(tx)
-      return
-    }
+    if (rotateSelection(ctx, e.shiftKey ? -1 : 1)) return
   }
 
   // flip selected furniture (mirror across item-local x) — one entry
   if (!isTxActive() && key.toLowerCase() === 'f' && !e.ctrlKey) {
-    const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
-    if (ids.length) {
-      const tx = beginTx()
-      for (const id of ids) {
-        const f = ctx.doc().furniture[id as FurnitureId]!
-        ctx.actions().transformFurniture(id as FurnitureId, { mirrored: !f.mirrored })
-      }
-      commitTx(tx)
-      return
-    }
+    if (flipSelection(ctx)) return
   }
 
   // arrow nudge — coalesced into one tx committed after 300ms idle; with no
@@ -334,13 +312,7 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     if (key === 'Backspace' && nudgeFlushed) return
     const tool = registry.get(ui.activeTool)
     if (tool.onKeyDown?.(key, ctx)) return // draw-wall Backspace steps back
-    const ids = ui.selection.filter((id) => !ctx.doc().rooms[id as never]) as (
-      | WallId
-      | NodeId
-      | OpeningId
-      | FurnitureId
-    )[]
-    if (ids.length) ctx.actions().deleteEntities(ids)
+    deleteSelection(ctx)
     return
   }
 
@@ -352,12 +324,7 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
 
   // zoom to selection
   if (e.shiftKey && (key === '2' || key === '@')) {
-    if (ui.selection.length) {
-      const d = ctx.doc()
-      useViewportStore
-        .getState()
-        .zoomToFit(polygonBounds(selectionContentBounds(d, getDerived(d), ui.selection)))
-    }
+    zoomToSelection(ctx)
     return
   }
 

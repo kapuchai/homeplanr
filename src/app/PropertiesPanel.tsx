@@ -7,6 +7,7 @@ import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { FLOOR_MATERIALS, WALL_PAINTS } from '../catalog/palette'
 import { CATALOG } from '../catalog'
+import { beginTx, commitTx, isTxActive } from '../store/transactions'
 import type { WallFinishId } from '../model/types'
 import type { FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
 
@@ -193,6 +194,159 @@ function PaintSwatchRow({
   )
 }
 
+/**
+ * Homogeneous multi-selections (M4) edit shared fields — each apply loops
+ * the mutation inside ONE transaction ⇒ one undo entry. Displayed values
+ * come from the first item; mixed paint/finish states show no active swatch.
+ */
+function MultiPanel({ selection }: { selection: string[] }) {
+  const doc = useDocStore((s) => s.doc)
+  const a = useDocStore.getState()
+
+  const wallIds = selection.filter((id) => doc.walls[id as WallId]) as WallId[]
+  const openingIds = selection.filter((id) => doc.openings[id as OpeningId]) as OpeningId[]
+  const furnitureIds = selection.filter((id) => doc.furniture[id as FurnitureId]) as FurnitureId[]
+
+  const batch = (fn: () => void) => {
+    // a live canvas gesture owns the tx (e.g. an input blur firing after a
+    // rotate-handle pointerdown) — preempt-aborting it would resume undo
+    // recording mid-drag
+    if (isTxActive()) return
+    const tx = beginTx()
+    fn()
+    commitTx(tx)
+  }
+
+  if (wallIds.length === selection.length && wallIds.length > 0) {
+    const first = doc.walls[wallIds[0]!]!
+    const shared = <K extends 'thickness' | 'height' | 'finish' | 'paintFront' | 'paintBack'>(
+      k: K,
+    ) => (wallIds.every((id) => doc.walls[id]![k] === first[k]) ? first[k] : null)
+    const sharedFinish = shared('finish')
+    return (
+      <aside className="props-panel">
+        <h3>{wallIds.length} walls</h3>
+        <LengthField
+          label="Thickness"
+          value={first.thickness}
+          onCommit={(v) => batch(() => wallIds.forEach((id) => a.updateWall(id, { thickness: v })))}
+        />
+        <LengthField
+          label="Height"
+          value={first.height}
+          onCommit={(v) => batch(() => wallIds.forEach((id) => a.updateWall(id, { height: v })))}
+        />
+        <Row>
+          <span>Finish</span>
+          <div className="segmented small finish-seg">
+            {WALL_FINISHES.map(([f, name]) => (
+              <button
+                key={f}
+                type="button"
+                className={(sharedFinish ?? '') === f || (sharedFinish === undefined && f === 'paint') ? 'active' : ''}
+                onClick={() => batch(() => wallIds.forEach((id) => a.updateWall(id, { finish: f })))}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <PaintSwatchRow
+          label="Paint · front"
+          current={shared('paintFront')}
+          hoverSide="front"
+          onPick={(pid) => batch(() => wallIds.forEach((id) => a.updateWall(id, { paintFront: pid })))}
+        />
+        <PaintSwatchRow
+          label="Paint · back"
+          current={shared('paintBack')}
+          hoverSide="back"
+          onPick={(pid) => batch(() => wallIds.forEach((id) => a.updateWall(id, { paintBack: pid })))}
+        />
+        <p className="hint">Values apply to every selected wall · Del deletes</p>
+      </aside>
+    )
+  }
+
+  if (furnitureIds.length === selection.length && furnitureIds.length > 0) {
+    const first = doc.furniture[furnitureIds[0]!]!
+    return (
+      <aside className="props-panel">
+        <h3>{furnitureIds.length} items</h3>
+        <NumField
+          label="Rotation"
+          value={first.rotation}
+          unit="°"
+          step={5}
+          toDisplay={(v) => (v * 180) / Math.PI}
+          fromDisplay={(v) => (v * Math.PI) / 180}
+          onCommit={(v) =>
+            batch(() => furnitureIds.forEach((id) => a.transformFurniture(id, { rotation: v })))
+          }
+        />
+        <LengthField
+          label="Elevation"
+          value={first.elevation}
+          onCommit={(v) =>
+            batch(() => furnitureIds.forEach((id) => a.transformFurniture(id, { elevation: v })))
+          }
+        />
+        <Row>
+          <span>Mirror</span>
+          <div className="segmented small">
+            <button
+              type="button"
+              onClick={() =>
+                batch(() =>
+                  furnitureIds.forEach((id) =>
+                    a.transformFurniture(id, { mirrored: !doc.furniture[id]!.mirrored }),
+                  ),
+                )
+              }
+            >
+              Flip each
+            </button>
+          </div>
+        </Row>
+        <p className="hint">Drag moves all · R rotates each · Ctrl+D duplicates · Del deletes</p>
+      </aside>
+    )
+  }
+
+  if (openingIds.length === selection.length && openingIds.length > 0) {
+    const first = doc.openings[openingIds[0]!]!
+    return (
+      <aside className="props-panel">
+        <h3>{openingIds.length} openings</h3>
+        <LengthField
+          label="Width"
+          value={first.width}
+          onCommit={(v) => batch(() => openingIds.forEach((id) => a.updateOpening(id, { width: v })))}
+        />
+        <LengthField
+          label="Height"
+          value={first.height}
+          onCommit={(v) => batch(() => openingIds.forEach((id) => a.updateOpening(id, { height: v })))}
+        />
+        <p className="hint">Each opening re-clamps into its wall · Del deletes</p>
+      </aside>
+    )
+  }
+
+  const parts = [
+    wallIds.length && `${wallIds.length} wall${wallIds.length > 1 ? 's' : ''}`,
+    openingIds.length && `${openingIds.length} opening${openingIds.length > 1 ? 's' : ''}`,
+    furnitureIds.length && `${furnitureIds.length} item${furnitureIds.length > 1 ? 's' : ''}`,
+  ].filter(Boolean)
+  return (
+    <aside className="props-panel">
+      <h3>{selection.length} selected</h3>
+      {parts.length > 0 && <p className="hint">{parts.join(' · ')}</p>}
+      <p className="hint">Drag moves items · Del deletes · Esc deselects</p>
+    </aside>
+  )
+}
+
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection)
   const doc = useDocStore((s) => s.doc)
@@ -200,12 +354,7 @@ export function PropertiesPanel() {
   const a = useDocStore.getState()
 
   if (selection.length > 1) {
-    return (
-      <aside className="props-panel">
-        <h3>{selection.length} items</h3>
-        <p className="hint">Drag moves all · R rotates each · Ctrl+D duplicates · Del deletes</p>
-      </aside>
-    )
+    return <MultiPanel selection={selection} />
   }
 
   const id = selection[0]

@@ -14,11 +14,15 @@ async function drawRoom(page: Page) {
   const at = (fx: number, fy: number) =>
     ({ x: box.x + box.width * fx, y: box.y + box.height * fy }) as const
   const corners = [at(0.3, 0.3), at(0.7, 0.3), at(0.7, 0.7), at(0.3, 0.7)]
+  // Ctrl suspends snapping: walls land EXACTLY at the click fractions, so
+  // later fraction-based clicks (context menu on a wall) hit deterministically
+  await page.keyboard.down('Control')
   for (const c of corners) {
     await page.mouse.click(c.x, c.y)
     await page.waitForTimeout(350) // > double-click window
   }
   await page.mouse.click(corners[0]!.x, corners[0]!.y) // close the loop
+  await page.keyboard.up('Control')
   await page.keyboard.press('Escape')
 }
 
@@ -48,7 +52,7 @@ test('marquee select → batch delete → undo restores', async ({ page }) => {
   await page.mouse.up()
 
   // 4 walls + 2 sofas selected → properties shows the multi-select count
-  await expect(page.locator('.props-panel')).toContainText('6 items')
+  await expect(page.locator('.props-panel')).toContainText('6 selected')
 
   // batch delete empties the canvas (room label gone), undo restores it
   await page.keyboard.press('Delete')
@@ -62,7 +66,34 @@ test('Ctrl+A selects everything; Escape clears', async ({ page }) => {
   await drawRoom(page)
   await expect(page.locator('svg.editor-canvas text').filter({ hasText: 'm²' })).toBeVisible()
   await page.keyboard.press('Control+a')
-  await expect(page.locator('.props-panel')).toContainText('4 items')
+  await expect(page.locator('.props-panel')).toContainText('4 walls')
   await page.keyboard.press('Escape')
-  await expect(page.locator('.props-panel')).not.toContainText('4 items')
+  await expect(page.locator('.props-panel')).not.toContainText('4 walls')
+})
+
+test('right-click context menu: duplicate furniture, split wall', async ({ page }) => {
+  await page.goto('/')
+  await drawRoom(page)
+  const canvas = page.locator('svg.editor-canvas')
+  const box = (await canvas.boundingBox())!
+  const at = (fx: number, fy: number) =>
+    ({ x: box.x + box.width * fx, y: box.y + box.height * fy }) as const
+
+  await page.locator('.catalog-card', { hasText: 'Sofa, 3-seat' }).click()
+  await page.mouse.click(at(0.5, 0.5).x, at(0.5, 0.5).y)
+  await page.keyboard.press('Escape') // disarm
+
+  // right-click the sofa → Duplicate (first item receives keyboard focus)
+  await page.mouse.click(at(0.5, 0.5).x, at(0.5, 0.5).y, { button: 'right' })
+  await expect(page.getByRole('menuitem').first()).toBeFocused()
+  await page.getByRole('menuitem', { name: /^Duplicate/ }).click()
+  await page.keyboard.press('Control+a')
+  await expect(page.locator('.props-panel')).toContainText('6 selected') // 4 walls + 2 items
+
+  // right-click the top wall → Split wall here
+  await page.keyboard.press('Escape')
+  await page.mouse.click(at(0.5, 0.3).x, at(0.5, 0.3).y, { button: 'right' })
+  await page.getByRole('menuitem', { name: 'Split wall here' }).click()
+  await page.keyboard.press('Control+a')
+  await expect(page.locator('.props-panel')).toContainText('7 selected') // 5 walls now
 })

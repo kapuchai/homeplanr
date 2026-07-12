@@ -9,6 +9,8 @@ import { GridLayer } from './viewport/GridLayer'
 import { WorldLayers } from './render/WorldLayers'
 import { InteractionOverlay } from './render/InteractionOverlay'
 import { toolContext, toolRegistry } from './tools/toolRegistry'
+import { hitTestTop } from './hit/hitTest'
+import { ContextMenu } from '../app/ContextMenu'
 import {
   flushPendingNudge,
   handleKey,
@@ -36,6 +38,9 @@ export function Editor2D() {
   // instances (via switchTool), so onDeactivate always sees this state
   const registry = toolRegistry
   const ctx = toolContext
+
+  // a menu left open must not survive a 2D→3D unmount and reappear stale
+  useEffect(() => () => useUiStore.getState().setContextMenu(null), [])
 
   // size tracking + first fit
   useEffect(() => {
@@ -259,9 +264,17 @@ export function Editor2D() {
     const onPointerUp = (e: PointerEvent) => {
       if (pendingMove) flushMove()
       if (rightPress && e.pointerId === rightPress.pointerId) {
-        // sub-slop right CLICK — reserved for the context menu (M4)
         if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
         rightPress = null
+        // sub-slop right CLICK → context menu; the click selects its target
+        // first (unless it's already part of the selection), and empty space
+        // deselects so the menu shows document-level actions
+        const n = normalize(e)
+        const ui = useUiStore.getState()
+        const hit = hitTestTop(ctx.doc(), ctx.derived(), n.world, ctx.pxToWorld())
+        if (hit && !ui.selection.includes(hit.id)) ui.setSelection([hit.id])
+        else if (!hit && ui.selection.length) ui.clearSelection()
+        ui.setContextMenu({ x: n.screen.x, y: n.screen.y, world: n.world })
         return
       }
       if (panning) {
@@ -368,6 +381,7 @@ export function Editor2D() {
       <EmptyState />
       <StatusHint />
       <ZoomControls />
+      <ContextMenu />
     </div>
   )
 }

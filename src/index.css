@@ -679,3 +679,27 @@ textarea,
   bottom: 8px;
   pointer-events: auto;
 }
+
+/* ---- canvas context menu (M4) ---- */
+.context-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+}
+
+.context-menu .menu {
+  position: static;
+}
+
+.menu button.danger {
+  color: var(--danger);
+}
+
+.menu button:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.menu button:disabled:hover {
+  background: transparent;
+}

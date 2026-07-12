@@ -8,7 +8,7 @@ import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
 import { screenToWorld } from '../viewport/viewportMath'
 import { resetDerivedForTests } from '../../store/derived'
-import { abortTx, beginTx as beginTxForTest, clearHistory, isTxActive, safeUndo } from '../../store/transactions'
+import { abortTx, beginTx as beginTxForTest, commitTx as commitTxForTest, clearHistory, isTxActive, safeUndo } from '../../store/transactions'
 import { switchTool, toolContext, toolRegistry } from './toolRegistry'
 import { clearClipboardForTests, hasClipboard } from '../clipboard'
 import { handleKey, handleKeyUp, flushPendingNudge, type KeyInput } from './keymap'
@@ -1200,5 +1200,65 @@ describe('M3 (0.3.0): Ctrl+A and zoom-to-selection', () => {
     // the selected far sofa is now centered: world(40,40) maps near screen center
     const cx = (40 * vp.k + vp.tx) / 1 // screenX = world.x * k + tx (y-up flip aside)
     expect(Math.abs(cx - vp.width / 2)).toBeLessThan(vp.width / 4)
+  })
+})
+
+describe('M4 (0.3.0): commands, batch editing, context-menu guard', () => {
+  it('a batched wall edit inside one tx is ONE undo entry across all walls', () => {
+    useDocStore
+      .getState()
+      .addWallChain([vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const ids = Object.keys(useDocStore.getState().doc.walls)
+    const base = past()
+    const tx = beginTxForTest()
+    for (const id of ids) useDocStore.getState().updateWall(id as never, { thickness: 0.3 })
+    commitTxForTest(tx)
+    expect(past()).toBe(base + 1)
+    for (const id of ids) {
+      expect(useDocStore.getState().doc.walls[id as never]!.thickness).toBeCloseTo(0.3, 9)
+    }
+    safeUndo()
+    for (const id of ids) {
+      expect(useDocStore.getState().doc.walls[id as never]!.thickness).not.toBeCloseTo(0.3, 9)
+    }
+  })
+
+  it('splitWallAt splits at the projected point; near-endpoint splits are rejected', async () => {
+    const { splitWallAt } = await import('../commands')
+    const r = useDocStore.getState().addWallSegment(vec(0, 0), vec(4, 0))
+    expect(splitWallAt(ctx, r.wallId!, vec(1, 0.5))).toBe(true)
+    expect(walls()).toBe(2)
+    expect(
+      Object.values(useDocStore.getState().doc.nodes).some(
+        (n) => Math.abs(n.x - 1) < 1e-6 && Math.abs(n.y) < 1e-6,
+      ),
+    ).toBe(true)
+    const anyWall = Object.keys(useDocStore.getState().doc.walls)[0]! as never
+    expect(splitWallAt(ctx, anyWall, vec(0.0001, 0))).toBe(false)
+  })
+
+  it('an open context menu swallows keymap keys; Escape closes it', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    useUiStore.getState().setContextMenu({ x: 10, y: 10, world: vec(0, 0) })
+    handleKey(key('Delete'), ctx, registry)
+    expect(useDocStore.getState().doc.furniture[id]).toBeDefined() // swallowed
+    handleKey(key('Escape'), ctx, registry)
+    expect(useUiStore.getState().contextMenu).toBeNull()
+    expect(useUiStore.getState().selection).toEqual([id]) // Esc only closed the menu
+    handleKey(key('Delete'), ctx, registry)
+    expect(useDocStore.getState().doc.furniture[id]).toBeUndefined()
+  })
+
+  it('pasteClipboard pastes at an explicit world point (context-menu Paste here)', async () => {
+    const { copySelection, pasteClipboard } = await import('../commands')
+    const id = addSofa(2, 2)
+    useUiStore.getState().setSelection([id])
+    expect(copySelection(ctx)).toBe(true)
+    expect(pasteClipboard(ctx, vec(9, 9))).toBe(true)
+    const pasted = useUiStore.getState().selection[0]! as FurnitureId
+    expect(pasted).not.toBe(id)
+    expect(useDocStore.getState().doc.furniture[pasted]!.x).toBeCloseTo(9, 6)
+    expect(useDocStore.getState().doc.furniture[pasted]!.y).toBeCloseTo(9, 6)
   })
 })
