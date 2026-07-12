@@ -1,6 +1,6 @@
 [package]
 name = "homeplanr"
-version = "0.1.0"
+version = "0.2.0"
 description = "Home planning app — draw floor plans in 2D, furnish them, and view in 3D"
 authors = ["kapuchai"]
 license = "MIT"
@@ -28,3 +28,9 @@ tauri-plugin-fs = "2"
 # Persists dialog-granted fs scopes across restarts (launch-reopen / Recent files).
 # Must be registered AFTER the fs plugin in lib.rs.
 tauri-plugin-persisted-scope = "2"
+
+# Relays a second launch's argv/cwd to the running instance (.homeplanr file
+# association keeps one window). Desktop-only per the plugin docs; must be
+# registered FIRST in lib.rs.
+[target."cfg(any(target_os = \"macos\", windows, target_os = \"linux\"))".dependencies]
+tauri-plugin-single-instance = "2"

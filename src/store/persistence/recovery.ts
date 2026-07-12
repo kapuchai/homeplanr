@@ -61,3 +61,35 @@ export function decideRecovery(
   }
   return { action: 'discard' }
 }
+
+export type LaunchIntent =
+  | { kind: 'default-chain' }
+  | { kind: 'open-argv'; preserveRecovery: boolean }
+  | { kind: 'restore-prompt-then-argv' }
+
+/**
+ * Launch routing when an argv `.homeplanr` path (file association / CLI)
+ * may compete with a crash-recovery blob:
+ * - no argv → the normal chain (recovery offer → recents → fresh)
+ * - argv names the SAME file the blob shadows and the blob is still
+ *   offerable per decideRecovery → recovery prompt first; a Discard there
+ *   falls back to opening the argv file itself
+ * - otherwise argv wins now, but an unrelated blob must be preserved so a
+ *   later plain launch can still offer it
+ */
+export function decideLaunchIntent(input: {
+  argvPath: string | null
+  blob: RecoveryBlob | null
+  fileMtimeMs: number | null
+}): LaunchIntent {
+  const { argvPath, blob, fileMtimeMs } = input
+  if (argvPath === null) return { kind: 'default-chain' }
+  if (
+    blob &&
+    blob.filePath === argvPath &&
+    decideRecovery(blob, fileMtimeMs).action !== 'discard'
+  ) {
+    return { kind: 'restore-prompt-then-argv' }
+  }
+  return { kind: 'open-argv', preserveRecovery: blob !== null }
+}

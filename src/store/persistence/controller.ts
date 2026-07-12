@@ -13,7 +13,14 @@ import {
   parseDocument,
   serializeDocument,
 } from './serialize'
-import { decideRecovery, decodeRecovery, encodeRecovery, RECOVERY_KEY } from './recovery'
+import {
+  decideLaunchIntent,
+  decideRecovery,
+  decodeRecovery,
+  encodeRecovery,
+  RECOVERY_KEY,
+  type RecoveryBlob,
+} from './recovery'
 import { useConfirmStore } from '../../app/confirmStore'
 
 /**
@@ -159,7 +166,12 @@ export async function newProject(): Promise<void> {
   recomputeDirty()
 }
 
-async function applyOpened(json: string, path: string | null, displayName?: string): Promise<boolean> {
+async function applyOpened(
+  json: string,
+  path: string | null,
+  displayName?: string,
+  opts?: { preserveRecovery?: boolean },
+): Promise<boolean> {
   const { adapter } = state()
   try {
     const { doc: parsed, warnings, healed } = parseDocument(json)
@@ -171,7 +183,9 @@ async function applyOpened(json: string, path: string | null, displayName?: stri
       // self-healed docs no longer match the file — mark dirty
       lastSavedDoc: healed ? NEVER_SAVED : useDocStore.getState().doc,
     })
-    clearRecovery()
+    // an argv-opened file must not destroy an UNRELATED crash blob — it
+    // stays offerable on a later plain launch
+    if (!opts?.preserveRecovery) clearRecovery()
     recomputeDirty()
     if (path) pushRecent(path, parsed.name)
     if (healed) {
@@ -206,18 +220,32 @@ export async function openProject(): Promise<void> {
   }
 }
 
-export async function openRecent(path: string): Promise<void> {
-  if (isTxActive()) return
+/**
+ * Read + open a known path (recents, argv, second-instance relay). Returns
+ * success; failures surface a dialog and prune the recents entry. Callers
+ * resolve dirty state (guardDirty) themselves.
+ */
+export async function openPath(
+  path: string,
+  opts?: { preserveRecovery?: boolean },
+): Promise<boolean> {
   const { adapter } = state()
-  if (!adapter.readPath) return
-  if ((await guardDirty()) === 'cancel') return
+  if (!adapter.readPath) return false
   try {
     const json = await adapter.readPath(path)
-    await applyOpened(json, path)
+    return await applyOpened(json, path, undefined, opts)
   } catch (err) {
     dropRecent(path) // unreadable/missing — prune the entry
     await adapter.message('Could not open', `${path}\n\n${String(err)}`)
+    return false
   }
+}
+
+export async function openRecent(path: string): Promise<void> {
+  if (isTxActive()) return
+  if (!state().adapter.readPath) return
+  if ((await guardDirty()) === 'cancel') return
+  await openPath(path)
 }
 
 export async function saveProject(): Promise<boolean> {
@@ -267,9 +295,44 @@ export async function saveProjectAs(): Promise<boolean> {
   }
 }
 
+/**
+ * The M3b recovery offer: prompt Restore/Discard (silently discarding a
+ * stale blob) → true when the blob was restored into the editor.
+ */
+async function offerRecovery(blob: RecoveryBlob, mtime: number | null): Promise<boolean> {
+  const decision = decideRecovery(blob, mtime)
+  if (decision.action === 'discard') {
+    clearRecovery()
+    return false
+  }
+  const choice = await useConfirmStore.getState().prompt(
+    'Restore unsaved work?',
+    decision.action === 'offer-unsaved'
+      ? `“${blob.doc.name}” has unsaved changes from a previous session.`
+      : `“${blob.doc.name}” has changes newer than ${decision.filePath}.`,
+    [
+      { label: 'Restore', value: 'restore', variant: 'primary' },
+      { label: 'Discard', value: 'discard', variant: 'danger' },
+    ],
+  )
+  if (choice !== 'restore') {
+    clearRecovery()
+    return false
+  }
+  useDocStore.getState().replaceDocument(blob.doc)
+  clearHistory()
+  usePersistStore.setState({
+    currentFilePath: blob.filePath,
+    lastSavedDoc: NEVER_SAVED, // always dirty until saved
+  })
+  // recovery blob KEPT until the next successful save
+  return true
+}
+
 // ---------- launch (plan-pinned order) ----------
 export async function launchPersistence(): Promise<void> {
-  const adapter = (await isTauriRuntime()) ? createTauriStorage() : createBrowserStorage()
+  const tauri = await isTauriRuntime()
+  const adapter = tauri ? createTauriStorage() : createBrowserStorage()
   usePersistStore.setState({ adapter, recents: loadRecents() })
 
   adapter.installCloseGuard({
@@ -283,42 +346,33 @@ export async function launchPersistence(): Promise<void> {
     },
   })
 
-  // 1. resolve recovery BEFORE autosave subscription and auto-reopen
+  // 1. argv .homeplanr path (file association / CLI) — tauri cold start
+  const argvPath = tauri ? await takeLaunchFile() : null
+
+  // 2. resolve recovery BEFORE autosave subscription and auto-reopen,
+  //    routed against the argv path (argv wins over auto-reopen)
   const blob = decodeRecovery(localStorage.getItem(RECOVERY_KEY))
+  const mtime =
+    blob?.filePath && adapter.statMtime ? await adapter.statMtime(blob.filePath) : null
+  const intent = decideLaunchIntent({ argvPath, blob, fileMtimeMs: mtime })
+
   let opened = false
-  if (blob) {
-    const mtime =
-      blob.filePath && adapter.statMtime ? await adapter.statMtime(blob.filePath) : null
-    const decision = decideRecovery(blob, mtime)
-    if (decision.action !== 'discard') {
-      const choice = await useConfirmStore.getState().prompt(
-        'Restore unsaved work?',
-        decision.action === 'offer-unsaved'
-          ? `“${blob.doc.name}” has unsaved changes from a previous session.`
-          : `“${blob.doc.name}” has changes newer than ${decision.filePath}.`,
-        [
-          { label: 'Restore', value: 'restore', variant: 'primary' },
-          { label: 'Discard', value: 'discard', variant: 'danger' },
-        ],
-      )
-      if (choice === 'restore') {
-        useDocStore.getState().replaceDocument(blob.doc)
-        clearHistory()
-        usePersistStore.setState({
-          currentFilePath: blob.filePath,
-          lastSavedDoc: NEVER_SAVED, // always dirty until saved
-        })
-        opened = true
-        // recovery blob KEPT until the next successful save
-      } else {
-        clearRecovery()
-      }
-    } else {
-      clearRecovery()
-    }
+  let recoveryOffered = false
+  if (argvPath && blob && intent.kind === 'restore-prompt-then-argv') {
+    // the blob shadows the argv file itself — the recovery prompt decides;
+    // Discard falls back to opening the file from disk
+    recoveryOffered = true
+    opened = await offerRecovery(blob, mtime)
+    if (!opened) opened = await openPath(argvPath)
+  } else if (argvPath && intent.kind === 'open-argv') {
+    opened = await openPath(argvPath, { preserveRecovery: intent.preserveRecovery })
+  }
+  // open failure falls through to the normal chain, starting at recovery
+  if (!opened && !recoveryOffered && blob) {
+    opened = await offerRecovery(blob, mtime)
   }
 
-  // 2. auto-reopen the most recent file
+  // 3. auto-reopen the most recent file
   if (!opened && adapter.readPath) {
     const recent = state().recents[0]
     if (recent) {
@@ -331,19 +385,50 @@ export async function launchPersistence(): Promise<void> {
     }
   }
 
-  // 3. fresh document
+  // 4. fresh document
   if (!opened) {
     usePersistStore.setState({ lastSavedDoc: doc() })
   }
   recomputeDirty()
 
-  // 4. subscriptions: dirty/title + recovery autosave
+  // 5. subscriptions: dirty/title + recovery autosave
   useDocStore.subscribe(
     (s) => s.doc,
     () => {
       recomputeDirty()
       scheduleRecoveryAutosave()
     },
+  )
+
+  // 6. second-instance argv relay (Rust single-instance plugin)
+  if (tauri) installOpenFileListener()
+}
+
+async function takeLaunchFile(): Promise<string | null> {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    return (await invoke<string | null>('take_launch_file')) ?? null
+  } catch {
+    return null
+  }
+}
+
+// registered ONCE for the app's lifetime (module-level guard, like the
+// onCloseRequested close guard) — launch may re-run under StrictMode
+let openFileListenerInstalled = false
+function installOpenFileListener(): void {
+  if (openFileListenerInstalled) return
+  openFileListenerInstalled = true
+  void import('@tauri-apps/api/event').then(({ listen }) =>
+    listen<string>('open-file', ({ payload }) => {
+      void (async () => {
+        if (isTxActive()) return
+        if ((await guardDirty()) === 'cancel') return
+        // normal clearRecovery inside the open is correct here: guardDirty
+        // just resolved this session's unsaved work
+        await openPath(payload)
+      })()
+    }),
   )
 }
 
