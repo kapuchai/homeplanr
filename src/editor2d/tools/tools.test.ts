@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDocStore, docTemporal } from '../../store/docStore'
 import { useUiStore } from '../../store/uiStore'
 import { useConfirmStore } from '../../app/confirmStore'
+import { usePersistStore } from '../../store/persistence/controller'
+import type { StorageAdapter } from '../../store/persistence/adapter'
 import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
 import { screenToWorld } from '../viewport/viewportMath'
@@ -736,6 +738,92 @@ describe('2D viewport navigation', () => {
     expect(useViewportStore.getState().k).toBe(100)
     handleKey(key('+'), ctx, registry)
     expect(useViewportStore.getState().k).toBeCloseTo(125, 9)
+  })
+})
+
+describe('keymap 3D gate (M6): file ops stay live, editing keys are 2D-only', () => {
+  beforeEach(() => useUiStore.getState().setViewMode('3d'))
+
+  it('3d: arrows neither nudge furniture nor pan the viewport', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    handleKey(key('ArrowRight'), ctx, registry)
+    flushNudgeForTests()
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+    useUiStore.getState().clearSelection()
+    handleKey(key('ArrowLeft'), ctx, registry)
+    expect(useViewportStore.getState().tx).toBe(0)
+    expect(past()).toBe(1) // only the addSofa entry
+  })
+
+  it('3d: v/w/d/n/m do not switch tools', () => {
+    for (const k of ['w', 'd', 'n', 'm']) {
+      handleKey(key(k), ctx, registry)
+      expect(useUiStore.getState().activeTool).toBe('select')
+    }
+    registry.switchTo(ctx, 'draw-wall')
+    handleKey(key('v'), ctx, registry)
+    expect(useUiStore.getState().activeTool).toBe('draw-wall')
+  })
+
+  it('3d: Delete keeps the entities and the selection', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    handleKey(key('Delete'), ctx, registry)
+    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+    expect(useUiStore.getState().selection).toEqual([id])
+  })
+
+  it('3d: Ctrl+Z does not undo', () => {
+    const id = addSofa()
+    const base = past()
+    handleKey(key('z', { ctrlKey: true }), ctx, registry)
+    expect(past()).toBe(base)
+    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+  })
+
+  it('3d: Ctrl+S still reaches the file ops (save hits the adapter)', async () => {
+    let saveAsCalls = 0
+    const fake: StorageAdapter = {
+      kind: 'browser',
+      openDialog: async () => null,
+      saveAsDialog: async () => {
+        saveAsCalls++
+        return null // "cancelled" — saveProject bails without state changes
+      },
+      saveBinaryDialog: async () => null,
+      setTitle: () => {},
+      installCloseGuard: () => {},
+      message: async () => {},
+    }
+    const prev = usePersistStore.getState().adapter
+    usePersistStore.setState({ adapter: fake })
+    try {
+      let prevented = false
+      handleKey(
+        key('s', { ctrlKey: true, preventDefault: () => (prevented = true) }),
+        ctx,
+        registry,
+      )
+      expect(prevented).toBe(true) // the Ctrl+S branch claimed the key
+      await vi.waitFor(() => expect(saveAsCalls).toBe(1))
+    } finally {
+      usePersistStore.setState({ adapter: prev })
+    }
+  })
+
+  it('2d behaviors unchanged: tools, undo, and arrow pan still work', () => {
+    useUiStore.getState().setViewMode('2d')
+    handleKey(key('w'), ctx, registry)
+    expect(useUiStore.getState().activeTool).toBe('draw-wall')
+    registry.switchTo(ctx, 'select')
+    const id = addSofa()
+    const base = past()
+    handleKey(key('z', { ctrlKey: true }), ctx, registry)
+    expect(past()).toBe(base - 1)
+    expect(useDocStore.getState().doc.furniture[id]).toBeUndefined()
+    handleKey(key('ArrowLeft'), ctx, registry)
+    expect(useViewportStore.getState().tx).toBe(80)
   })
 })
 

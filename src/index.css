@@ -669,3 +669,13 @@ textarea,
   height: 64px;
   object-fit: contain;
 }
+
+/* ---- M6 walk mode: floating Walk / Save-image cluster over the 3D canvas
+   (mirrors .canvas-controls); the walk hint line reuses .status-hint, both
+   positioned by the .view3d-wrapper containing block ---- */
+.view3d-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  pointer-events: auto;
+}

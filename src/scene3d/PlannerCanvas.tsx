@@ -1,5 +1,5 @@
-import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import {
   PMREMGenerator,
@@ -22,6 +22,11 @@ import {
 import { toBufferGeometry } from './mesh/toBufferGeometry'
 import { fitCameraPose, sceneBBox, type SceneBBox } from './mesh/fitCamera'
 import { floorMaterial, itemMaterial, sceneMaterial, wallFaceMaterial } from './sceneMaterials'
+import { WalkControls } from './walk/WalkControls'
+import { useWalkStore } from './walk/walkStore'
+import { getCollisionSet, validateTeleport } from './walk/collision'
+import { worldToPlan } from './walk/walkMath'
+import { captureAndSave, type CaptureApi } from './screenshot'
 import { CATALOG } from '../catalog'
 import { realizeItem } from '../catalog/realize'
 import type { WallSolid, PatchSolid } from '../geometry/wallSolids'
@@ -32,6 +37,7 @@ import type { MaterialId } from '../catalog/types'
  * The full 3D view (M4). Plan-pinned behaviors:
  * - frameloop="demand": static scene; OrbitControls self-invalidates;
  *   doc changes reach the scene ONLY via useSceneDoc (latched while hidden);
+ *   walk mode (M6) flips the loop to "always" for its whole session;
  * - one <group rotation-x={-π/2}> maps plan→world (the single 3D mapping);
  * - memo keys are the DERIVED ENTRY OBJECTS (reference-stable per entity);
  * - shadow flags per mesh: furniture cast; walls/fixtures cast+receive;
@@ -92,10 +98,23 @@ function PatchMesh({ patch }: { patch: PatchSolid }) {
   return <mesh geometry={geo} material={sceneMaterial('wallPaint')} castShadow receiveShadow />
 }
 
-function FloorMesh({ room }: { room: DerivedRoom }) {
+function FloorMesh({
+  room,
+  onClick,
+}: {
+  room: DerivedRoom
+  onClick?: (e: ThreeEvent<MouseEvent>) => void
+}) {
   const geo = useMemo(() => toBufferGeometry(buildFloorMeshData(room.floor)), [room])
   useEffect(() => () => geo.dispose(), [geo])
-  return <mesh geometry={geo} material={floorMaterial(room.room.floorMaterialId)} receiveShadow />
+  return (
+    <mesh
+      geometry={geo}
+      material={floorMaterial(room.room.floorMaterialId)}
+      receiveShadow
+      onClick={onClick}
+    />
+  )
 }
 
 /** Door leaves + window glass/frames from the REALIZED intervals. */
@@ -184,7 +203,13 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
 }
 
 /** IBL + shadow-fitted key light + fog + ground, sized by the sceneBBox. */
-function SceneEnvironment({ box }: { box: SceneBBox }) {
+function SceneEnvironment({
+  box,
+  onGroundClick,
+}: {
+  box: SceneBBox
+  onGroundClick?: (e: ThreeEvent<MouseEvent>) => void
+}) {
   const { gl, scene } = useThree()
   const theme3d = useThemeStore((s) => s.theme3d)
   useEffect(() => {
@@ -222,7 +247,12 @@ function SceneEnvironment({ box }: { box: SceneBBox }) {
       <fog attach="fog" args={[theme3d.fog, 2 * box.diag + 10, 6 * box.diag + 30]} />
       {/* ground disc at z = −1cm (kills floor coplanarity) */}
       <group rotation-x={-Math.PI / 2}>
-        <mesh position={[box.cx, box.cy, -0.01]} receiveShadow material={sceneMaterial('ground')}>
+        <mesh
+          position={[box.cx, box.cy, -0.01]}
+          receiveShadow
+          material={sceneMaterial('ground')}
+          onClick={onGroundClick}
+        >
           <circleGeometry args={[groundR, 48]} />
         </mesh>
       </group>
@@ -271,6 +301,20 @@ function InvalidateBridge() {
   return null
 }
 
+/** Exposes {gl, scene, camera} to the overlay's Save-image button. */
+function CaptureBridge({ apiRef }: { apiRef: RefObject<CaptureApi | null> }) {
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
+  useEffect(() => {
+    apiRef.current = { gl, scene, camera }
+    return () => {
+      apiRef.current = null
+    }
+  }, [gl, scene, camera, apiRef])
+  return null
+}
+
 function ContextGuard({ onLost }: { onLost: () => void }) {
   const gl = useThree((s) => s.gl)
   useEffect(() => {
@@ -295,6 +339,29 @@ export function PlannerCanvas() {
   const failFlag = useRef(
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('failgl'),
   )
+  const walkMode = useWalkStore((s) => s.mode)
+  const walkHint = useWalkStore((s) => s.hint)
+  const captureApi = useRef<CaptureApi | null>(null)
+
+  // shared by every floor AND the ground disc — walk-mode click-to-go
+  const handleFloorClick = (e: ThreeEvent<MouseEvent>) => {
+    const walk = useWalkStore.getState()
+    if (walk.mode === 'off') return
+    e.stopPropagation() // the ray often hits floor + ground disc — act once
+    if (e.delta > 4) return // r3f px-move metric: that was a drag, not a click
+    const plan = worldToPlan([e.point.x, e.point.y, e.point.z])
+    const ok = validateTeleport(getCollisionSet(doc, derived), plan)
+    if (ok) walk.requestWalkTo(ok)
+    else walk.setHint('That spot is inside a wall')
+  }
+
+  const hint =
+    walkHint ??
+    (walkMode === 'arming'
+      ? 'Click a floor to start walking · Esc exits'
+      : walkMode === 'walking'
+        ? 'WASD/arrows move · Shift sprints · drag looks · click floor teleports · Esc exits'
+        : null)
 
   if (glError) {
     return (
@@ -320,10 +387,16 @@ export function PlannerCanvas() {
   }
 
   return (
-    <div className="view3d-wrapper">
+    <div
+      className="view3d-wrapper"
+      style={walkMode === 'arming' ? { cursor: 'crosshair' } : undefined}
+    >
       <GlErrorBoundary key={epoch} onError={setGlError}>
         <Canvas
-        frameloop="demand"
+        // r3f v9 re-applies this prop on EVERY Canvas render (root.configure),
+        // so it must agree with WalkControls' imperative setFrameloop — a
+        // constant "demand" would silently starve the walk loop mid-session.
+        frameloop={walkMode === 'walking' ? 'always' : 'demand'}
         shadows
         dpr={[1, 2]}
         camera={{ position: pose.position, fov: 45, near: 0.1, far: 500 }}
@@ -338,9 +411,12 @@ export function PlannerCanvas() {
         <ContextGuard onLost={() => setGlError('The WebGL context was lost (GPU reset or driver issue).')} />
         <InvalidateBridge />
         <ThemeBridge3D />
-        <SceneEnvironment box={box} />
+        <CaptureBridge apiRef={captureApi} />
+        <WalkControls doc={doc} derived={derived} />
+        <SceneEnvironment box={box} onGroundClick={handleFloorClick} />
         <OrbitControls
           makeDefault
+          enabled={walkMode !== 'walking'}
           enableDamping
           dampingFactor={0.08}
           zoomToCursor
@@ -361,7 +437,7 @@ export function PlannerCanvas() {
             <PatchMesh key={p.nodeId} patch={p} />
           ))}
           {Object.values(derived.rooms).map((r) => (
-            <FloorMesh key={r.roomId} room={r} />
+            <FloorMesh key={r.roomId} room={r} onClick={handleFloorClick} />
           ))}
           {Object.values(doc.furniture).map((f) => (
             <Furniture3D key={f.id} f={f} />
@@ -369,6 +445,35 @@ export function PlannerCanvas() {
         </group>
       </Canvas>
       </GlErrorBoundary>
+      <div className="view3d-controls segmented small">
+        <button
+          type="button"
+          aria-label="Walk"
+          aria-pressed={walkMode !== 'off'}
+          className={walkMode !== 'off' ? 'active' : ''}
+          title="Walk around (click a floor to start)"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            const walk = useWalkStore.getState()
+            if (walk.mode === 'off') walk.arm()
+            else walk.exit()
+          }}
+        >
+          Walk
+        </button>
+        <button
+          type="button"
+          title="Save the current 3D view as a PNG"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            const api = captureApi.current
+            if (api) void captureAndSave(api, useDocStore.getState().doc.name)
+          }}
+        >
+          Save image
+        </button>
+      </div>
+      {hint && <div className="status-hint">{hint}</div>}
     </div>
   )
 }

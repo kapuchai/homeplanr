@@ -1,0 +1,379 @@
+import { useEffect, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { Euler, Quaternion, Vector3, type EulerOrder } from 'three'
+import type { ProjectDocument } from '../../model/types'
+import type { DerivedGeometry } from '../../store/derived'
+import type { Vec2 } from '../../geometry/vec'
+import { useUiStore } from '../../store/uiStore'
+import { useConfirmStore } from '../../app/confirmStore'
+import { useWalkStore } from './walkStore'
+import { EYE_HEIGHT, getCollisionSet, resolveMove } from './collision'
+import {
+  clampPitch,
+  eyePoseFor,
+  moveDelta,
+  planToWorld,
+  smoothstep,
+  type MoveKeys,
+} from './walkMath'
+
+/**
+ * First-person walk mode (M6), mounted INSIDE the Canvas. Enter/teleport/
+ * exit are eased glides driven by useFrame; the frameloop is switched to
+ * 'always' for the whole walking span and back to 'demand' on exit. Input
+ * is buffered out during glides: mid-glide clicks are consumed and
+ * dropped, keys and look-drags apply only while free-walking.
+ *
+ * Exit paths (all restore the orbit pose, rotation order, frameloop, and
+ * reset the walk store): Esc / the overlay Walk button glide back 0.5s;
+ * a viewMode switch to 2D and unmount (context-loss epoch remount)
+ * restore instantly.
+ */
+const LOOK_SENSITIVITY = 0.0032
+const ENTER_GLIDE_S = 0.65
+const GLIDE_S = 0.5
+const MAX_FRAME_DT = 0.05
+
+/** Structural view of drei's makeDefault OrbitControls (state.controls). */
+interface OrbitLike {
+  enabled: boolean
+  target: Vector3
+  update: () => void
+}
+
+interface SavedPose {
+  position: Vector3
+  quaternion: Quaternion
+  order: EulerOrder
+  target: Vector3
+}
+
+interface Glide {
+  kind: 'enter' | 'teleport' | 'exit'
+  t: number
+  dur: number
+  fromPos: Vector3
+  toPos: Vector3
+  /** null quats (teleport) keep the current orientation. */
+  fromQuat: Quaternion | null
+  toQuat: Quaternion | null
+  /** Plan-space landing point for enter/teleport. */
+  endPlan: Vec2 | null
+}
+
+const freshKeys = (): MoveKeys => ({
+  forward: false,
+  back: false,
+  left: false,
+  right: false,
+  sprint: false,
+})
+
+export function WalkControls({
+  doc,
+  derived,
+}: {
+  doc: ProjectDocument
+  derived: DerivedGeometry
+}) {
+  const camera = useThree((s) => s.camera)
+  const gl = useThree((s) => s.gl)
+  const controls = useThree((s) => s.controls) as unknown as OrbitLike | null
+  const setFrameloop = useThree((s) => s.setFrameloop)
+  const invalidate = useThree((s) => s.invalidate)
+  const mode = useWalkStore((s) => s.mode)
+
+  const pose = useRef<SavedPose | null>(null)
+  const glide = useRef<Glide | null>(null)
+  const plan = useRef<Vec2>({ x: 0, y: 0 })
+  const yaw = useRef(0)
+  const pitch = useRef(0)
+  const keys = useRef<MoveKeys>(freshKeys())
+  const drag = useRef<{ pointerId: number; x: number; y: number } | null>(null)
+  const exitRequested = useRef(false)
+
+  const beginEnter = (target: Vec2) => {
+    pose.current = {
+      position: camera.position.clone(),
+      quaternion: camera.quaternion.clone(),
+      order: camera.rotation.order,
+      target: controls ? controls.target.clone() : new Vector3(),
+    }
+    const dir = camera.getWorldDirection(new Vector3())
+    const eye = eyePoseFor(
+      [camera.position.x, camera.position.y, camera.position.z],
+      { x: dir.x, z: dir.z },
+      target,
+    )
+    // order first, then drive the quaternion — the linked euler re-syncs as YXZ
+    camera.rotation.order = 'YXZ'
+    yaw.current = eye.yaw
+    pitch.current = eye.pitch
+    plan.current = { x: target.x, y: target.y }
+    glide.current = {
+      kind: 'enter',
+      t: 0,
+      dur: ENTER_GLIDE_S,
+      fromPos: pose.current.position.clone(),
+      toPos: new Vector3(...planToWorld(target, EYE_HEIGHT)),
+      fromQuat: pose.current.quaternion.clone(),
+      toQuat: new Quaternion().setFromEuler(new Euler(eye.pitch, eye.yaw, 0, 'YXZ')),
+      endPlan: target,
+    }
+  }
+
+  const beginTeleport = (target: Vec2) => {
+    glide.current = {
+      kind: 'teleport',
+      t: 0,
+      dur: GLIDE_S,
+      fromPos: camera.position.clone(),
+      toPos: new Vector3(...planToWorld(target, EYE_HEIGHT)),
+      fromQuat: null,
+      toQuat: null,
+      endPlan: target,
+    }
+  }
+
+  const finishRestore = () => {
+    const saved = pose.current
+    if (saved) {
+      camera.rotation.order = saved.order
+      camera.position.copy(saved.position)
+      camera.quaternion.copy(saved.quaternion)
+      if (controls) {
+        controls.target.copy(saved.target)
+        controls.update()
+      }
+    }
+    pose.current = null
+    glide.current = null
+    keys.current = freshKeys()
+    drag.current = null
+    exitRequested.current = false
+    const walk = useWalkStore.getState()
+    walk._consumeTarget()
+    walk.setHint(null)
+    walk._setMode('off')
+    setFrameloop('demand')
+    invalidate()
+  }
+
+  const beginExit = () => {
+    const saved = pose.current
+    if (!saved) {
+      finishRestore()
+      return
+    }
+    glide.current = {
+      kind: 'exit',
+      t: 0,
+      dur: GLIDE_S,
+      fromPos: camera.position.clone(),
+      toPos: saved.position.clone(),
+      fromQuat: camera.quaternion.clone(),
+      toQuat: saved.quaternion.clone(),
+      endPlan: null,
+    }
+  }
+
+  const instantRestore = () => {
+    if (useWalkStore.getState().mode === 'off' && !pose.current) return
+    finishRestore()
+  }
+
+  // latest-impl refs so subscriptions/cleanup never call stale closures
+  const finishRestoreRef = useRef(finishRestore)
+  finishRestoreRef.current = finishRestore
+  const beginExitRef = useRef(beginExit)
+  beginExitRef.current = beginExit
+  const instantRestoreRef = useRef(instantRestore)
+  instantRestoreRef.current = instantRestore
+
+  // store bridges: frameloop kick on enter, exit requests, 2D bail-out
+  useEffect(() => {
+    const unsubMode = useWalkStore.subscribe(
+      (s) => s.mode,
+      (m) => {
+        if (m === 'walking') {
+          setFrameloop('always')
+          invalidate()
+        }
+      },
+    )
+    const unsubExit = useWalkStore.subscribe(
+      (s) => s.exitSeq,
+      () => {
+        if (useWalkStore.getState().mode === 'walking') {
+          exitRequested.current = true
+          invalidate() // make sure a frame runs to pick the request up
+        }
+      },
+    )
+    const unsubView = useUiStore.subscribe(
+      (s) => s.viewMode,
+      (m) => {
+        if (m === '2d') instantRestoreRef.current()
+      },
+    )
+    return () => {
+      unsubMode()
+      unsubExit()
+      unsubView()
+    }
+  }, [setFrameloop, invalidate])
+
+  // unmount (context-loss epoch remount / app teardown): instant restore
+  useEffect(() => () => instantRestoreRef.current(), [])
+
+  // keyboard: movement keys + Esc, active whenever walk mode is armed/on
+  const active = mode !== 'off'
+  useEffect(() => {
+    if (!active) return
+    const modalOpen = () =>
+      useConfirmStore.getState().pending !== null || useUiStore.getState().optionsOpen
+    const editable = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable)
+    const setKey = (code: string, down: boolean): boolean => {
+      const k = keys.current
+      switch (code) {
+        case 'KeyW':
+        case 'ArrowUp':
+          k.forward = down
+          return true
+        case 'KeyS':
+        case 'ArrowDown':
+          k.back = down
+          return true
+        case 'KeyA':
+        case 'ArrowLeft':
+        case 'KeyQ':
+          k.left = down
+          return true
+        case 'KeyD':
+        case 'ArrowRight':
+        case 'KeyE':
+          k.right = down
+          return true
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          k.sprint = down
+          return true
+        default:
+          return false
+      }
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (modalOpen() || editable(e.target)) return
+      if (e.key === 'Escape') {
+        useWalkStore.getState().exit()
+        return
+      }
+      if (setKey(e.code, true) && useWalkStore.getState().mode === 'walking') e.preventDefault()
+    }
+    // keyup is never guarded — a key released behind a modal must not stick
+    const onKeyUp = (e: KeyboardEvent) => setKey(e.code, false)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      keys.current = freshKeys()
+    }
+  }, [active])
+
+  // look: capture-drag on the canvas while walking (no pointer-lock)
+  useEffect(() => {
+    if (mode !== 'walking') return
+    const el = gl.domElement
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 || glide.current) return
+      drag.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY }
+      el.setPointerCapture(e.pointerId)
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      const d = drag.current
+      if (!d || d.pointerId !== e.pointerId || glide.current) return
+      const dx = e.clientX - d.x
+      const dy = e.clientY - d.y
+      d.x = e.clientX
+      d.y = e.clientY
+      yaw.current -= dx * LOOK_SENSITIVITY
+      pitch.current = clampPitch(pitch.current - dy * LOOK_SENSITIVITY)
+      camera.rotation.set(pitch.current, yaw.current, 0)
+    }
+    const endDrag = (e: PointerEvent) => {
+      if (drag.current?.pointerId !== e.pointerId) return
+      drag.current = null
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+    }
+    el.addEventListener('pointerdown', onPointerDown)
+    el.addEventListener('pointermove', onPointerMove)
+    el.addEventListener('pointerup', endDrag)
+    el.addEventListener('pointercancel', endDrag)
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('pointermove', onPointerMove)
+      el.removeEventListener('pointerup', endDrag)
+      el.removeEventListener('pointercancel', endDrag)
+      drag.current = null
+    }
+  }, [mode, gl, camera])
+
+  useFrame((_, delta) => {
+    const walk = useWalkStore.getState()
+    if (walk.mode !== 'walking' && !glide.current) return
+
+    // consume queued clicks up front; mid-glide ones are dropped
+    const target = walk.pendingTarget ? walk._consumeTarget() : null
+
+    const g = glide.current
+    if (g) {
+      if (exitRequested.current && g.kind !== 'exit') {
+        // Esc mid-glide: bail out from the current mid-flight pose
+        exitRequested.current = false
+        beginExitRef.current()
+        return
+      }
+      g.t += delta
+      const k = smoothstep(g.t / g.dur)
+      camera.position.lerpVectors(g.fromPos, g.toPos, k)
+      if (g.fromQuat && g.toQuat) camera.quaternion.slerpQuaternions(g.fromQuat, g.toQuat, k)
+      if (g.t >= g.dur) {
+        glide.current = null
+        if (g.kind === 'exit') {
+          finishRestoreRef.current()
+        } else {
+          if (g.endPlan) plan.current = { x: g.endPlan.x, y: g.endPlan.y }
+          camera.position.set(...planToWorld(plan.current, EYE_HEIGHT))
+          camera.rotation.set(pitch.current, yaw.current, 0)
+        }
+      }
+      return
+    }
+
+    if (exitRequested.current) {
+      exitRequested.current = false
+      beginExitRef.current()
+      return
+    }
+
+    if (target) {
+      if (!pose.current) beginEnter(target)
+      else beginTeleport(target)
+      return
+    }
+
+    // free walking: substepped collision slide in plan space
+    const dt = Math.min(delta, MAX_FRAME_DT)
+    const d = moveDelta(keys.current, yaw.current, dt)
+    if (d.x !== 0 || d.y !== 0) {
+      plan.current = resolveMove(getCollisionSet(doc, derived), plan.current, d)
+    }
+    camera.position.set(...planToWorld(plan.current, EYE_HEIGHT))
+    camera.rotation.set(pitch.current, yaw.current, 0)
+  })
+
+  return null
+}

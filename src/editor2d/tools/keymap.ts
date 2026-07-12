@@ -18,6 +18,8 @@ import type { ProjectDocument } from '../../model/types'
  *   focus (only Esc blurs);
  * - browser accelerators (F5, Ctrl+R/P/F/J) are suppressed everywhere;
  * - undo/redo/Del/file/tool-switch are gated while a transaction is live;
+ * - 3D view: file ops (Ctrl+N/O/S/Shift+S) stay live, everything below the
+ *   3D gate is 2D-only (walk mode owns its keys via WalkControls);
  * - Esc ladder: ① tool gesture/state → ② switch to select → ③ deselect.
  *
  * handleKey is DOM-free (headless-testable); Editor2D adapts real
@@ -105,6 +107,11 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
       return
     }
   }
+
+  // 3D view: only the file accelerators above stay live — every editing/
+  // navigation shortcut below is 2D-only (walk-mode WASD/Esc/arrows belong
+  // to WalkControls' own listeners)
+  if (ui.viewMode === '3d') return
 
   // undo/redo (gated inside safeUndo/safeRedo as well)
   if (e.ctrlKey && key.toLowerCase() === 'z') {

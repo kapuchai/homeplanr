@@ -48,6 +48,13 @@ function partGeometry(p: Part): BufferGeometry {
     const h = axis === 'z' ? p.h * (p.scale?.[2] ?? 1) : 0
     geo.translate(p.at[0], p.at[1], p.at[2] + h / 2)
   }
+  // mergeGeometries requires all-indexed or all-non-indexed; RoundedBox is
+  // non-indexed while Box/Cylinder are indexed — normalize so any slot mix merges
+  if (geo.index) {
+    const soup = geo.toNonIndexed()
+    geo.dispose()
+    return soup
+  }
   return geo
 }
 
@@ -66,6 +73,7 @@ export function realizeItem(item: CatalogItem, opts?: { mirrored?: boolean }): R
   for (const [mat, geos] of bySlot) {
     const merged = mergeGeometries(geos, false)
     if (merged) groups.push({ mat, geometry: merged })
+    else console.warn(`realizeItem: slot merge failed — dropping '${mat}' of ${item.id}`)
     for (const g of geos) g.dispose()
   }
   const realized: RealizedItem = { groups }

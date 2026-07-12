@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { BufferGeometry } from 'three'
 import { CATALOG } from './index'
 import { realizeItem } from './realize'
+import { collectParts } from './builder'
 
 /**
  * realizeItem mirrored-variant pins (M4 flip). Mirroring is PART-LEVEL
@@ -122,5 +123,23 @@ describe('realizeItem mirrored', () => {
       found++
     }
     expect(found).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('slot merging never drops groups', () => {
+  // Regression: RoundedBox (non-indexed) mixed with Box/Cylinder (indexed) in
+  // one slot made mergeGeometries fail and the slot silently vanish —
+  // partGeometry now normalizes to non-indexed so any mix merges.
+  it('every catalog item (both variants) yields one geometry per used slot', () => {
+    for (const item of Object.values(CATALOG)) {
+      const usedSlots = new Set(collectParts((b) => item.build3d(b, item.dims)).map((p) => p.mat))
+      for (const mirrored of [false, true]) {
+        const r = realizeItem(item, { mirrored })
+        expect(r.groups.map((g) => g.mat).sort(), `${item.id}${mirrored ? '|m' : ''}`).toEqual(
+          [...usedSlots].sort(),
+        )
+        for (const g of r.groups) expect(g.geometry.getAttribute('position').count).toBeGreaterThan(0)
+      }
+    }
   })
 })
