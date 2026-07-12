@@ -16,6 +16,7 @@ import {
   saveProjectAs,
   usePersistStore,
 } from './store/persistence/controller'
+import { exportImage } from './export/exportController'
 import { switchTool } from './editor2d/tools/toolRegistry'
 import { CatalogPanel } from './app/CatalogPanel'
 import { PropertiesPanel } from './app/PropertiesPanel'
@@ -69,6 +70,13 @@ function FileMenu() {
             </button>
             <button type="button" onClick={run(saveProjectAs)}>
               Save As… <kbd>Ctrl+Shift+S</kbd>
+            </button>
+            <div className="menu-sep" />
+            <button type="button" onClick={run(() => exportImage('png'))}>
+              Export PNG…
+            </button>
+            <button type="button" onClick={run(() => exportImage('svg'))}>
+              Export SVG…
             </button>
             {canRecent && recents.length > 0 && (
               <>

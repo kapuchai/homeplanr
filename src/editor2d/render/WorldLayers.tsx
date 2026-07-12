@@ -4,69 +4,26 @@ import { useUiStore } from '../../store/uiStore'
 import { useAppSettings } from '../../store/appSettings'
 import { formatArea } from '../../format/units'
 import { useViewportStore } from '../viewport/viewportStore'
-import { getDerived, type DerivedGeometry, type DerivedRoom } from '../../store/derived'
+import { getDerived, type DerivedGeometry } from '../../store/derived'
 import type { ProjectDocument } from '../../model/types'
-import type { Vec2 } from '../../geometry/vec'
 import { add, normalize, perp, scale, sub } from '../../geometry/vec'
-import { FLOOR_IDS, floorSpec, WALL_PAINTS } from '../../catalog/palette'
+import { WALL_PAINTS } from '../../catalog/palette'
 import { CATALOG } from '../../catalog'
 import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { DimensionsLayer } from './DimensionsLayer'
+import { openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
 import { rotateHandlePos } from '../tools/handles'
 import { useThemeStore } from '../../theme/themeStore'
-import type { Theme2D } from '../../theme/theme2d'
-import type { WallSolid } from '../../geometry/wallSolids'
 
 /**
  * Read-only world rendering (M2). Layer order (bottom→top): rooms → walls
  * (ONE path incl. patches; opening cover rects) → opening symbols →
  * furniture → room labels → wall dimensions → selection outlines. All
- * strokes non-scaling.
+ * strokes non-scaling. The pure geometry lives in planGeometry.ts, shared
+ * with the SVG exporter.
  * M3a refactors to per-entity subscriptions when drags land.
  */
-const polyPath = (poly: readonly Vec2[]): string =>
-  poly.length ? `M ${poly.map((p) => `${p.x} ${p.y}`).join(' L ')} Z` : ''
-
-const worldPoint = (s: WallSolid, u: number, v: number): Vec2 =>
-  add(add(s.frame.origin, scale(s.frame.dir, u)), scale(perp(s.frame.dir), v))
-
-/**
- * Light tint of a floor color: mix(color, white, 0.55) — channels lerp
- * toward 255 (no hex literal here; lint:colors). Memoized per (id, theme).
- */
-const floorTints = new WeakMap<Theme2D, Map<string, string>>()
-function floorTint(floorId: string, theme: Theme2D): string {
-  let byId = floorTints.get(theme)
-  if (!byId) {
-    byId = new Map()
-    floorTints.set(theme, byId)
-  }
-  const hit = byId.get(floorId)
-  if (hit) return hit
-  const hex = floorSpec(floorId).color
-  const mixed = [0, 1, 2]
-    .map((i) => {
-      const c = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)
-      return Math.round(c + (255 - c) * 0.55)
-        .toString(16)
-        .padStart(2, '0')
-    })
-    .join('')
-  const out = '#' + mixed
-  byId.set(floorId, out)
-  return out
-}
-
-function roomFill(room: DerivedRoom, theme: Theme2D): string {
-  const floorId = room.room.floorMaterialId
-  if (floorId !== undefined && FLOOR_IDS.has(floorId)) return floorTint(floorId, theme)
-  // id-hash pastel — unchanged so docs without floor materials render as before
-  const roomId = room.roomId
-  let h = 0
-  for (let i = 0; i < roomId.length; i++) h = (h * 31 + roomId.charCodeAt(i)) >>> 0
-  return theme.roomFills[h % theme.roomFills.length]!
-}
 
 export function WorldLayers() {
   const doc = useDocStore((s) => s.doc)
@@ -146,16 +103,12 @@ function WallsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGe
     for (const solid of Object.values(derived.wallSolids)) {
       const wall = doc.walls[solid.wallId]
       if (!wall) continue
-      const half = wall.thickness / 2 + 0.002
       for (const op of solid.openings) {
+        const model = doc.openings[op.openingId]
+        if (!model) continue
         out.push({
           key: op.openingId,
-          d: polyPath([
-            worldPoint(solid, op.u0, -half),
-            worldPoint(solid, op.u1, -half),
-            worldPoint(solid, op.u1, half),
-            worldPoint(solid, op.u0, half),
-          ]),
+          d: polyPath(openingSymbol(solid, wall, op, model).coverRect),
         })
       }
     }
@@ -184,60 +137,28 @@ function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: Derive
   for (const solid of Object.values(derived.wallSolids)) {
     const wall = doc.walls[solid.wallId]
     if (!wall) continue
-    const half = wall.thickness / 2
     for (const op of solid.openings) {
       const model = doc.openings[op.openingId]
       if (!model) continue
-      // jamb ticks across the wall at both ends of the gap
-      const jambs = (
+      // all geometry (incl. the EMPIRICALLY PINNED door-arc sweep — see
+      // planGeometry + RUNBOOK) comes from the shared helper
+      const sym = openingSymbol(solid, wall, op, model)
+      els.push(
         <g key={`${op.openingId}-j`}>
-          <line
-            x1={worldPoint(solid, op.u0, -half).x}
-            y1={worldPoint(solid, op.u0, -half).y}
-            x2={worldPoint(solid, op.u0, half).x}
-            y2={worldPoint(solid, op.u0, half).y}
-            {...hair}
-          />
-          <line
-            x1={worldPoint(solid, op.u1, -half).x}
-            y1={worldPoint(solid, op.u1, -half).y}
-            x2={worldPoint(solid, op.u1, half).x}
-            y2={worldPoint(solid, op.u1, half).y}
-            {...hair}
-          />
-        </g>
+          <line {...sym.jambs[0]} {...hair} />
+          <line {...sym.jambs[1]} {...hair} />
+        </g>,
       )
-      els.push(jambs)
-      if (op.kind === 'window') {
-        // triple line along the gap
-        for (const v of [-half / 2, 0, half / 2]) {
-          const a = worldPoint(solid, op.u0, v)
-          const b = worldPoint(solid, op.u1, v)
-          els.push(
-            <line key={`${op.openingId}-w${v}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} {...hair} />,
-          )
-        }
-      } else if (model.kind === 'door') {
-        const width = op.u1 - op.u0
-        const hingeU = model.hinge === 'a' ? op.u0 : op.u1
-        const farU = model.hinge === 'a' ? op.u1 : op.u0
-        // leaf drawn open 90°: from the hinge jamb corner, perpendicular to
-        // the wall on the swing side ('front' = +perp of a→b)
-        const swingSign = model.swing === 'front' ? 1 : -1
-        const vJamb = swingSign * half
-        const hinge = worldPoint(solid, hingeU, vJamb)
-        const leafEnd = worldPoint(solid, hingeU, vJamb + swingSign * width)
-        const far = worldPoint(solid, farU, vJamb)
-        // Empirically pinned by TWO user checks (M2 y-down, M6 y-up): the
-        // y-flip mirrors both the sweep sense AND the leaf side, so the
-        // original value stands. Do not re-derive from theory — check the
-        // rendered arc.
-        const sweep = (model.hinge === 'a') === (model.swing === 'front') ? 0 : 1
+      sym.windowLines?.forEach((l, i) => {
+        els.push(<line key={`${op.openingId}-w${i}`} {...l} {...hair} />)
+      })
+      if (sym.door) {
+        const { leaf, arc } = sym.door
         els.push(
           <g key={`${op.openingId}-d`}>
-            <line x1={hinge.x} y1={hinge.y} x2={leafEnd.x} y2={leafEnd.y} {...hair} />
+            <line {...leaf} {...hair} />
             <path
-              d={`M ${leafEnd.x} ${leafEnd.y} A ${width} ${width} 0 0 ${sweep} ${far.x} ${far.y}`}
+              d={`M ${arc.from.x} ${arc.from.y} A ${arc.r} ${arc.r} 0 0 ${arc.sweep} ${arc.to.x} ${arc.to.y}`}
               {...hair}
               strokeWidth={0.75}
             />
