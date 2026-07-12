@@ -2,8 +2,16 @@ import { create } from 'zustand'
 
 /**
  * In-app modal prompt (plugin-dialog maxes out at two buttons — the
- * Save/Discard/Cancel guard needs three). One pending prompt at a time;
- * ConfirmDialog renders it, resolve() settles the awaiting promise.
+ * Save/Discard/Cancel guard needs three). Prompts QUEUE in FIFO order: a
+ * prompt arriving while another is visible waits its turn — the old policy
+ * force-resolved the visible one as its last button, silently answering a
+ * question the user never saw (for the recovery prompt that answer was
+ * Discard, i.e. destroying the crash blob).
+ *
+ * Escape resolves the VISIBLE prompt to its `escValue` — non-destructive by
+ * contract. It defaults to the last button (cancel-shaped in every 3-button
+ * guard); any prompt whose last button is destructive (Restore/Discard)
+ * MUST pass an explicit safe escValue.
  */
 export interface ConfirmButton<T extends string = string> {
   label: string
@@ -15,33 +23,42 @@ interface PendingPrompt {
   title: string
   message: string
   buttons: ConfirmButton[]
+  escValue: string
   resolve: (value: string) => void
 }
 
 interface ConfirmState {
   pending: PendingPrompt | null
+  queue: PendingPrompt[]
   prompt: <T extends string>(
     title: string,
     message: string,
     buttons: ConfirmButton<T>[],
+    opts?: { escValue?: T },
   ) => Promise<T>
   resolve: (value: string) => void
 }
 
 export const useConfirmStore = create<ConfirmState>()((set, get) => ({
   pending: null,
-  prompt: (title, message, buttons) =>
+  queue: [],
+  prompt: (title, message, buttons, opts) =>
     new Promise((resolve) => {
-      // settle any orphaned prompt as its last (cancel-ish) button
-      const prev = get().pending
-      if (prev) prev.resolve(prev.buttons[prev.buttons.length - 1]!.value)
-      set({
-        pending: { title, message, buttons, resolve: resolve as (v: string) => void },
-      })
+      const entry: PendingPrompt = {
+        title,
+        message,
+        buttons,
+        escValue: opts?.escValue ?? buttons[buttons.length - 1]!.value,
+        resolve: resolve as (v: string) => void,
+      }
+      if (get().pending) set((s) => ({ queue: [...s.queue, entry] }))
+      else set({ pending: entry })
     }),
   resolve: (value) => {
     const p = get().pending
-    set({ pending: null })
-    p?.resolve(value)
+    if (!p) return
+    const [next, ...rest] = get().queue
+    set({ pending: next ?? null, queue: rest })
+    p.resolve(value)
   },
 }))

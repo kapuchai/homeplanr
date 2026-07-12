@@ -1,8 +1,19 @@
+import { useEffect, useRef } from 'react'
 import { useConfirmStore } from './confirmStore'
 
 export function ConfirmDialog() {
   const pending = useConfirmStore((s) => s.pending)
   const resolve = useConfirmStore((s) => s.resolve)
+  // when a QUEUED prompt is promoted (prompt→prompt transition), swallow
+  // clicks for a beat: the second click of a double-click on the previous
+  // prompt's button must not fall through onto this one's same-position
+  // (possibly destructive) button. First-from-empty prompts arm instantly.
+  const armedAt = useRef(0)
+  const prevPending = useRef<typeof pending>(null)
+  useEffect(() => {
+    armedAt.current = prevPending.current && pending ? performance.now() + 250 : 0
+    prevPending.current = pending
+  }, [pending])
   if (!pending) return null
   return (
     <div className="modal-backdrop">
@@ -15,7 +26,10 @@ export function ConfirmDialog() {
               key={b.value}
               type="button"
               className={b.variant ?? 'plain'}
-              onClick={() => resolve(b.value)}
+              onClick={() => {
+                if (performance.now() < armedAt.current) return
+                resolve(b.value)
+              }}
             >
               {b.label}
             </button>

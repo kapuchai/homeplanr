@@ -14,7 +14,9 @@ export function createBrowserStorage(): StorageAdapter {
         const input = document.createElement('input')
         input.type = 'file'
         input.accept = '.homeplanr,.json,application/json'
+        let fileChosen = false
         input.onchange = () => {
+          fileChosen = true
           const file = input.files?.[0]
           if (!file) return resolve(null)
           const reader = new FileReader()
@@ -24,9 +26,14 @@ export function createBrowserStorage(): StorageAdapter {
           reader.readAsText(file)
         }
         // cancel fires no event reliably — resolve(null) if focus returns
+        // WITHOUT a chosen file (a slow FileReader must not lose the race
+        // against this timer and read as a cancel)
         window.addEventListener(
           'focus',
-          () => setTimeout(() => resolve(null), 400),
+          () =>
+            setTimeout(() => {
+              if (!fileChosen) resolve(null)
+            }, 400),
           { once: true },
         )
         input.click()

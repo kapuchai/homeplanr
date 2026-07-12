@@ -112,7 +112,9 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   const confirm = useConfirmStore.getState()
   if (confirm.pending || ctx.ui().optionsOpen) {
     if (e.key === 'Escape' && confirm.pending) {
-      confirm.resolve(confirm.pending.buttons[confirm.pending.buttons.length - 1]!.value)
+      // per-prompt escValue: non-destructive by contract (the recovery
+      // prompt's Esc must never mean Discard)
+      confirm.resolve(confirm.pending.escValue)
     }
     return
   }

@@ -130,40 +130,81 @@ function scheduleRecoveryAutosave(): void {
 
 const clearRecovery = () => localStorage.removeItem(RECOVERY_KEY)
 
+// ---------- op serialization ----------
+// Doc-replacing operations run ONE at a time: a second request (second
+// window relay, menu click while a guard prompt is up) queues behind the
+// first instead of interleaving its awaits with it — each queued op
+// re-checks dirty/world state when its turn comes. Never wrap saveProject
+// (it runs INSIDE guarded ops via guardDirty — wrapping would deadlock).
+let opChain: Promise<unknown> = Promise.resolve()
+function serialized<T>(fn: () => Promise<T>): Promise<T> {
+  const run = opChain.then(fn, fn)
+  opChain = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
+// ---------- tx-idle wait ----------
+/**
+ * Wait briefly for a live drag transaction to finish instead of silently
+ * dropping the request (double-clicking a file mid-drag used to focus the
+ * window and then do nothing). False after the timeout — caller surfaces it.
+ */
+async function whenTxIdle(timeoutMs = 2000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (isTxActive()) {
+    if (Date.now() > deadline) return false
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  return true
+}
+
+async function reportBusy(): Promise<void> {
+  await state().adapter.message('Busy', 'A drag is in progress — finish it and try again.')
+}
+
 // ---------- guard ----------
 export type GuardChoice = 'save' | 'discard' | 'cancel'
 
 export async function guardDirty(): Promise<GuardChoice> {
-  if (!state().dirty) return 'discard' // clean: nothing to guard
-  const choice = await useConfirmStore.getState().prompt<GuardChoice>(
-    'Unsaved changes',
-    `“${doc().name}” has unsaved changes.`,
-    [
-      { label: 'Save', value: 'save', variant: 'primary' },
-      { label: 'Discard', value: 'discard', variant: 'danger' },
-      { label: 'Cancel', value: 'cancel', variant: 'plain' },
-    ],
-  )
-  if (choice === 'save') {
-    const ok = await saveProject()
-    return ok ? 'save' : 'cancel' // failed/cancelled save aborts the action
+  // loop: a successful save no longer implies clean — edits landing under
+  // the Save-As dialog (S1 snapshot semantics) leave NEW unsaved work that
+  // must be re-guarded, not destroyed by the caller's doc replacement
+  for (;;) {
+    if (!state().dirty) return 'discard' // clean: nothing to guard
+    const choice = await useConfirmStore.getState().prompt<GuardChoice>(
+      'Unsaved changes',
+      `“${doc().name}” has unsaved changes.`,
+      [
+        { label: 'Save', value: 'save', variant: 'primary' },
+        { label: 'Discard', value: 'discard', variant: 'danger' },
+        { label: 'Cancel', value: 'cancel', variant: 'plain' },
+      ],
+    )
+    if (choice !== 'save') return choice
+    if (!(await saveProject())) return 'cancel' // failed/cancelled save aborts
+    if (!state().dirty) return 'save'
+    // mid-save edits exist — prompt again for them
   }
-  return choice
 }
 
 // ---------- core ops (the state matrix) ----------
-export async function newProject(): Promise<void> {
-  if (isTxActive()) return
-  if ((await guardDirty()) === 'cancel') return
-  const fresh = emptyDocument(newProjectId(), 'Untitled', new Date().toISOString())
-  useDocStore.getState().replaceDocument(fresh)
-  clearHistory()
-  usePersistStore.setState({
-    currentFilePath: null,
-    lastSavedDoc: useDocStore.getState().doc, // pristine, not dirty
+export function newProject(): Promise<void> {
+  return serialized(async () => {
+    if (!(await whenTxIdle())) return reportBusy()
+    if ((await guardDirty()) === 'cancel') return
+    const fresh = emptyDocument(newProjectId(), 'Untitled', new Date().toISOString())
+    useDocStore.getState().replaceDocument(fresh)
+    clearHistory()
+    usePersistStore.setState({
+      currentFilePath: null,
+      lastSavedDoc: useDocStore.getState().doc, // pristine, not dirty
+    })
+    clearRecovery()
+    recomputeDirty()
   })
-  clearRecovery()
-  recomputeDirty()
 }
 
 async function applyOpened(
@@ -183,8 +224,9 @@ async function applyOpened(
       // self-healed docs no longer match the file — mark dirty
       lastSavedDoc: healed ? NEVER_SAVED : useDocStore.getState().doc,
     })
-    // an argv-opened file must not destroy an UNRELATED crash blob — it
-    // stays offerable on a later plain launch
+    // preserveRecovery: only the Esc-DISMISSED launch prompt sets this —
+    // the user deferred the decision, so the blob stays offerable on a
+    // later launch (until the next edit's autosave, single-slot caveat)
     if (!opts?.preserveRecovery) clearRecovery()
     recomputeDirty()
     if (path) pushRecent(path, parsed.name)
@@ -207,17 +249,19 @@ async function applyOpened(
   }
 }
 
-export async function openProject(): Promise<void> {
-  if (isTxActive()) return
-  if ((await guardDirty()) === 'cancel') return
-  const { adapter } = state()
-  try {
-    const result = await adapter.openDialog()
-    if (!result) return // cancelled
-    await applyOpened(result.json, result.path, result.name)
-  } catch (err) {
-    await adapter.message('Could not open', String(err))
-  }
+export function openProject(): Promise<void> {
+  return serialized(async () => {
+    if (!(await whenTxIdle())) return reportBusy()
+    if ((await guardDirty()) === 'cancel') return
+    const { adapter } = state()
+    try {
+      const result = await adapter.openDialog()
+      if (!result) return // cancelled
+      await applyOpened(result.json, result.path, result.name)
+    } catch (err) {
+      await adapter.message('Could not open', String(err))
+    }
+  })
 }
 
 /**
@@ -241,32 +285,46 @@ export async function openPath(
   }
 }
 
-export async function openRecent(path: string): Promise<void> {
-  if (isTxActive()) return
-  if (!state().adapter.readPath) return
-  if ((await guardDirty()) === 'cancel') return
-  await openPath(path)
+export function openRecent(path: string): Promise<void> {
+  return serialized(async () => {
+    if (!state().adapter.readPath) return
+    if (!(await whenTxIdle())) return reportBusy()
+    if ((await guardDirty()) === 'cancel') return
+    await openPath(path)
+  })
 }
 
 export async function saveProject(): Promise<boolean> {
-  if (isTxActive()) return false
+  if (!(await whenTxIdle())) {
+    await reportBusy() // an answered "Save" must never silently do nothing
+    return false
+  }
   const { adapter, currentFilePath } = state()
-  const json = serializeDocument(doc())
+  // Snapshot ONCE, before any await: the write can take a while (Save-As
+  // keeps the webview interactive under the native dialog) and edits landing
+  // mid-save must stay dirty — so the file's content and lastSavedDoc MUST
+  // be the same doc reference. Re-reading doc() after the await used to mark
+  // mid-save edits as saved without ever writing them.
+  const snapshot = doc()
+  const json = serializeDocument(snapshot)
   try {
     let path: string | null
     if (currentFilePath && adapter.savePath) {
       path = await adapter.savePath(currentFilePath, json)
     } else {
-      path = await adapter.saveAsDialog(json, doc().name)
+      path = await adapter.saveAsDialog(json, snapshot.name)
       if (!path) return false // cancelled
     }
     usePersistStore.setState({
       currentFilePath: adapter.kind === 'tauri' ? path : null,
-      lastSavedDoc: doc(),
+      lastSavedDoc: snapshot,
     })
-    if (adapter.kind === 'tauri') pushRecent(path, doc().name)
+    if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
     clearRecovery()
     recomputeDirty()
+    // mid-save edits: still dirty, and the clearRecovery above wiped their
+    // crash blob — re-arm it
+    if (state().dirty) scheduleRecoveryAutosave()
     return true
   } catch (err) {
     await adapter.message('Save failed', String(err))
@@ -275,19 +333,24 @@ export async function saveProject(): Promise<boolean> {
 }
 
 export async function saveProjectAs(): Promise<boolean> {
-  if (isTxActive()) return false
+  if (!(await whenTxIdle())) {
+    await reportBusy()
+    return false
+  }
   const { adapter } = state()
-  const json = serializeDocument(doc())
+  const snapshot = doc() // see saveProject: one snapshot for file AND state
+  const json = serializeDocument(snapshot)
   try {
-    const path = await adapter.saveAsDialog(json, doc().name)
+    const path = await adapter.saveAsDialog(json, snapshot.name)
     if (!path) return false
     usePersistStore.setState({
       currentFilePath: adapter.kind === 'tauri' ? path : null,
-      lastSavedDoc: doc(),
+      lastSavedDoc: snapshot,
     })
-    if (adapter.kind === 'tauri') pushRecent(path, doc().name)
+    if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
     clearRecovery()
     recomputeDirty()
+    if (state().dirty) scheduleRecoveryAutosave()
     return true
   } catch (err) {
     await adapter.message('Save failed', String(err))
@@ -295,29 +358,47 @@ export async function saveProjectAs(): Promise<boolean> {
   }
 }
 
+export type RecoveryOutcome = 'restored' | 'declined' | 'dismissed'
+
 /**
  * The M3b recovery offer: prompt Restore/Discard (silently discarding a
- * stale blob) → true when the blob was restored into the editor.
+ * stale blob). Escape resolves as 'dismissed' — the blob is KEPT for a
+ * later launch instead of being destroyed by a reflexive keypress (the
+ * prompt's last button is Discard, so the default esc mapping would delete
+ * it). Note the single-slot caveat: a dismissed blob still dies to the
+ * autosave on the first edit of whatever opens next.
  */
-async function offerRecovery(blob: RecoveryBlob, mtime: number | null): Promise<boolean> {
+export async function offerRecovery(
+  blob: RecoveryBlob,
+  mtime: number | null,
+  opts?: { competingPath?: string },
+): Promise<RecoveryOutcome> {
   const decision = decideRecovery(blob, mtime)
   if (decision.action === 'discard') {
     clearRecovery()
-    return false
+    return 'declined'
   }
+  // when the prompt shadows a file the user just double-clicked, say what
+  // Restore means for it — their open-intent must not vanish untold
+  const competing =
+    opts?.competingPath && opts.competingPath !== blob.filePath
+      ? ` Restore keeps “${opts.competingPath.split(/[/\\]/).pop()}” unopened — open it from the File menu afterwards.`
+      : ''
   const choice = await useConfirmStore.getState().prompt(
     'Restore unsaved work?',
-    decision.action === 'offer-unsaved'
+    (decision.action === 'offer-unsaved'
       ? `“${blob.doc.name}” has unsaved changes from a previous session.`
-      : `“${blob.doc.name}” has changes newer than ${decision.filePath}.`,
+      : `“${blob.doc.name}” has changes newer than ${decision.filePath}.`) + competing,
     [
       { label: 'Restore', value: 'restore', variant: 'primary' },
       { label: 'Discard', value: 'discard', variant: 'danger' },
     ],
+    { escValue: 'dismiss' },
   )
+  if (choice === 'dismiss') return 'dismissed' // blob kept
   if (choice !== 'restore') {
     clearRecovery()
-    return false
+    return 'declined'
   }
   useDocStore.getState().replaceDocument(blob.doc)
   clearHistory()
@@ -326,7 +407,7 @@ async function offerRecovery(blob: RecoveryBlob, mtime: number | null): Promise<
     lastSavedDoc: NEVER_SAVED, // always dirty until saved
   })
   // recovery blob KEPT until the next successful save
-  return true
+  return 'restored'
 }
 
 // ---------- launch (plan-pinned order) ----------
@@ -335,61 +416,82 @@ export async function launchPersistence(): Promise<void> {
   const adapter = tauri ? createTauriStorage() : createBrowserStorage()
   usePersistStore.setState({ adapter, recents: loadRecents() })
 
-  adapter.installCloseGuard({
-    isDirty: () => state().dirty,
-    confirmAndClose: async () => {
-      const choice = await guardDirty()
-      // an explicit Discard on close is a decision — never re-offer that
-      // work as crash recovery on the next launch
-      if (choice === 'discard') clearRecovery()
-      return choice !== 'cancel'
-    },
-  })
-
-  // 1. argv .homeplanr path (file association / CLI) — tauri cold start
-  const argvPath = tauri ? await takeLaunchFile() : null
-
-  // 2. resolve recovery BEFORE autosave subscription and auto-reopen,
-  //    routed against the argv path (argv wins over auto-reopen)
-  const blob = decodeRecovery(localStorage.getItem(RECOVERY_KEY))
-  const mtime =
-    blob?.filePath && adapter.statMtime ? await adapter.statMtime(blob.filePath) : null
-  const intent = decideLaunchIntent({ argvPath, blob, fileMtimeMs: mtime })
-
-  let opened = false
-  let recoveryOffered = false
-  if (argvPath && blob && intent.kind === 'restore-prompt-then-argv') {
-    // the blob shadows the argv file itself — the recovery prompt decides;
-    // Discard falls back to opening the file from disk
-    recoveryOffered = true
-    opened = await offerRecovery(blob, mtime)
-    if (!opened) opened = await openPath(argvPath)
-  } else if (argvPath && intent.kind === 'open-argv') {
-    opened = await openPath(argvPath, { preserveRecovery: intent.preserveRecovery })
-  }
-  // open failure falls through to the normal chain, starting at recovery
-  if (!opened && !recoveryOffered && blob) {
-    opened = await offerRecovery(blob, mtime)
+  if (!closeGuardInstalled) {
+    // once per app lifetime — StrictMode re-runs launch in dev, and a second
+    // onCloseRequested handler would queue the guard prompt twice
+    closeGuardInstalled = true
+    adapter.installCloseGuard({
+      isDirty: () => state().dirty,
+      confirmAndClose: async () => {
+        const choice = await guardDirty()
+        // an explicit Discard on close is a decision — never re-offer that
+        // work as crash recovery on the next launch
+        if (choice === 'discard') clearRecovery()
+        return choice !== 'cancel'
+      },
+    })
   }
 
-  // 3. auto-reopen the most recent file
-  if (!opened && adapter.readPath) {
-    const recent = state().recents[0]
-    if (recent) {
-      try {
-        const json = await adapter.readPath(recent.path)
-        opened = await applyOpened(json, recent.path)
-      } catch {
-        dropRecent(recent.path) // ENOENT etc. — silent fallback to new doc
+  // second-instance argv relay (Rust single-instance plugin) — registered
+  // BEFORE the launch chain so a relay arriving during the recovery prompt
+  // queues behind it (serialized) instead of vanishing unheard
+  if (tauri) installOpenFileListener()
+
+  await serialized(async () => {
+    // 1. argv .homeplanr path (file association / CLI) — tauri cold start
+    const argvPath = tauri ? await takeLaunchFile() : null
+
+    // 2. resolve recovery BEFORE autosave subscription and auto-reopen,
+    //    routed against the argv path (argv wins over auto-reopen)
+    const blob = decodeRecovery(localStorage.getItem(RECOVERY_KEY))
+    const mtime =
+      blob?.filePath && adapter.statMtime ? await adapter.statMtime(blob.filePath) : null
+    const intent = decideLaunchIntent({ argvPath, blob, fileMtimeMs: mtime })
+
+    let opened = false
+    let recoveryOffered = false
+    // an Esc-dismissed blob must survive whatever opens next in this launch
+    let dismissed = false
+    if (argvPath && blob && intent.kind === 'restore-prompt-then-argv') {
+      // ANY offerable blob prompts before an argv open (single recovery
+      // slot: deferring it would let the first edit's autosave destroy it)
+      // — Discard falls back to opening the file from disk
+      recoveryOffered = true
+      const outcome = await offerRecovery(blob, mtime, { competingPath: argvPath })
+      dismissed = outcome === 'dismissed'
+      opened = outcome === 'restored'
+      if (!opened) opened = await openPath(argvPath, { preserveRecovery: dismissed })
+    } else if (argvPath && intent.kind === 'open-argv') {
+      opened = await openPath(argvPath)
+    }
+    // open failure falls through to the normal chain, starting at recovery
+    if (!opened && !recoveryOffered && blob) {
+      const outcome = await offerRecovery(blob, mtime)
+      dismissed = outcome === 'dismissed'
+      opened = outcome === 'restored'
+    }
+
+    // 3. auto-reopen the most recent file
+    if (!opened && adapter.readPath) {
+      const recent = state().recents[0]
+      if (recent) {
+        try {
+          const json = await adapter.readPath(recent.path)
+          opened = await applyOpened(json, recent.path, undefined, {
+            preserveRecovery: dismissed,
+          })
+        } catch {
+          dropRecent(recent.path) // ENOENT etc. — silent fallback to new doc
+        }
       }
     }
-  }
 
-  // 4. fresh document
-  if (!opened) {
-    usePersistStore.setState({ lastSavedDoc: doc() })
-  }
-  recomputeDirty()
+    // 4. fresh document
+    if (!opened) {
+      usePersistStore.setState({ lastSavedDoc: doc() })
+    }
+    recomputeDirty()
+  })
 
   // 5. subscriptions: dirty/title + recovery autosave
   useDocStore.subscribe(
@@ -399,9 +501,6 @@ export async function launchPersistence(): Promise<void> {
       scheduleRecoveryAutosave()
     },
   )
-
-  // 6. second-instance argv relay (Rust single-instance plugin)
-  if (tauri) installOpenFileListener()
 }
 
 async function takeLaunchFile(): Promise<string | null> {
@@ -413,21 +512,24 @@ async function takeLaunchFile(): Promise<string | null> {
   }
 }
 
-// registered ONCE for the app's lifetime (module-level guard, like the
-// onCloseRequested close guard) — launch may re-run under StrictMode
+// registered ONCE for the app's lifetime — launch may re-run under StrictMode
+let closeGuardInstalled = false
 let openFileListenerInstalled = false
 function installOpenFileListener(): void {
   if (openFileListenerInstalled) return
   openFileListenerInstalled = true
   void import('@tauri-apps/api/event').then(({ listen }) =>
     listen<string>('open-file', ({ payload }) => {
-      void (async () => {
-        if (isTxActive()) return
+      void serialized(async () => {
+        // wait for a live drag instead of silently dropping the relay (the
+        // second instance already focused this window — doing nothing after
+        // that reads as a broken double-click)
+        if (!(await whenTxIdle())) return reportBusy()
         if ((await guardDirty()) === 'cancel') return
         // normal clearRecovery inside the open is correct here: guardDirty
         // just resolved this session's unsaved work
         await openPath(payload)
-      })()
+      })
     }),
   )
 }

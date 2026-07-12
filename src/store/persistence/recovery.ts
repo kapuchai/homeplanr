@@ -64,18 +64,19 @@ export function decideRecovery(
 
 export type LaunchIntent =
   | { kind: 'default-chain' }
-  | { kind: 'open-argv'; preserveRecovery: boolean }
+  | { kind: 'open-argv' }
   | { kind: 'restore-prompt-then-argv' }
 
 /**
  * Launch routing when an argv `.homeplanr` path (file association / CLI)
  * may compete with a crash-recovery blob:
  * - no argv → the normal chain (recovery offer → recents → fresh)
- * - argv names the SAME file the blob shadows and the blob is still
- *   offerable per decideRecovery → recovery prompt first; a Discard there
- *   falls back to opening the argv file itself
- * - otherwise argv wins now, but an unrelated blob must be preserved so a
- *   later plain launch can still offer it
+ * - argv with ANY offerable blob (judged against the blob's OWN file via
+ *   decideRecovery) → recovery prompt first; a Discard there falls through
+ *   to opening the argv file. There is a single recovery slot — the old
+ *   "open argv now, preserve the unrelated blob for later" policy was a
+ *   lie: the first edit's autosave overwrote the preserved blob 500ms in.
+ * - otherwise (no blob, or a stale one) argv wins
  */
 export function decideLaunchIntent(input: {
   argvPath: string | null
@@ -84,12 +85,8 @@ export function decideLaunchIntent(input: {
 }): LaunchIntent {
   const { argvPath, blob, fileMtimeMs } = input
   if (argvPath === null) return { kind: 'default-chain' }
-  if (
-    blob &&
-    blob.filePath === argvPath &&
-    decideRecovery(blob, fileMtimeMs).action !== 'discard'
-  ) {
+  if (blob && decideRecovery(blob, fileMtimeMs).action !== 'discard') {
     return { kind: 'restore-prompt-then-argv' }
   }
-  return { kind: 'open-argv', preserveRecovery: blob !== null }
+  return { kind: 'open-argv' }
 }
