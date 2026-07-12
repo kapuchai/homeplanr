@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "homeplanr main-window permissions: file dialogs, text file IO on dialog-granted paths (persisted across restarts by persisted-scope), window title for the dirty marker, destroy for the close guard.",
+  "description": "homeplanr main-window permissions: file dialogs, text file IO and binary export writes on dialog-granted paths (persisted across restarts by persisted-scope), window title for the dirty marker, destroy for the close guard.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -10,6 +10,7 @@
     "dialog:default",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
+    "fs:allow-write-file",
     "fs:allow-rename",
     "fs:allow-stat"
   ]

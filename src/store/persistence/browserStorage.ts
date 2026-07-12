@@ -47,6 +47,25 @@ export function createBrowserStorage(): StorageAdapter {
       return name // pseudo-path: browser saves are always Save-As downloads
     },
 
+    async saveBinaryDialog(bytes, suggestedName) {
+      const ext = suggestedName.split('.').pop()?.toLowerCase()
+      const mime =
+        ext === 'png'
+          ? 'image/png'
+          : ext === 'svg'
+            ? 'image/svg+xml'
+            : 'application/octet-stream'
+      // BlobPart requires an ArrayBuffer-backed view — re-wrap the bytes
+      const blob = new Blob([new Uint8Array(bytes)], { type: mime })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = suggestedName
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+      return suggestedName
+    },
+
     setTitle(title) {
       document.title = title
     },

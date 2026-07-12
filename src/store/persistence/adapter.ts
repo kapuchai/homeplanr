@@ -24,6 +24,12 @@ export interface StorageAdapter {
   savePath?(path: string, json: string): Promise<string>
   /** Save-As dialog. Returns the chosen path/name, null = cancelled. */
   saveAsDialog(json: string, suggestedName: string): Promise<string | null>
+  /** Binary export save-as. Returns the saved path/name, null when cancelled. */
+  saveBinaryDialog(
+    bytes: Uint8Array,
+    suggestedName: string,
+    filter: { name: string; extensions: string[] },
+  ): Promise<string | null>
   /** File mtime in epoch ms; null when missing/unstattable. */
   statMtime?(path: string): Promise<number | null>
   /** Window title (dirty marker). No-op in browser. */

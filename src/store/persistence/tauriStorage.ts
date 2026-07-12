@@ -61,6 +61,18 @@ export function createTauriStorage(): StorageAdapter {
       return this.savePath!(picked, json)
     },
 
+    async saveBinaryDialog(bytes, suggestedName, filter) {
+      const { save } = await import('@tauri-apps/plugin-dialog')
+      const picked = await save({
+        defaultPath: suggestedName,
+        filters: [filter],
+      })
+      if (!picked) return null
+      const { writeFile } = await import('@tauri-apps/plugin-fs')
+      await writeFile(picked, bytes)
+      return picked
+    },
+
     async statMtime(path) {
       try {
         const { stat } = await import('@tauri-apps/plugin-fs')
