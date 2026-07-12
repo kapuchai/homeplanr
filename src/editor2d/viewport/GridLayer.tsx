@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import { theme } from '../render/theme'
+import { useThemeStore } from '../../theme/themeStore'
 
 /**
  * Adaptive grid: a GPU-composited div behind the SVG. Two line weights ×
@@ -10,6 +10,9 @@ const line = (color: string, deg: number) =>
   `linear-gradient(${deg}deg, ${color} 0px, ${color} 1px, transparent 1px)`
 
 export const GridLayer = forwardRef<HTMLDivElement>(function GridLayer(_, ref) {
+  // theme flips re-render backgroundImage only; useViewportTransform keeps
+  // writing backgroundSize/backgroundPosition imperatively (untouched by React)
+  const theme = useThemeStore((s) => s.theme)
   return (
     <div
       ref={ref}

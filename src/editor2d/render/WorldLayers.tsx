@@ -12,7 +12,8 @@ import { CATALOG } from '../../catalog'
 import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { rotateHandlePos } from '../tools/handles'
-import { theme } from './theme'
+import { useThemeStore } from '../../theme/themeStore'
+import type { Theme2D } from '../../theme/theme2d'
 import type { WallSolid } from '../../geometry/wallSolids'
 
 /**
@@ -27,7 +28,7 @@ const polyPath = (poly: readonly Vec2[]): string =>
 const worldPoint = (s: WallSolid, u: number, v: number): Vec2 =>
   add(add(s.frame.origin, scale(s.frame.dir, u)), scale(perp(s.frame.dir), v))
 
-function roomFill(roomId: string): string {
+function roomFill(roomId: string, theme: Theme2D): string {
   let h = 0
   for (let i = 0; i < roomId.length; i++) h = (h * 31 + roomId.charCodeAt(i)) >>> 0
   return theme.roomFills[h % theme.roomFills.length]!
@@ -49,6 +50,7 @@ export function WorldLayers() {
 }
 
 function RoomsLayer({ derived }: { derived: DerivedGeometry }) {
+  const theme = useThemeStore((s) => s.theme)
   return (
     <g>
       {Object.values(derived.rooms).map((r) => (
@@ -56,7 +58,7 @@ function RoomsLayer({ derived }: { derived: DerivedGeometry }) {
           key={r.roomId}
           d={[polyPath(r.polygon), ...r.holePolygons.map(polyPath)].join(' ')}
           fillRule="evenodd"
-          fill={roomFill(r.roomId)}
+          fill={roomFill(r.roomId, theme)}
           fillOpacity={0.6}
           stroke="none"
         />
@@ -68,6 +70,7 @@ function RoomsLayer({ derived }: { derived: DerivedGeometry }) {
 function RoomLabels({ derived }: { derived: DerivedGeometry }) {
   const k = useViewportStore((s) => s.k)
   const units = useAppSettings((s) => s.units)
+  const theme = useThemeStore((s) => s.theme)
   return (
     <g>
       {Object.values(derived.rooms).map((r) => {
@@ -94,6 +97,7 @@ function RoomLabels({ derived }: { derived: DerivedGeometry }) {
 }
 
 function WallsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
+  const theme = useThemeStore((s) => s.theme)
   const d = useMemo(() => {
     const parts: string[] = []
     for (const poly of Object.values(derived.outlines.wallPolygons)) parts.push(polyPath(poly))
@@ -134,6 +138,7 @@ function WallsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGe
 }
 
 function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
+  const theme = useThemeStore((s) => s.theme)
   const hair = {
     stroke: theme.text,
     strokeWidth: 1,
@@ -237,6 +242,7 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
   const selection = useUiStore((s) => s.selection)
   const hovered = useUiStore((s) => s.hoveredId)
   const k = useViewportStore((s) => s.k)
+  const theme = useThemeStore((s) => s.theme)
 
   // rotate handles: every selected furniture item shows one on its front side
   const handles = selection
@@ -259,7 +265,7 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
             cx={pos.x}
             cy={pos.y}
             r={7 / k}
-            fill="#fff"
+            fill={theme.handleFill}
             stroke={theme.accent}
             strokeWidth={1.5}
             vectorEffect="non-scaling-stroke"

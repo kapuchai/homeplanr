@@ -4,9 +4,10 @@ import {
   ACCENT_IDS,
   THEME_PREFERENCES,
   useAppSettings,
-  type AccentId,
   type ThemePreference,
 } from '../store/appSettings'
+import { ACCENTS } from '../theme/accents'
+import { useThemeStore } from '../theme/themeStore'
 import type { UnitSystem } from '../format/units'
 
 /**
@@ -14,15 +15,6 @@ import type { UnitSystem } from '../format/units'
  * While open, the editor keymap drops all shortcuts (guard in keymap.ts);
  * Escape is handled by this dialog's own listener.
  */
-const ACCENT_COLORS: Record<AccentId, string> = {
-  blue: '#2563EB',
-  violet: '#7C3AED',
-  green: '#059669',
-  amber: '#D97706',
-  rose: '#E11D48',
-  teal: '#0D9488',
-}
-
 const THEME_LABELS: Record<ThemePreference, string> = {
   system: 'System',
   light: 'Light',
@@ -39,6 +31,8 @@ export function OptionsDialog() {
   const open = useUiStore((s) => s.optionsOpen)
   const setOpen = useUiStore((s) => s.setOptionsOpen)
   const settings = useAppSettings()
+  // swatches show the resolved-scheme variant (dark accents are lifted)
+  const resolved = useThemeStore((s) => s.resolved)
 
   useEffect(() => {
     if (!open) return
@@ -89,7 +83,7 @@ export function OptionsDialog() {
                   type="button"
                   title={a}
                   className={`swatch${settings.accent === a ? ' active' : ''}`}
-                  style={{ background: ACCENT_COLORS[a] }}
+                  style={{ background: ACCENTS[a][resolved] }}
                   onClick={() => settings.setAccent(a)}
                 />
               ))}

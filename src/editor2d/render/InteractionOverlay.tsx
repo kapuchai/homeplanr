@@ -1,6 +1,6 @@
 import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
-import { theme } from './theme'
+import { useThemeStore } from '../../theme/themeStore'
 import type { Vec2 } from '../../geometry/vec'
 
 /**
@@ -10,6 +10,7 @@ import type { Vec2 } from '../../geometry/vec'
 const GUIDE_EXTENT = 2000 // world meters; effectively infinite lines
 
 function Pill({ at, text, k }: { at: Vec2; text: string; k: number }) {
+  const theme = useThemeStore((s) => s.theme)
   const w = text.length * 6.6 + 12
   return (
     // counter-scale flips y back (world renders y-up) so text stays upright
@@ -20,8 +21,8 @@ function Pill({ at, text, k }: { at: Vec2; text: string; k: number }) {
         width={w}
         height={18}
         rx={5}
-        fill="#fff"
-        stroke={theme.panelBorder}
+        fill={theme.pillBg}
+        stroke={theme.pillBorder}
       />
       <text textAnchor="middle" y={-7} fontSize={11} fill={theme.text}>
         {text}
@@ -35,6 +36,7 @@ export function InteractionOverlay() {
   const snap = useInteractionStore((s) => s.snap)
   const pills = useInteractionStore((s) => s.pills)
   const k = useViewportStore((s) => s.k)
+  const theme = useThemeStore((s) => s.theme)
   const px = (n: number) => n / k
 
   const els: React.ReactNode[] = []

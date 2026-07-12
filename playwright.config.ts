@@ -12,6 +12,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   use: {
     baseURL: 'http://localhost:5173',
+    // Pin the scheme so screenshots/selectors don't depend on the host OS theme.
+    colorScheme: 'light',
     trace: 'retain-on-failure',
   },
   projects: [

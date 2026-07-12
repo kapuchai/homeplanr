@@ -5,6 +5,7 @@ import { PMREMGenerator, ACESFilmicToneMapping } from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
+import { useThemeStore } from '../theme/themeStore'
 import { getDerived, type DerivedRoom } from '../store/derived'
 import { useSceneDoc } from './useSceneDoc'
 import { buildFloorMeshData, buildPrismMeshData } from './mesh/prismGeometry'
@@ -145,6 +146,7 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
 /** IBL + shadow-fitted key light + fog + ground, sized by the sceneBBox. */
 function SceneEnvironment({ box }: { box: SceneBBox }) {
   const { gl, scene } = useThree()
+  const theme3d = useThemeStore((s) => s.theme3d)
   useEffect(() => {
     const pmrem = new PMREMGenerator(gl)
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04)
@@ -161,7 +163,7 @@ function SceneEnvironment({ box }: { box: SceneBBox }) {
   const margin = 2
   return (
     <>
-      <hemisphereLight intensity={0.5} color="#dfe8f0" groundColor="#b8b4ac" />
+      <hemisphereLight intensity={0.5} color={theme3d.hemiSky} groundColor={theme3d.hemiGround} />
       <ambientLight intensity={0.1} />
       <directionalLight
         position={[box.cx + 0.5 * 30, 30, -box.cy + 0.35 * 30]}
@@ -177,7 +179,7 @@ function SceneEnvironment({ box }: { box: SceneBBox }) {
         shadow-camera-far={80}
         target-position={[box.cx, 0, -box.cy]}
       />
-      <fog attach="fog" args={['#eef1f4', 2 * box.diag + 10, 6 * box.diag + 30]} />
+      <fog attach="fog" args={[theme3d.fog, 2 * box.diag + 10, 6 * box.diag + 30]} />
       {/* ground disc at z = −1cm (kills floor coplanarity) */}
       <group rotation-x={-Math.PI / 2}>
         <mesh position={[box.cx, box.cy, -0.01]} receiveShadow material={sceneMaterial('ground')}>
@@ -186,6 +188,21 @@ function SceneEnvironment({ box }: { box: SceneBBox }) {
       </group>
     </>
   )
+}
+
+/**
+ * Retints the cached ground-material singleton on theme flips. Explicit
+ * invalidate(): frameloop="demand" and a singleton mutation is invisible to
+ * React. Physical wall/floor/item materials and IBL stay theme-independent.
+ */
+function ThemeBridge3D() {
+  const invalidate = useThree((s) => s.invalidate)
+  const theme3d = useThemeStore((s) => s.theme3d)
+  useEffect(() => {
+    sceneMaterial('ground').color.set(theme3d.ground)
+    invalidate()
+  }, [theme3d, invalidate])
+  return null
 }
 
 /** Bridge: store → invalidate(), gated by view mode (zero hidden work). */
@@ -263,7 +280,7 @@ export function PlannerCanvas() {
   }
 
   return (
-    <div style={{ flex: 1, background: '#eef1f4', position: 'relative' }}>
+    <div className="view3d-wrapper">
       <GlErrorBoundary key={epoch} onError={setGlError}>
         <Canvas
         frameloop="demand"
@@ -280,6 +297,7 @@ export function PlannerCanvas() {
       >
         <ContextGuard onLost={() => setGlError('The WebGL context was lost (GPU reset or driver issue).')} />
         <InvalidateBridge />
+        <ThemeBridge3D />
         <SceneEnvironment box={box} />
         <OrbitControls
           makeDefault

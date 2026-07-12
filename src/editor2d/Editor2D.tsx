@@ -243,12 +243,12 @@ export function Editor2D() {
   return (
     <div
       ref={rootRef}
+      className="editor-viewport"
       style={{
         position: 'relative',
         flex: 1,
         overflow: 'hidden',
         cursor,
-        background: '#FAFAF7',
       }}
     >
       <GridLayer ref={gridRef} />

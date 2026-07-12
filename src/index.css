@@ -1,5 +1,100 @@
-/* Global reset + app frame. Theme tokens live in src/editor2d/render/theme.ts
-   (JS side) and are mirrored here as CSS custom properties when needed. */
+/* Global reset + app frame. CSS theme tokens live in the :root blocks below;
+   canvas/GL palettes (JS side) live in src/theme. */
+
+:root {
+  color-scheme: light;
+  --bg: #fafaf7;
+  --bg-canvas: #fafaf7;
+  --bg-3d: #eef1f4;
+  --panel: #ffffff;
+  --panel-2: #fafaf7;
+  --border: #e5e7eb;
+  --hover: #f3f4f6;
+  --input-bg: #ffffff;
+  --text: #1f2937;
+  --text-2: #374151;
+  --text-3: #4b5563;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --ghost: #d1d5db;
+  /* --accent/--accent-soft: blue defaults; initTheming() overrides per accent. */
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.3);
+  --accent-contrast: #ffffff;
+  --danger: #dc2626;
+  --danger-border: #fecaca;
+  --kbd-bg: #e5e7eb;
+  --backdrop: rgba(17, 24, 39, 0.4);
+  --overlay: rgba(255, 255, 255, 0.85);
+  --shadow-menu: 0 10px 24px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.25);
+  --swatch-border: rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #17181b;
+  --bg-canvas: #1b1c1f;
+  --bg-3d: #131417;
+  --panel: #1f2124;
+  --panel-2: #24262a;
+  --border: #33363b;
+  --hover: #2a2d31;
+  --input-bg: #26282c;
+  --text: #e8eaed;
+  --text-2: #c9cdd2;
+  --text-3: #b0b5bb;
+  --muted: #9aa0a8;
+  --faint: #7a8087;
+  --ghost: #4d5157;
+  --accent: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.35);
+  --accent-contrast: #ffffff;
+  --danger: #f87171;
+  --danger-border: #5b2a2a;
+  --kbd-bg: #33363b;
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --overlay: rgba(31, 33, 36, 0.88);
+  --shadow-menu: 0 10px 24px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.6);
+  --swatch-border: rgba(255, 255, 255, 0.18);
+}
+
+/* Mechanical mirror of the [data-theme='dark'] block above. CSP blocks inline
+   scripts, so initTheming() can't stamp data-theme before the first frame;
+   this keeps that pre-JS frame from flashing light on dark-scheme systems.
+   Keep in sync with the block above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #17181b;
+    --bg-canvas: #1b1c1f;
+    --bg-3d: #131417;
+    --panel: #1f2124;
+    --panel-2: #24262a;
+    --border: #33363b;
+    --hover: #2a2d31;
+    --input-bg: #26282c;
+    --text: #e8eaed;
+    --text-2: #c9cdd2;
+    --text-3: #b0b5bb;
+    --muted: #9aa0a8;
+    --faint: #7a8087;
+    --ghost: #4d5157;
+    --accent: #3b82f6;
+    --accent-soft: rgba(59, 130, 246, 0.35);
+    --accent-contrast: #ffffff;
+    --danger: #f87171;
+    --danger-border: #5b2a2a;
+    --kbd-bg: #33363b;
+    --backdrop: rgba(0, 0, 0, 0.55);
+    --overlay: rgba(31, 33, 36, 0.88);
+    --shadow-menu: 0 10px 24px rgba(0, 0, 0, 0.5);
+    --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.6);
+    --swatch-border: rgba(255, 255, 255, 0.18);
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -15,8 +110,8 @@ body,
 
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background: #fafaf7; /* paper */
-  color: #1f2937;
+  background: var(--bg);
+  color: var(--text);
   /* Desktop-app input hygiene: no accidental text selection during drags.
      Re-enabled explicitly for editable fields. */
   user-select: none;
@@ -43,8 +138,8 @@ textarea,
   align-items: center;
   gap: 12px;
   padding: 0 14px;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
 }
 
 .toolbar .brand {
@@ -53,7 +148,7 @@ textarea,
 }
 
 .toolbar .project-name {
-  color: #6b7280;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -63,7 +158,7 @@ textarea,
 
 .segmented {
   display: inline-flex;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -71,38 +166,38 @@ textarea,
 .segmented button {
   appearance: none;
   border: 0;
-  background: #fff;
+  background: var(--panel);
   padding: 6px 16px;
   font: inherit;
   font-size: 13px;
-  color: #374151;
+  color: var(--text-2);
   cursor: pointer;
 }
 
 .segmented button + button {
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid var(--border);
 }
 
 .segmented button.active {
-  background: #2563eb;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .icon-btn {
   appearance: none;
   display: inline-flex;
   align-items: center;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   padding: 6px 9px;
   font: inherit;
-  color: #374151;
+  color: var(--text-2);
   cursor: pointer;
 }
 
 .icon-btn:hover {
-  background: #f3f4f6;
+  background: var(--hover);
 }
 
 .content {
@@ -111,26 +206,38 @@ textarea,
   min-height: 0;
 }
 
+/* Editor canvas host (class attached by the 2D editor wrapper). */
+.editor-viewport {
+  background: var(--bg-canvas);
+}
+
+/* 3D canvas host. */
+.view3d-wrapper {
+  flex: 1;
+  position: relative;
+  background: var(--bg-3d);
+}
+
 .toolbar .project-name input {
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: #374151;
+  color: var(--text-2);
   padding: 4px 6px;
   width: 160px;
 }
 
 .toolbar .project-name input:hover,
 .toolbar .project-name input:focus {
-  border-color: #e5e7eb;
-  background: #fff;
+  border-color: var(--border);
+  background: var(--input-bg);
   outline: none;
 }
 
 .dirty-dot {
-  color: #2563eb;
+  color: var(--accent);
   font-size: 20px;
   line-height: 0;
   vertical-align: middle;
@@ -143,9 +250,9 @@ textarea,
 
 .file-menu > button {
   appearance: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   padding: 6px 12px;
   font: inherit;
   font-size: 13px;
@@ -164,10 +271,10 @@ textarea,
   left: 0;
   z-index: 41;
   min-width: 220px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-menu);
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -192,26 +299,26 @@ textarea,
 }
 
 .menu button:hover {
-  background: #f3f4f6;
+  background: var(--hover);
 }
 
 .menu kbd {
-  color: #9ca3af;
+  color: var(--faint);
   font-family: inherit;
   font-size: 11px;
 }
 
 .menu-sep {
   height: 1px;
-  background: #e5e7eb;
+  background: var(--border);
   margin: 5px 4px;
 }
 
 .catalog-panel {
   flex: 0 0 232px;
   overflow-y: auto;
-  background: #fff;
-  border-right: 1px solid #e5e7eb;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
   padding: 10px;
 }
 
@@ -221,7 +328,7 @@ textarea,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #9ca3af;
+  color: var(--faint);
 }
 
 .catalog-grid {
@@ -232,9 +339,9 @@ textarea,
 
 .catalog-card {
   appearance: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fafaf7;
+  background: var(--panel-2);
   padding: 8px 4px 6px;
   display: flex;
   flex-direction: column;
@@ -242,26 +349,26 @@ textarea,
   gap: 4px;
   font: inherit;
   font-size: 11px;
-  color: #374151;
+  color: var(--text-2);
   cursor: grab;
   touch-action: none;
 }
 
 .catalog-card:hover {
-  border-color: #c7d2fe;
-  background: #fff;
+  border-color: var(--accent-soft);
+  background: var(--hover);
 }
 
 .catalog-card.armed {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .props-panel {
   flex: 0 0 260px;
   overflow-y: auto;
-  background: #fff;
-  border-left: 1px solid #e5e7eb;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
   padding: 14px;
 }
 
@@ -278,7 +385,7 @@ textarea,
   gap: 10px;
   margin-bottom: 10px;
   font-size: 12.5px;
-  color: #4b5563;
+  color: var(--text-3);
 }
 
 .prop-input {
@@ -290,7 +397,7 @@ textarea,
 .prop-field input,
 .props-panel input[type='text'] {
   width: 92px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 5px 7px;
   font: inherit;
@@ -303,7 +410,7 @@ textarea,
 
 .prop-input em {
   font-style: normal;
-  color: #9ca3af;
+  color: var(--faint);
   font-size: 11px;
 }
 
@@ -321,22 +428,22 @@ textarea,
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--swatch-border);
   cursor: pointer;
 }
 
 .swatch.active {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
 .readonly {
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .hint {
   font-size: 11.5px;
-  color: #9ca3af;
+  color: var(--faint);
   line-height: 1.5;
 }
 
@@ -344,16 +451,16 @@ textarea,
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(17, 24, 39, 0.4);
+  background: var(--backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .modal {
-  background: #fff;
+  background: var(--panel);
   border-radius: 12px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-modal);
   padding: 20px 22px;
   width: 380px;
 }
@@ -365,7 +472,7 @@ textarea,
 .modal p {
   margin: 0 0 18px;
   font-size: 13.5px;
-  color: #4b5563;
+  color: var(--text-3);
 }
 
 .options-section {
@@ -378,7 +485,7 @@ textarea,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #9ca3af;
+  color: var(--faint);
 }
 
 .options-row {
@@ -388,7 +495,7 @@ textarea,
   gap: 10px;
   margin-bottom: 10px;
   font-size: 12.5px;
-  color: #4b5563;
+  color: var(--text-3);
 }
 
 .modal-buttons {
@@ -399,9 +506,9 @@ textarea,
 
 .modal-buttons button {
   appearance: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   font: inherit;
   font-size: 13px;
   padding: 7px 14px;
@@ -409,14 +516,14 @@ textarea,
 }
 
 .modal-buttons button.primary {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .modal-buttons button.danger {
-  border-color: #fecaca;
-  color: #dc2626;
+  border-color: var(--danger-border);
+  color: var(--danger);
 }
 
 .gl-banner {
@@ -426,14 +533,14 @@ textarea,
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #eef1f4;
-  color: #374151;
+  background: var(--bg-3d);
+  color: var(--text-2);
   text-align: center;
   padding: 24px;
 }
 
 .gl-banner code {
-  background: #e5e7eb;
+  background: var(--kbd-bg);
   border-radius: 4px;
   padding: 1px 5px;
   font-size: 12px;
@@ -442,9 +549,9 @@ textarea,
 .gl-banner button {
   margin-top: 10px;
   appearance: none;
-  border: 1px solid #2563eb;
-  background: #2563eb;
-  color: #fff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
   font: inherit;
   border-radius: 8px;
   padding: 8px 16px;
@@ -456,9 +563,9 @@ textarea,
   left: 10px;
   bottom: 8px;
   font-size: 11.5px;
-  color: #6b7280;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid #e5e7eb;
+  color: var(--muted);
+  background: var(--overlay);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 4px 9px;
   pointer-events: none;
@@ -473,18 +580,18 @@ textarea,
   justify-content: center;
   pointer-events: none;
   text-align: center;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .empty-state strong {
   display: block;
   font-size: 18px;
-  color: #374151;
+  color: var(--text-2);
   margin-bottom: 6px;
 }
 
 .empty-state kbd {
-  background: #e5e7eb;
+  background: var(--kbd-bg);
   border-radius: 4px;
   padding: 1px 6px;
   font-family: inherit;
@@ -501,7 +608,7 @@ textarea,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #9ca3af;
+  color: var(--faint);
   user-select: none;
 }
 
@@ -515,6 +622,6 @@ textarea,
 }
 
 .catalog-section .count {
-  color: #d1d5db;
+  color: var(--ghost);
   font-weight: 500;
 }

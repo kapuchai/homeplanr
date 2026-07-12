@@ -1,5 +1,6 @@
 import type { SymbolPrim } from '../../catalog/types'
-import { theme } from './theme'
+import { useThemeStore } from '../../theme/themeStore'
+import type { Theme2D } from '../../theme/theme2d'
 
 /**
  * Generic renderer for declarative catalog symbols (item-local meters,
@@ -9,13 +10,31 @@ import { theme } from './theme'
  *  detail  → lighter hairline stroke
  * All strokes are non-scaling (constant px at any zoom).
  */
-const styles = {
-  body: { fill: '#FFFFFF', fillOpacity: 0.92, stroke: '#6B7280', strokeWidth: 1.1 },
-  outline: { fill: 'none', stroke: '#6B7280', strokeWidth: 1.1 },
-  detail: { fill: 'none', stroke: '#9CA3AF', strokeWidth: 1 },
-} as const
+const buildStyles = (theme: Theme2D) => ({
+  body: {
+    fill: theme.symbolBody,
+    fillOpacity: 0.92,
+    stroke: theme.symbolLine,
+    strokeWidth: 1.1,
+  },
+  outline: { fill: 'none', stroke: theme.symbolLine, strokeWidth: 1.1 },
+  detail: { fill: 'none', stroke: theme.symbolDetail, strokeWidth: 1 },
+})
+
+type SymbolStyles = ReturnType<typeof buildStyles>
+
+// single-slot memo keyed by theme identity: one styles object per theme flip,
+// shared by every symbol instance (this renders per furniture item)
+let cache: { key: Theme2D; styles: SymbolStyles } | null = null
+function stylesFor(theme: Theme2D): SymbolStyles {
+  if (!cache || cache.key !== theme) cache = { key: theme, styles: buildStyles(theme) }
+  return cache.styles
+}
 
 export function SymbolRenderer({ prims }: { prims: SymbolPrim[] }) {
+  // theme via the store (not props) so call sites (WorldLayers, CatalogPanel
+  // cards) stay untouched
+  const styles = stylesFor(useThemeStore((s) => s.theme))
   return (
     <>
       {prims.map((p, i) => {
@@ -40,13 +59,14 @@ export function SymbolRenderer({ prims }: { prims: SymbolPrim[] }) {
 
 /** Fallback footprint when a catalog item is unknown (imported docs). */
 export function UnknownSymbol({ w, d }: { w: number; d: number }) {
+  const theme = useThemeStore((s) => s.theme)
   return (
     <rect
       x={-w / 2}
       y={-d / 2}
       width={w}
       height={d}
-      fill="#FFFFFF"
+      fill={theme.symbolBody}
       fillOpacity={0.9}
       stroke={theme.invalid}
       strokeDasharray="4 3"
