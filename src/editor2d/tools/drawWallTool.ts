@@ -136,10 +136,13 @@ export function createDrawWallTool(): Tool {
       }
       if (closing) {
         endChain(ctx)
-      } else {
-        chain.anchor = p
-        updatePreview(ctx, p, snap)
+        return
       }
+      // rejected segments (micro / duplicate pair) must NOT advance the
+      // anchor — otherwise Backspace bookkeeping desyncs and the rubber
+      // band teleports past a click that committed nothing
+      if (r.wallId) chain.anchor = p
+      updatePreview(ctx, p, snap)
     },
 
     onPointerUp() {},
@@ -169,7 +172,12 @@ export function createDrawWallTool(): Tool {
           if (!chain.anchor) endChain(ctx)
           return true
         }
-        return chain.anchor !== null
+        if (chain.anchor) {
+          // zero committed segments: retract the initial anchor entirely
+          endChain(ctx)
+          return true
+        }
+        return false
       }
       return false
     },

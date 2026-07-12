@@ -15,8 +15,23 @@ import { CATALOG } from '../../catalog'
 export function createPlaceFurnitureTool(): Tool {
   let lastSnap: SnapResult | null = null
   let rotation = 0
+  let mirrored = false
+  let armedFor: string | null = null
+
+  // ghost rotation/mirror belong to ONE armed item: re-arming with a
+  // different card must reset them (switchTool skips onDeactivate when the
+  // tool is already active, so the tool tracks the item change itself)
+  const syncArmedItem = (ctx: ToolContext): void => {
+    const id = ctx.ui().toolParams.catalogItemId
+    if (id !== armedFor) {
+      armedFor = id
+      rotation = 0
+      mirrored = false
+    }
+  }
 
   const ghost = (ctx: ToolContext, world: Vec2): SnapResult | null => {
+    syncArmedItem(ctx)
     const itemId = ctx.ui().toolParams.catalogItemId
     const item = itemId ? CATALOG[itemId] : null
     if (!item) return null
@@ -70,6 +85,7 @@ export function createPlaceFurnitureTool(): Tool {
       rotation: snap.rotation ?? rotation,
       size: { ...item.dims },
       elevation: item.defaultElevation ?? 0,
+      ...(mirrored ? { mirrored: true } : {}),
     })
     ctx.ui().setSelection([id])
   }
@@ -90,8 +106,15 @@ export function createPlaceFurnitureTool(): Tool {
     onPointerUp() {},
 
     onKeyDown(key, ctx) {
-      if (key.toLowerCase() === 'r') {
-        rotation += Math.PI / 2
+      syncArmedItem(ctx)
+      // the keymap offers R/F to the tool BEFORE the global rotate/flip
+      // handlers — placement selects the dropped item, which would otherwise
+      // shadow the ghost forever after the first drop. The raw key carries
+      // shift ('R' = counter-rotate, mirroring the selection's Shift+R).
+      const k = key.toLowerCase()
+      if ((k === 'r' || k === 'f') && ctx.ui().toolParams.catalogItemId) {
+        if (k === 'r') rotation += key === 'R' ? -Math.PI / 2 : Math.PI / 2
+        else mirrored = !mirrored
         return true
       }
       if (key === 'Escape') {
@@ -108,6 +131,8 @@ export function createPlaceFurnitureTool(): Tool {
       ctx.interaction().clear()
       lastSnap = null
       rotation = 0
+      mirrored = false
+      armedFor = null
     },
   }
 }

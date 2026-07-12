@@ -11,7 +11,7 @@ import {
   splitWall,
   updateWall,
 } from './walls'
-import { addOpening } from './openings'
+import { addOpening, updateOpening } from './openings'
 import { paintRoomWalls, renameRoom } from './rooms'
 import {
   addFurniture,
@@ -486,5 +486,45 @@ describe('furniture', () => {
     expect(Object.keys(d.furniture)).toHaveLength(2)
     expect(d.furniture[ids[0]!]!.x).toBeCloseTo(1, 9) // 1cm quantization
     expect(d.furniture[ids[1]!]!.size.w).toBe(5) // SIZE_MAX clamp
+  })
+})
+
+describe('live-mode opening survival (S4, 0.3.0)', () => {
+  it('a transient live shrink below door width never deletes; the commit re-run decides', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(6, 0))
+    const opId = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.5 })!
+    const nb = d.walls[r.wallId!]!.b
+    const tBefore = d.openings[opId]!.t
+    // live overshoot: a 0.5m wall cannot fit a 0.9m door — must survive UNTOUCHED
+    moveNode(d, nb, vec(0.5, 0), { mode: 'live' })
+    expect(d.openings[opId]).toBeDefined()
+    expect(d.openings[opId]!.t).toBe(tBefore)
+    // drag back out to a fitting length and commit: the door is still there
+    moveNode(d, nb, vec(5, 0), { mode: 'live' })
+    moveNode(d, nb, vec(5, 0), { mode: 'commit' })
+    expect(d.openings[opId]).toBeDefined()
+    const op = d.openings[opId]!
+    expect(op.t * 5 - op.width / 2).toBeGreaterThanOrEqual(0)
+    expect(op.t * 5 + op.width / 2).toBeLessThanOrEqual(5)
+    // commit-mode shrink below fit still deletes (pinned since M2)
+    moveNode(d, nb, vec(0.5, 0), { mode: 'commit' })
+    expect(d.openings[opId]).toBeUndefined()
+  })
+
+  it('live-sliding a door into a neighbor on a tight wall deletes neither', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(3, 0))
+    const a = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.25 })!
+    const b = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.75 })!
+    // drag A onto B: serialization has no room for both at commit rules,
+    // but a live frame must not destroy either
+    updateOpening(d, a, { t: 0.75 }, { mode: 'live' })
+    expect(d.openings[a]).toBeDefined()
+    expect(d.openings[b]).toBeDefined()
+    // settle A back to a legal spot and commit: both survive
+    updateOpening(d, a, { t: 0.25 }, { mode: 'commit' })
+    expect(d.openings[a]).toBeDefined()
+    expect(d.openings[b]).toBeDefined()
   })
 })

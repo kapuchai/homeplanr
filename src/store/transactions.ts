@@ -4,37 +4,67 @@ import type { ProjectDocument } from '../model/types'
 /**
  * Drag-transaction lifecycle — the SOLE owner of the zundo temporal API.
  *
- * beginTx  → snapshot the doc reference + pause recording
+ * beginTx  → snapshot the doc reference + pause recording; returns a TOKEN
  * (live-mode mutations run per pointer-frame, unrecorded)
  * commitTx → the tool has already re-run the final mutation in 'commit'
  *            mode; silently revert to the snapshot, resume recording, then
  *            re-apply the final doc ⇒ EXACTLY ONE history entry
  * abortTx  → restore the snapshot, resume, no entry (Esc / pointercancel)
  *
- * Guards: beginTx while active aborts the previous tx (dev warning);
- * commit/abort with no tx are no-ops (Esc-then-pointer-up); undo/redo are
- * exposed here as safeUndo/safeRedo which no-op while a tx is active —
+ * Ownership: commitTx/abortTx act only when the given token owns the live
+ * tx — a stale owner (the arrow-nudge idle timer, an outgoing tool's
+ * onDeactivate) can never close a LATER gesture's transaction. Omitting the
+ * token forces the close regardless of owner (test cleanup only; production
+ * callers always pass their token).
+ *
+ * Preemption: beginTx while a tx is open closes the previous one first,
+ * honoring ITS declared policy — `preempt: 'commit'` txs (the coalesced
+ * arrow nudge) are committed so their work survives as one entry; default
+ * txs are aborted (dev warning: gestures should be closed by their owner).
+ *
+ * commit/abort with no active tx are no-ops (Esc-then-pointer-up); undo/redo
+ * are exposed here as safeUndo/safeRedo which no-op while a tx is active —
  * the keymap and toolbar must use these, never docTemporal directly.
  */
+export type TxToken = number
+
 let txSnapshot: ProjectDocument | null = null
+let txPreempt: 'abort' | 'commit' = 'abort'
+let activeToken = 0
+let nextToken = 1
 
 export const isTxActive = (): boolean => txSnapshot !== null
 
-export function beginTx(): void {
+/** Token of the currently-open tx, or 0 when none — lets a coalescing owner
+ * (the arrow nudge) distinguish "my tx is still open" from "a different
+ * gesture owns the tx now". */
+export const activeTxToken = (): TxToken => activeToken
+
+export function beginTx(opts?: { preempt?: 'abort' | 'commit' }): TxToken {
   if (txSnapshot !== null) {
-    if (import.meta.env?.DEV) {
-      console.warn('beginTx while a transaction is active — aborting the previous one')
+    if (txPreempt === 'commit') {
+      commitTx(activeToken)
+    } else {
+      if (import.meta.env?.DEV) {
+        console.warn('beginTx while a transaction is active — aborting the previous one')
+      }
+      abortTx(activeToken)
     }
-    abortTx()
   }
   txSnapshot = useDocStore.getState().doc
+  txPreempt = opts?.preempt ?? 'abort'
+  activeToken = nextToken++
   docTemporal.getState().pause()
+  return activeToken
 }
 
-export function commitTx(): void {
+export function commitTx(token?: TxToken): void {
   if (txSnapshot === null) return
+  if (token !== undefined && token !== activeToken) return // not the owner
   const snapshot = txSnapshot
   txSnapshot = null
+  activeToken = 0
+  txPreempt = 'abort'
   const final = useDocStore.getState().doc
   if (final !== snapshot) {
     // Silent revert (still paused), then one recorded change to `final`.
@@ -46,10 +76,13 @@ export function commitTx(): void {
   }
 }
 
-export function abortTx(): void {
+export function abortTx(token?: TxToken): void {
   if (txSnapshot === null) return
+  if (token !== undefined && token !== activeToken) return // not the owner
   useDocStore.setState({ doc: txSnapshot })
   txSnapshot = null
+  activeToken = 0
+  txPreempt = 'abort'
   docTemporal.getState().resume()
 }
 

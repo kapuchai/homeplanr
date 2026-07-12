@@ -12,7 +12,7 @@ import {
   wallPointCandidates,
   wallBackCandidate,
 } from '../snap/candidates'
-import { beginTx, commitTx, abortTx, isTxActive } from '../../store/transactions'
+import { beginTx, commitTx, abortTx, type TxToken } from '../../store/transactions'
 import { useViewportStore } from '../viewport/viewportStore'
 import { useAppSettings } from '../../store/appSettings'
 import { CATALOG } from '../../catalog'
@@ -48,6 +48,7 @@ type DragState =
   | { kind: 'panning'; lastScreen: Vec2 }
   | {
       kind: 'furniture'
+      tx: TxToken
       ids: FurnitureId[]
       grabbedId: FurnitureId
       grabOffset: Vec2
@@ -57,15 +58,17 @@ type DragState =
     }
   | {
       kind: 'rotate'
+      tx: TxToken
       ids: FurnitureId[]
       grabbedId: FurnitureId
       startPointer: number
       starts: Map<FurnitureId, number>
       center: Vec2
     }
-  | { kind: 'node'; nodeId: NodeId; lastSnap: SnapResult | null }
+  | { kind: 'node'; tx: TxToken; nodeId: NodeId; lastSnap: SnapResult | null }
   | {
       kind: 'wall'
+      tx: TxToken
       wallId: WallId
       normal: Vec2
       startWorld: Vec2
@@ -73,7 +76,7 @@ type DragState =
       /** Measurement scope, frozen at drag-arm (topology never changes mid-drag). */
       pillWallIds: WallId[]
     }
-  | { kind: 'opening'; openingId: OpeningId; wallId: WallId }
+  | { kind: 'opening'; tx: TxToken; openingId: OpeningId; wallId: WallId }
 
 export function createSelectTool(): Tool {
   let state: DragState = { kind: 'idle' }
@@ -112,9 +115,9 @@ export function createSelectTool(): Tool {
       starts.set(id, { x: f.x, y: f.y, rotation: f.rotation })
     }
     const grabbed = doc.furniture[grabbedId]!
-    beginTx()
     state = {
       kind: 'furniture',
+      tx: beginTx(),
       ids,
       grabbedId,
       grabOffset: sub({ x: grabbed.x, y: grabbed.y }, world),
@@ -125,7 +128,7 @@ export function createSelectTool(): Tool {
     ctx.interaction().set({ gestureActive: true })
   }
 
-  return {
+  const tool: Tool = {
     id: 'select',
     cursor: (ctx) => (ctx.ui().spaceHeld ? 'grab' : 'default'),
 
@@ -144,9 +147,9 @@ export function createSelectTool(): Tool {
         if (grabbed) {
           const starts = new Map<FurnitureId, number>()
           for (const id of selFurn) starts.set(id, doc.furniture[id]!.rotation)
-          beginTx()
           state = {
             kind: 'rotate',
+            tx: beginTx(),
             ids: selFurn,
             grabbedId: grabbed.id,
             startPointer: Math.atan2(e.world.y - grabbed.y, e.world.x - grabbed.x),
@@ -189,6 +192,13 @@ export function createSelectTool(): Tool {
     },
 
     onPointerMove(e, ctx) {
+      // chorded release: pointerup only fires when the LAST button lifts —
+      // if the primary button is no longer down mid-gesture, finish now
+      // (buttons is optional so scripted tests default to "primary held")
+      if (state.kind !== 'idle' && e.buttons !== undefined && (e.buttons & 1) === 0) {
+        tool.onPointerUp(e, ctx)
+        return
+      }
       const doc = ctx.doc()
       const ui = ctx.ui()
       const px = ctx.pxToWorld()
@@ -229,17 +239,16 @@ export function createSelectTool(): Tool {
           if (hit.kind === 'furniture') {
             beginFurnitureDrag(ctx, hit.id, state.world)
           } else if (hit.kind === 'node') {
-            beginTx()
-            state = { kind: 'node', nodeId: hit.id, lastSnap: null }
+            state = { kind: 'node', tx: beginTx(), nodeId: hit.id, lastSnap: null }
             ctx.interaction().set({ gestureActive: true })
           } else if (hit.kind === 'wall') {
             const w = doc.walls[hit.id]
             const na = w && doc.nodes[w.a]
             const nb = w && doc.nodes[w.b]
             if (!w || !na || !nb) return
-            beginTx()
             state = {
               kind: 'wall',
+              tx: beginTx(),
               wallId: hit.id,
               normal: perp(normalize(sub(nb, na))),
               startWorld: state.world,
@@ -252,8 +261,7 @@ export function createSelectTool(): Tool {
           } else if (hit.kind === 'opening') {
             const op = doc.openings[hit.id]
             if (!op) return
-            beginTx()
-            state = { kind: 'opening', openingId: hit.id, wallId: op.wallId }
+            state = { kind: 'opening', tx: beginTx(), openingId: hit.id, wallId: op.wallId }
             ctx.interaction().set({ gestureActive: true })
           } else {
             state = { kind: 'idle' } // rooms don't drag
@@ -437,12 +445,12 @@ export function createSelectTool(): Tool {
             const f = doc.furniture[id]
             if (f) ctx.actions().transformFurniture(id, { x: f.x, y: f.y })
           }
-          commitTx()
+          commitTx(state.tx)
           reset(ctx)
           return
         }
         case 'rotate': {
-          commitTx()
+          commitTx(state.tx)
           reset(ctx)
           return
         }
@@ -455,20 +463,20 @@ export function createSelectTool(): Tool {
             const n = doc.nodes[state.nodeId]
             if (n) ctx.actions().moveNode(state.nodeId, { x: n.x, y: n.y }, { mode: 'commit' })
           }
-          commitTx()
+          commitTx(state.tx)
           reset(ctx)
           return
         }
         case 'wall': {
           ctx.actions().moveWall(state.wallId, { x: 0, y: 0 }, { mode: 'commit' })
-          commitTx()
+          commitTx(state.tx)
           reset(ctx)
           return
         }
         case 'opening': {
           const op = doc.openings[state.openingId]
           if (op) ctx.actions().updateOpening(state.openingId, { t: op.t }, { mode: 'commit' })
-          commitTx()
+          commitTx(state.tx)
           reset(ctx)
           return
         }
@@ -478,8 +486,12 @@ export function createSelectTool(): Tool {
     },
 
     onKeyDown(key, ctx) {
-      if (key === 'Escape' && state.kind !== 'idle' && state.kind !== 'pressed') {
-        if (isTxActive()) abortTx()
+      if (key === 'Escape' && state.kind !== 'idle') {
+        // covers 'pressed' too: a pointercancel (dispatched as Escape) while
+        // pressed must not leave a stuck press that later fires a phantom
+        // click. Abort only a tx THIS gesture owns — never a foreign one
+        // (e.g. a pending arrow-nudge run while panning).
+        if ('tx' in state) abortTx(state.tx)
         reset(ctx)
         return true
       }
@@ -487,8 +499,10 @@ export function createSelectTool(): Tool {
     },
 
     onDeactivate(ctx) {
-      if (isTxActive()) abortTx()
+      if ('tx' in state) abortTx(state.tx)
       reset(ctx)
     },
   }
+
+  return tool
 }

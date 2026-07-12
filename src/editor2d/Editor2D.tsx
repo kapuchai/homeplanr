@@ -9,7 +9,13 @@ import { GridLayer } from './viewport/GridLayer'
 import { WorldLayers } from './render/WorldLayers'
 import { InteractionOverlay } from './render/InteractionOverlay'
 import { toolContext, toolRegistry } from './tools/toolRegistry'
-import { handleKey, handleKeyUp, toKeyInput, zoomToFitContent } from './tools/keymap'
+import {
+  flushPendingNudge,
+  handleKey,
+  handleKeyUp,
+  toKeyInput,
+  zoomToFitContent,
+} from './tools/keymap'
 import { EmptyState, StatusHint } from '../app/StatusHint'
 import { ZoomControls } from './ZoomControls'
 import type { EditorPointerEvent } from './tools/toolTypes'
@@ -116,11 +122,22 @@ export function Editor2D() {
     }
   }, [])
 
-  // pointer pipeline: pan override → active tool (rAF-coalesced moves)
+  // pointer pipeline: pan override → active tool (rAF-coalesced moves).
+  // ONE pointer owns the interaction at a time (gesture or pan): moves/ups
+  // from other pointers are dropped — a hovering pen or second touch must
+  // neither drive nor chord-terminate a mouse drag.
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
-    let panning: { pointerId: number; lastX: number; lastY: number } | null = null
+    let panning: {
+      pointerId: number
+      lastX: number
+      lastY: number
+      /** buttons bit of the initiating button — releasing it ends the pan
+       * even when another button stays held (no pointerup fires then). */
+      buttonBit: number
+    } | null = null
+    let gesturePointerId: number | null = null
     let pendingMove: PointerEvent | null = null
     let rafId = 0
 
@@ -132,18 +149,32 @@ export function Editor2D() {
         screen,
         mods: { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey },
         button: e.button,
+        buttons: e.buttons,
         pointerId: e.pointerId,
       }
     }
     const activeTool = () => registry.get(useUiStore.getState().activeTool)
 
     const onPointerDown = (e: PointerEvent) => {
+      // a press invalidates any rAF-queued PRE-press hover move — delivered
+      // late it would feed the tools a stale buttons=0 event that trips the
+      // chord-release guard and kills the gesture it just started
+      pendingMove = null
+      // pointer actions act on the post-nudge doc (mirrors the keymap flush)
+      flushPendingNudge()
+      if (gesturePointerId !== null || panning) return
       if (e.button === 1 || (e.button === 0 && useUiStore.getState().spaceHeld)) {
         e.preventDefault()
-        panning = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY }
+        panning = {
+          pointerId: e.pointerId,
+          lastX: e.clientX,
+          lastY: e.clientY,
+          buttonBit: e.button === 1 ? 4 : 1,
+        }
         el.setPointerCapture(e.pointerId)
         return
       }
+      gesturePointerId = e.pointerId
       el.setPointerCapture(e.pointerId)
       activeTool().onPointerDown(normalize(e), ctx)
     }
@@ -156,34 +187,52 @@ export function Editor2D() {
       // cursor tracking for paste targets — rAF-coalesced ⇒ ≤1 write/frame,
       // read imperatively (nothing subscribes)
       useInteractionStore.getState().set({ pointerWorld: n.world })
-      if (panning && e.pointerId === panning.pointerId) {
+      if (panning) {
+        if (e.pointerId !== panning.pointerId) return
+        if ((e.buttons & panning.buttonBit) === 0) {
+          // chorded release: the initiating button lifted, another is held
+          if (el.hasPointerCapture(panning.pointerId)) el.releasePointerCapture(panning.pointerId)
+          panning = null
+          return
+        }
         useViewportStore.getState().panBy(e.clientX - panning.lastX, e.clientY - panning.lastY)
         panning.lastX = e.clientX
         panning.lastY = e.clientY
         return
       }
+      if (gesturePointerId !== null && e.pointerId !== gesturePointerId) return
       activeTool().onPointerMove(n, ctx)
     }
     const onPointerMove = (e: PointerEvent) => {
+      // foreign pointers are filtered at ENQUEUE time: the single coalescing
+      // slot must never let a second pointer overwrite (starve) the gesture
+      // or pan pointer's queued move for that frame
+      if (panning && e.pointerId !== panning.pointerId) return
+      if (!panning && gesturePointerId !== null && e.pointerId !== gesturePointerId) return
       pendingMove = e
       if (!rafId) rafId = requestAnimationFrame(flushMove)
     }
     const onPointerUp = (e: PointerEvent) => {
       if (pendingMove) flushMove()
-      if (panning && e.pointerId === panning.pointerId) {
-        el.releasePointerCapture(panning.pointerId)
+      if (panning) {
+        if (e.pointerId !== panning.pointerId) return
+        if (el.hasPointerCapture(panning.pointerId)) el.releasePointerCapture(panning.pointerId)
         panning = null
         return
       }
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      if (gesturePointerId !== null && e.pointerId !== gesturePointerId) return
+      gesturePointerId = null
       activeTool().onPointerUp(normalize(e), ctx)
     }
     const onPointerCancel = (e: PointerEvent) => {
-      panning = null
+      if (panning?.pointerId === e.pointerId) panning = null
       // pointercancel mid-gesture must abort (plan-pinned) — tools handle
-      // Escape identically
-      activeTool().onKeyDown?.('Escape', ctx)
-      void e
+      // Escape identically; cancels of foreign pointers don't reach the tool
+      if (gesturePointerId === null || e.pointerId === gesturePointerId) {
+        gesturePointerId = null
+        activeTool().onKeyDown?.('Escape', ctx)
+      }
     }
     const onDblClick = (e: MouseEvent) => {
       activeTool().onDoubleClick?.(normalize(e as PointerEvent), ctx)

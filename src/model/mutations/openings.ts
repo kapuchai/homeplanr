@@ -153,15 +153,20 @@ export function updateOpening(
 
 /**
  * Clamp every opening into its wall's straight core with margins, serialize
- * overlaps in t-order, and clamp vertical extents; delete what cannot fit.
+ * overlaps in t-order, and clamp vertical extents; delete what cannot fit —
+ * in COMMIT mode only. Live mode (per-frame drags) clamps what it can and
+ * leaves non-fitting openings UNTOUCHED: a transiently-too-short wall during
+ * a node drag must never permanently destroy its doors (the pointer-up
+ * commit re-run decides for real; wallSolids' defensive re-check keeps the
+ * render legal in the meantime).
  * Runs on every pipeline pass (cheap: one outline computation per call).
  */
-export function revalidateOpenings(doc: ProjectDocument): void {
+export function revalidateOpenings(doc: ProjectDocument, mode: MutationMode = 'commit'): void {
   const byWall = new Map<WallId, Opening[]>()
   for (const op of Object.values(doc.openings)) {
     const w = doc.walls[op.wallId]
     if (!w) {
-      delete doc.openings[op.id] // orphaned
+      if (mode === 'commit') delete doc.openings[op.id] // orphaned
       continue
     }
     ;(byWall.get(op.wallId) ?? byWall.set(op.wallId, []).get(op.wallId)!).push(op)
@@ -177,7 +182,7 @@ export function revalidateOpenings(doc: ProjectDocument): void {
     const nb = doc.nodes[w.b]
     const core = outlines.wallCores[wallId]
     if (!na || !nb || !core) {
-      for (const op of ops) delete doc.openings[op.id]
+      if (mode === 'commit') for (const op of ops) delete doc.openings[op.id]
       continue
     }
     const L = dist(na, nb)
@@ -196,32 +201,36 @@ export function revalidateOpenings(doc: ProjectDocument): void {
           ;(op as Record<K, number>)[key] = value
         }
       }
-      // --- vertical clamps first (independent of position) ---
+      // --- vertical clamps first (independent of position; compute-then-
+      // assign so live mode never writes a value it would then delete) ---
       if (op.kind === 'door') {
-        assign('height', Math.min(op.height, H - DEFAULTS.openingHeadroom))
-        if (op.height <= 0) {
-          delete doc.openings[op.id]
+        const h = Math.min(op.height, H - DEFAULTS.openingHeadroom)
+        if (h <= 0) {
+          if (mode === 'commit') delete doc.openings[op.id]
           continue
         }
+        assign('height', h)
       } else {
-        assign('sillHeight', Math.min(Math.max(op.sillHeight, 0), H - DEFAULTS.openingHeadroom))
-        assign('height', Math.min(op.height, H - DEFAULTS.openingHeadroom - op.sillHeight))
-        if (op.height < DEFAULTS.minWindowHeight) {
-          delete doc.openings[op.id]
+        const sill = Math.min(Math.max(op.sillHeight, 0), H - DEFAULTS.openingHeadroom)
+        const h = Math.min(op.height, H - DEFAULTS.openingHeadroom - sill)
+        if (h < DEFAULTS.minWindowHeight) {
+          if (mode === 'commit') delete doc.openings[op.id]
           continue
         }
+        assign('sillHeight', sill)
+        assign('height', h)
       }
       // --- horizontal clamp + overlap serialization ---
       const half = op.width / 2
       if (hi - cursor < op.width) {
-        delete doc.openings[op.id]
-        continue
+        if (mode === 'commit') delete doc.openings[op.id]
+        continue // live: leave untouched — never delete mid-gesture
       }
       let u = op.t * L
       if (u - half < cursor) u = cursor + half
       if (u + half > hi) u = hi - half
       if (u - half < cursor - 1e-12) {
-        delete doc.openings[op.id]
+        if (mode === 'commit') delete doc.openings[op.id]
         continue
       }
       assign('t', u / L)

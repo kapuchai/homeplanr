@@ -5,6 +5,8 @@ import { ensureThumbnails, getThumbnail } from '../catalog/thumbnails'
 import { SymbolRenderer } from '../editor2d/render/SymbolRenderer'
 import { useUiStore } from '../store/uiStore'
 import { useDocStore } from '../store/docStore'
+import { switchTool } from '../editor2d/tools/toolRegistry'
+import { flushPendingNudge } from '../editor2d/tools/keymap'
 import { useInteractionStore } from '../editor2d/session/interactionStore'
 import { useViewportStore } from '../editor2d/viewport/viewportStore'
 import { screenToWorld } from '../editor2d/viewport/viewportMath'
@@ -79,19 +81,23 @@ function ItemCard({ item }: { item: CatalogItem }) {
     const ui = useUiStore.getState()
     useInteractionStore.getState().clear()
     if (!drag.started) {
-      // plain click: toggle armed click-to-place
+      // plain click: toggle armed click-to-place. switchTool (never
+      // setActiveTool): the outgoing tool must deactivate — disarming via
+      // setActiveTool used to skip place-furniture's onDeactivate and leak
+      // ghost rotation/mirror state into the next arming
       if (armed) {
+        switchTool('select')
         ui.setToolParams({ catalogItemId: null })
-        ui.setActiveTool('select')
       } else {
         ui.setToolParams({ catalogItemId: item.id })
-        ui.setActiveTool('place-furniture')
+        switchTool('place-furniture')
       }
       return
     }
     // drag path: place at the drop point when it lands on the canvas
     const over = overCanvas(e.clientX, e.clientY)
     if (!over) return // dropped over chrome — cancel
+    flushPendingNudge() // the drop must not fold into a pending nudge entry
     const id = useDocStore.getState().addFurniture({
       catalogItemId: item.id,
       x: over.world.x,
@@ -101,7 +107,7 @@ function ItemCard({ item }: { item: CatalogItem }) {
       elevation: item.defaultElevation ?? 0,
     })
     ui.setSelection([id])
-    ui.setActiveTool('select')
+    switchTool('select')
     ui.setToolParams({ catalogItemId: null })
   }
 

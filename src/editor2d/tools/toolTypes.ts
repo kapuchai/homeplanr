@@ -15,6 +15,10 @@ export interface EditorPointerEvent {
   screen: Vec2
   mods: { shift: boolean; ctrl: boolean; alt: boolean }
   button: number
+  /** Held-buttons bitmask (PointerEvent.buttons). Chorded releases fire no
+   * pointerup, so tools watch bit 1 mid-drag; undefined ⇒ primary held
+   * (scripted tests). */
+  buttons?: number
   pointerId: number
 }
 

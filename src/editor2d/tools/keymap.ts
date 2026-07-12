@@ -2,7 +2,16 @@ import type { ToolContext } from './toolTypes'
 import { switchTool, type ToolRegistry } from './toolRegistry'
 import { buildPasteParams, copyFurniture, hasClipboard, pasteTarget } from '../clipboard'
 import { useConfirmStore } from '../../app/confirmStore'
-import { isTxActive, safeRedo, safeUndo, beginTx, commitTx } from '../../store/transactions'
+import {
+  isTxActive,
+  activeTxToken,
+  safeRedo,
+  safeUndo,
+  beginTx,
+  commitTx,
+  abortTx,
+  type TxToken,
+} from '../../store/transactions'
 import { getDerived } from '../../store/derived'
 import { polygonBounds } from '../../geometry/polygon'
 import { docContentBounds } from '../render/bounds'
@@ -61,8 +70,36 @@ export function zoomToFitContent(doc: ProjectDocument): void {
 
 interface NudgeState {
   timer: ReturnType<typeof setTimeout> | null
+  /** Owner token of the coalesced nudge tx — the idle timer and flush commit
+   * ONLY this token, so a stale timer can never close a later gesture's tx. */
+  tx: TxToken
 }
-const nudge: NudgeState = { timer: null }
+const nudge: NudgeState = { timer: null, tx: 0 }
+
+/**
+ * Commit a pending arrow-nudge run immediately (instead of at the 300ms idle
+ * timer). Called for every non-arrow, non-modifier key — and by pointer entry
+ * points (Editor2D pointerdown, toolbar undo/redo, File menu, catalog drop) —
+ * so subsequent actions act on the POST-nudge doc rather than silently
+ * no-oping behind `isTxActive()` or folding into the nudge's undo entry.
+ * Safe against later gestures: commitTx is token-gated, so if the nudge tx
+ * was already preempted this is a no-op. Returns true when it actually
+ * committed a pending nudge (callers with targeted-undo semantics swallow
+ * their action for that press).
+ */
+export function flushPendingNudge(): boolean {
+  if (!nudge.timer) return false
+  clearTimeout(nudge.timer)
+  nudge.timer = null
+  const owned = activeTxToken() === nudge.tx && isTxActive()
+  commitTx(nudge.tx)
+  return owned
+}
+
+const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
+// bare non-acting keys that must not split a coalesced nudge run
+// (AltGraph matters: it is a routinely-pressed bare key on EU layouts)
+const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'NumLock', 'ScrollLock', 'Dead', 'Compose']
 
 export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry): void {
   // desktop app: never let the webview act like a browser
@@ -85,6 +122,12 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   }
   const ui = ctx.ui()
   const key = e.key
+
+  // any non-arrow, non-modifier key commits a pending nudge run first, so
+  // everything below sees the post-nudge doc (arrows continue the run;
+  // bare modifiers must not split it — Shift mid-run switches step size)
+  const nudgeFlushed =
+    !ARROWS.includes(key) && !MODIFIERS.includes(key) ? flushPendingNudge() : false
 
   // file operations (gated while a gesture is live)
   if (e.ctrlKey && !isTxActive()) {
@@ -188,19 +231,29 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     }
   }
 
+  // R/F reach the ACTIVE TOOL first — the place-furniture ghost consumes
+  // them for pre-placement rotate/flip. Without this, placement selecting
+  // the dropped item would shadow the ghost forever after the first drop
+  // (the global handlers below act on the selection and return). The raw
+  // key is passed through: 'R' (shifted) means counter-rotate to the ghost.
+  const lk = key.toLowerCase()
+  if (!isTxActive() && !e.ctrlKey && !e.altKey && (lk === 'r' || lk === 'f')) {
+    if (registry.get(ui.activeTool).onKeyDown?.(key, ctx)) return
+  }
+
   // rotate selected furniture ±90° — one transaction, one undo entry
   if (!isTxActive() && key.toLowerCase() === 'r' && !e.ctrlKey) {
     const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
     if (ids.length) {
       const dir = e.shiftKey ? -1 : 1
-      beginTx()
+      const tx = beginTx()
       for (const id of ids) {
         const f = ctx.doc().furniture[id as FurnitureId]!
         ctx.actions().transformFurniture(id as FurnitureId, {
           rotation: f.rotation + (dir * Math.PI) / 2,
         })
       }
-      commitTx()
+      commitTx(tx)
       return
     }
   }
@@ -209,19 +262,19 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   if (!isTxActive() && key.toLowerCase() === 'f' && !e.ctrlKey) {
     const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
     if (ids.length) {
-      beginTx()
+      const tx = beginTx()
       for (const id of ids) {
         const f = ctx.doc().furniture[id as FurnitureId]!
         ctx.actions().transformFurniture(id as FurnitureId, { mirrored: !f.mirrored })
       }
-      commitTx()
+      commitTx(tx)
       return
     }
   }
 
   // arrow nudge — coalesced into one tx committed after 300ms idle; with no
   // furniture selected the arrows pan the 2D viewport (screen px, no tx)
-  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+  if (ARROWS.includes(key)) {
     const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
     if (!ids.length) {
       if (ui.viewMode !== '2d') return
@@ -238,7 +291,13 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     const step = (e.shiftKey ? 0.1 : 0.01) * (key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1)
     const dx = key === 'ArrowLeft' || key === 'ArrowRight' ? step : 0
     const dy = key === 'ArrowUp' || key === 'ArrowDown' ? step : 0
-    if (!isTxActive()) beginTx()
+    // arrows while a FOREIGN gesture owns the tx (mid-drag) are swallowed —
+    // folding a nudge into another gesture's undo entry (and losing it on
+    // that gesture's Esc) is worse than ignoring the keypress
+    if (isTxActive() && activeTxToken() !== nudge.tx) return
+    // preempt:'commit' — a drag starting inside the idle window COMMITS this
+    // run (its own undo entry) instead of silently reverting it
+    if (!isTxActive()) nudge.tx = beginTx({ preempt: 'commit' })
     for (const id of ids) {
       const f = ctx.doc().furniture[id as FurnitureId]!
       ctx.actions().transformFurniture(id as FurnitureId, { x: f.x + dx, y: f.y + dy })
@@ -246,13 +305,17 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     if (nudge.timer) clearTimeout(nudge.timer)
     nudge.timer = setTimeout(() => {
       nudge.timer = null
-      if (isTxActive()) commitTx()
+      commitTx(nudge.tx) // token-gated: no-ops if a later gesture owns the tx
     }, 300)
     return
   }
 
   // deletion (never mid-gesture; rooms are derived — not deletable)
   if ((key === 'Delete' || key === 'Backspace') && !isTxActive()) {
+    // Backspace is a TARGETED undo (draw-wall steps back one segment): when
+    // this very press flushed a nudge, the top history entry is the nudge,
+    // not the segment — swallow the press instead of desyncing the chain
+    if (key === 'Backspace' && nudgeFlushed) return
     const tool = registry.get(ui.activeTool)
     if (tool.onKeyDown?.(key, ctx)) return // draw-wall Backspace steps back
     const ids = ui.selection.filter((id) => !ctx.doc().rooms[id as never]) as (
@@ -294,6 +357,12 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   if (key === 'Escape') {
     const tool = registry.get(ui.activeTool)
     if (tool.onKeyDown?.('Escape', ctx)) return // ① gesture / tool state
+    // ①.5 safety net: a tx no tool claims is stuck (exception mid-gesture) —
+    // without this, token-gated aborts would leave the keyboard locked out
+    if (isTxActive()) {
+      abortTx()
+      return
+    }
     if (ui.activeTool !== 'select') {
       switchTool('select') // ② back to select
       return
@@ -310,11 +379,3 @@ export function handleKeyUp(e: { key: string }, ctx: ToolContext): void {
   if (e.key === ' ') ctx.ui().setSpaceHeld(false)
 }
 
-/** Test hook: flush a pending nudge coalescing timer immediately. */
-export function flushNudgeForTests(): void {
-  if (nudge.timer) {
-    clearTimeout(nudge.timer)
-    nudge.timer = null
-    if (isTxActive()) commitTx()
-  }
-}

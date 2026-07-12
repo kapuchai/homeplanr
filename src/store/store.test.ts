@@ -307,3 +307,58 @@ describe('crash recovery decisions', () => {
     expect(decodeRecovery('{"v":2}')).toBeNull()
   })
 })
+
+describe('transaction ownership tokens (M1 0.3.0)', () => {
+  it('a stale owner token can neither commit nor abort a later transaction', () => {
+    drawSquare()
+    const nodeId = Object.keys(useDocStore.getState().doc.nodes)[0]! as NodeId
+    const stale = beginTx()
+    useDocStore.getState().moveNode(nodeId, vec(1, 1), { mode: 'live' })
+    abortTx(stale)
+    const base = past()
+    const current = beginTx()
+    useDocStore.getState().moveNode(nodeId, vec(2, 2), { mode: 'live' })
+    const during = useDocStore.getState().doc
+    commitTx(stale) // e.g. the nudge idle timer firing mid-drag
+    expect(isTxActive()).toBe(true)
+    expect(useDocStore.getState().doc).toBe(during)
+    abortTx(stale) // e.g. an outgoing tool's onDeactivate
+    expect(isTxActive()).toBe(true)
+    useDocStore.getState().moveNode(nodeId, vec(2, 2), { mode: 'commit' })
+    commitTx(current)
+    expect(isTxActive()).toBe(false)
+    expect(past()).toBe(base + 1)
+  })
+
+  it("beginTx COMMITS an open preempt:'commit' tx (coalesced nudge) as its own entry", () => {
+    const id = useDocStore
+      .getState()
+      .addFurniture({ catalogItemId: 'test-box', x: 2, y: 2, size: { w: 1, d: 1, h: 1 } })
+    const base = past()
+    beginTx({ preempt: 'commit' })
+    useDocStore.getState().transformFurniture(id, { x: 3 })
+    const second = beginTx() // preemption commits, never reverts
+    expect(past()).toBe(base + 1)
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(3)
+    useDocStore.getState().transformFurniture(id, { x: 5 })
+    commitTx(second)
+    expect(past()).toBe(base + 2)
+    safeUndo()
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(3)
+    safeUndo()
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(2)
+  })
+
+  it('beginTx ABORTS an open default-policy tx (unclosed gesture), as before', () => {
+    const id = useDocStore
+      .getState()
+      .addFurniture({ catalogItemId: 'test-box', x: 2, y: 2, size: { w: 1, d: 1, h: 1 } })
+    const base = past()
+    beginTx()
+    useDocStore.getState().transformFurniture(id, { x: 9 })
+    const second = beginTx()
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(2) // reverted
+    expect(past()).toBe(base)
+    abortTx(second)
+  })
+})

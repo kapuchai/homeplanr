@@ -8,10 +8,10 @@ import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
 import { screenToWorld } from '../viewport/viewportMath'
 import { resetDerivedForTests } from '../../store/derived'
-import { abortTx, clearHistory, isTxActive } from '../../store/transactions'
+import { abortTx, beginTx as beginTxForTest, clearHistory, isTxActive, safeUndo } from '../../store/transactions'
 import { switchTool, toolContext, toolRegistry } from './toolRegistry'
 import { clearClipboardForTests, hasClipboard } from '../clipboard'
-import { handleKey, handleKeyUp, flushNudgeForTests, type KeyInput } from './keymap'
+import { handleKey, handleKeyUp, flushPendingNudge, type KeyInput } from './keymap'
 import type { EditorPointerEvent } from './toolTypes'
 import { emptyDocument } from '../../model/types'
 import { newProjectId, type FurnitureId } from '../../model/ids'
@@ -63,6 +63,7 @@ const drag = (from: Vec2, to: Vec2, mods?: Partial<EditorPointerEvent['mods']>) 
 }
 
 beforeEach(() => {
+  flushPendingNudge() // defuse any timer a prior test left armed
   if (isTxActive()) abortTx()
   registry.switchTo(ctx, 'select')
   useDocStore.setState({ doc: emptyDocument(newProjectId(), 'test', '2026-07-11T00:00:00.000Z') })
@@ -463,7 +464,7 @@ describe('keymap', () => {
     handleKey(key('ArrowRight'), ctx, registry)
     handleKey(key('ArrowRight'), ctx, registry)
     handleKey(key('ArrowDown', { shiftKey: true }), ctx, registry)
-    flushNudgeForTests()
+    flushPendingNudge()
     expect(past()).toBe(base + 1)
     const f = useDocStore.getState().doc.furniture[id]!
     expect(f.x).toBeCloseTo(2.02, 9)
@@ -699,7 +700,7 @@ describe('2D viewport navigation', () => {
     const id = addSofa()
     useUiStore.getState().setSelection([id])
     handleKey(key('ArrowRight'), ctx, registry)
-    flushNudgeForTests()
+    flushPendingNudge()
     expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
     expect(useViewportStore.getState().tx).toBe(0)
   })
@@ -748,7 +749,7 @@ describe('keymap 3D gate (M6): file ops stay live, editing keys are 2D-only', ()
     const id = addSofa()
     useUiStore.getState().setSelection([id])
     handleKey(key('ArrowRight'), ctx, registry)
-    flushNudgeForTests()
+    flushPendingNudge()
     expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
     useUiStore.getState().clearSelection()
     handleKey(key('ArrowLeft'), ctx, registry)
@@ -874,5 +875,261 @@ describe('keymap modal guard', () => {
     useUiStore.getState().setOptionsOpen(false)
     handleKey(key('w'), ctx, registry)
     expect(useUiStore.getState().activeTool).toBe('draw-wall')
+  })
+})
+
+describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
+  it('a drag starting inside the nudge idle window: nudge survives as its own entry, the stale timer cannot steal the drag tx', () => {
+    vi.useFakeTimers()
+    try {
+      const id = addSofa()
+      useUiStore.getState().setSelection([id])
+      const base = past()
+      handleKey(key('ArrowRight'), ctx, registry) // x → 2.01, tx open, timer armed
+      // drag begins before the 300ms idle commit
+      tool().onPointerDown(pe(vec(2.01, 2)), ctx)
+      tool().onPointerMove(pe(vec(2.11, 2.1)), ctx) // > slop ⇒ beginTx preempt-commits the nudge
+      expect(past()).toBe(base + 1) // the nudge survived as one entry
+      vi.advanceTimersByTime(300) // stale nudge timer fires MID-DRAG
+      expect(isTxActive()).toBe(true) // …and must not commit the drag's tx
+      tool().onPointerMove(pe(vec(3.01, 2.5)), ctx)
+      tool().onPointerUp(pe(vec(3.01, 2.5)), ctx)
+      expect(isTxActive()).toBe(false)
+      expect(past()).toBe(base + 2) // nudge + drag = exactly two entries
+      safeUndo()
+      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+      safeUndo()
+      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a keymap tool switch inside the idle window flushes the nudge first (one entry, kept)', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    const base = past()
+    handleKey(key('ArrowRight'), ctx, registry)
+    handleKey(key('w'), ctx, registry)
+    expect(useUiStore.getState().activeTool).toBe('draw-wall')
+    expect(isTxActive()).toBe(false)
+    expect(past()).toBe(base + 1)
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+  })
+
+  it('a direct switchTool call (toolbar) cannot revert a pending nudge; the idle timer still commits it', () => {
+    vi.useFakeTimers()
+    try {
+      const id = addSofa()
+      useUiStore.getState().setSelection([id])
+      const base = past()
+      handleKey(key('ArrowRight'), ctx, registry)
+      switchTool('measure') // outgoing select onDeactivate owns no tx — must not abort
+      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+      vi.advanceTimersByTime(300)
+      expect(isTxActive()).toBe(false)
+      expect(past()).toBe(base + 1)
+      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('Ctrl+Z inside the idle window undoes the nudge instead of being swallowed', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    handleKey(key('ArrowRight'), ctx, registry)
+    handleKey(key('z', { ctrlKey: true }), ctx, registry)
+    expect(isTxActive()).toBe(false)
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+  })
+
+  it('R rotates the placement ghost, not the just-placed item (S3)', () => {
+    useUiStore.getState().setToolParams({ catalogItemId: 'sofa-3' })
+    switchTool('place-furniture')
+    tool().onPointerDown(pe(vec(2, 2)), ctx) // place #1 → selects it
+    const first = useUiStore.getState().selection[0]! as FurnitureId
+    expect(useDocStore.getState().doc.furniture[first]).toBeDefined()
+    handleKey(key('r'), ctx, registry) // must reach the GHOST, not the selection
+    expect(useDocStore.getState().doc.furniture[first]!.rotation).toBe(0)
+    tool().onPointerDown(pe(vec(6, 6)), ctx) // place #2 carries the ghost angle
+    const second = useUiStore.getState().selection[0]! as FurnitureId
+    expect(second).not.toBe(first)
+    expect(useDocStore.getState().doc.furniture[second]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+  })
+
+  it('F mirrors the placement ghost; R/F still act on the selection in the select tool', () => {
+    useUiStore.getState().setToolParams({ catalogItemId: 'sofa-3' })
+    switchTool('place-furniture')
+    handleKey(key('f'), ctx, registry)
+    tool().onPointerDown(pe(vec(2, 2)), ctx)
+    const placed = useUiStore.getState().selection[0]! as FurnitureId
+    expect(useDocStore.getState().doc.furniture[placed]!.mirrored).toBe(true)
+    switchTool('select')
+    handleKey(key('r'), ctx, registry) // global handler again: rotates the selection
+    expect(useDocStore.getState().doc.furniture[placed]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+  })
+
+  it('releasing the primary button while another is held ends the drag (chorded release, R6)', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    const base = past()
+    tool().onPointerDown(pe(vec(2, 2)), ctx)
+    tool().onPointerMove({ ...pe(vec(2.1, 2.1)), buttons: 3 }, ctx) // engage (left+right held)
+    tool().onPointerMove({ ...pe(vec(2.5, 2.5)), buttons: 3 }, ctx)
+    expect(isTxActive()).toBe(true)
+    tool().onPointerMove({ ...pe(vec(2.6, 2.6)), buttons: 2 }, ctx) // left lifted, right held
+    expect(isTxActive()).toBe(false) // gesture committed — no phantom tracking
+    expect(past()).toBe(base + 1)
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.5, 9)
+  })
+})
+
+describe('M1 (0.3.0): draw-wall rejected segments (R8)', () => {
+  beforeEach(() => registry.switchTo(ctx, 'draw-wall'))
+
+  it('a rejected duplicate segment does not advance the anchor', () => {
+    click(vec(0, 0))
+    click(vec(4, 0)) // wall A→B, anchor at B
+    click(vec(0, 0)) // B→A duplicates A→B → rejected, anchor must stay at B
+    expect(walls()).toBe(1)
+    click(vec(4, 3)) // continues from B(4,0), not from A(0,0)
+    expect(walls()).toBe(2)
+    const doc = useDocStore.getState().doc
+    const corner = Object.values(doc.nodes).find((n) => n.x === 4 && n.y === 3)!
+    const wall = Object.values(doc.walls).find((w) => w.a === corner.id || w.b === corner.id)!
+    const otherId = wall.a === corner.id ? wall.b : wall.a
+    expect(doc.nodes[otherId]!.x).toBe(4)
+    expect(doc.nodes[otherId]!.y).toBe(0)
+  })
+
+  it('a micro click near the anchor commits nothing and the chain continues from the anchor', () => {
+    // zoomed in: the 4px double-click slop (0.004m at k=1000) is smaller than
+    // minWallLength, so a micro click is a REJECTED segment, not a dbl-click
+    // (Ctrl suspends snapping so the raw click point survives)
+    useViewportStore.setState({ k: 1000 })
+    click(vec(0, 0))
+    click(vec(0.006, 0), { ctrl: true }) // < minWallLength → rejected
+    expect(walls()).toBe(0)
+    click(vec(3, 0), { ctrl: true })
+    expect(walls()).toBe(1)
+  })
+
+  it('Backspace with an armed anchor and zero segments retracts the anchor', () => {
+    click(vec(0, 0))
+    expect(tool().onKeyDown?.('Backspace', ctx)).toBe(true)
+    // fully reset: the next Backspace bubbles to the keymap deletion path
+    expect(tool().onKeyDown?.('Backspace', ctx)).toBe(false)
+    click(vec(1, 1))
+    click(vec(4, 1))
+    expect(walls()).toBe(1) // chain re-arms cleanly after the retraction
+  })
+})
+
+describe('M1 (0.3.0): review-hardening pins', () => {
+  it('chorded primary release while merely pressed runs click semantics', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    tool().onPointerDown(pe(vec(6, 6)), ctx) // press on empty space
+    tool().onPointerMove({ ...pe(vec(6.01, 6)), buttons: 2 }, ctx) // left lifted under slop
+    expect(useUiStore.getState().selection).toEqual([]) // click-on-nothing cleared
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('Escape cancels a pressed-but-not-dragging press (pointercancel path)', () => {
+    const id = addSofa()
+    tool().onPointerDown(pe(vec(2, 2)), ctx) // selects + presses
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    // press is dead: a later move must not start a drag
+    tool().onPointerMove(pe(vec(4, 4)), ctx)
+    tool().onPointerMove(pe(vec(5, 5)), ctx)
+    expect(isTxActive()).toBe(false)
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+  })
+
+  it('arrow keys during a foreign drag are swallowed, never folded into its tx', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    tool().onPointerDown(pe(vec(2, 2)), ctx)
+    tool().onPointerMove(pe(vec(2.5, 2.5)), ctx) // drag engaged, tx open
+    const during = useDocStore.getState().doc
+    handleKey(key('ArrowRight'), ctx, registry)
+    expect(useDocStore.getState().doc).toBe(during) // no mutation joined the drag
+    tool().onKeyDown?.('Escape', ctx) // abort the drag
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+  })
+
+  it('Shift+R counter-rotates the placement ghost', () => {
+    useUiStore.getState().setToolParams({ catalogItemId: 'sofa-3' })
+    switchTool('place-furniture')
+    handleKey(key('R', { shiftKey: true }), ctx, registry)
+    tool().onPointerDown(pe(vec(2, 2)), ctx)
+    const placed = useUiStore.getState().selection[0]! as FurnitureId
+    expect(useDocStore.getState().doc.furniture[placed]!.rotation).toBeCloseTo(-Math.PI / 2, 9)
+  })
+
+  it('a bare AltGraph tap mid-run does not split the nudge (EU layouts)', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    const base = past()
+    handleKey(key('ArrowRight'), ctx, registry)
+    handleKey(key('AltGraph'), ctx, registry)
+    handleKey(key('ArrowRight'), ctx, registry)
+    flushPendingNudge()
+    expect(past()).toBe(base + 1) // ONE coalesced entry
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.02, 9)
+  })
+
+  it('re-arming with a DIFFERENT card resets the ghost rotation/mirror (same-tool path)', () => {
+    useUiStore.getState().setToolParams({ catalogItemId: 'sofa-3' })
+    switchTool('place-furniture')
+    handleKey(key('r'), ctx, registry)
+    handleKey(key('f'), ctx, registry)
+    // switching cards keeps the tool active — onDeactivate never runs
+    useUiStore.getState().setToolParams({ catalogItemId: 'bed-double' })
+    tool().onPointerDown(pe(vec(3, 3)), ctx)
+    const placed = useUiStore.getState().selection[0]! as FurnitureId
+    const f = useDocStore.getState().doc.furniture[placed]!
+    expect(f.rotation).toBe(0)
+    expect(f.mirrored).toBeUndefined()
+  })
+
+  it('ghost rotation/mirror reset when the tool properly deactivates', () => {
+    useUiStore.getState().setToolParams({ catalogItemId: 'sofa-3' })
+    switchTool('place-furniture')
+    handleKey(key('f'), ctx, registry)
+    handleKey(key('r'), ctx, registry)
+    switchTool('select') // onDeactivate clears params + ghost state
+    expect(useUiStore.getState().toolParams.catalogItemId).toBeNull()
+    useUiStore.getState().setToolParams({ catalogItemId: 'sofa-3' })
+    switchTool('place-furniture')
+    tool().onPointerDown(pe(vec(2, 2)), ctx)
+    const placed = useUiStore.getState().selection[0]! as FurnitureId
+    const f = useDocStore.getState().doc.furniture[placed]!
+    expect(f.mirrored).toBeUndefined()
+    expect(f.rotation).toBe(0)
+  })
+
+  it('Backspace that flushes a nudge is swallowed: the wall chain stays intact', () => {
+    const id = addSofa(8, 8)
+    registry.switchTo(ctx, 'draw-wall')
+    click(vec(0, 0))
+    click(vec(4, 0))
+    useUiStore.getState().setSelection([id])
+    handleKey(key('ArrowRight'), ctx, registry) // nudge tx pending
+    handleKey(key('Backspace'), ctx, registry) // flushes + is swallowed
+    expect(walls()).toBe(1) // the segment was NOT stepped back
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(8.01, 9) // nudge kept
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('Escape force-aborts a stuck ownerless transaction (safety net)', () => {
+    const id = addSofa()
+    const stuck = beginTxForTest()
+    useDocStore.getState().transformFurniture(id, { x: 9 })
+    handleKey(key('Escape'), ctx, registry)
+    expect(isTxActive()).toBe(false)
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9) // reverted
+    void stuck
   })
 })

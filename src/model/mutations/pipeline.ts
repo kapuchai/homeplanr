@@ -10,17 +10,19 @@ import { reconcileRooms } from './rooms'
  *   same undo entry.
  * - 'live': per-frame drag updates — graph normalization and room
  *   reconciliation are skipped (topology fixes happen at pointer-up when the
- *   tool re-runs the final mutation in 'commit' mode); opening clamps still
- *   run so drags can never leave openings outside their walls.
+ *   tool re-runs the final mutation in 'commit' mode); opening clamps run
+ *   where possible but NEVER delete — a transiently non-fitting opening is
+ *   left untouched in the doc (wallSolids re-clamps defensively at render)
+ *   so an overshoot mid-drag can't destroy doors/windows permanently.
  */
 export type MutationMode = 'live' | 'commit'
 
 export function runPipeline(doc: ProjectDocument, mode: MutationMode): void {
   if (mode === 'commit') {
     normalizeGraph(doc)
-    revalidateOpenings(doc)
+    revalidateOpenings(doc, 'commit')
     reconcileRooms(doc)
   } else {
-    revalidateOpenings(doc)
+    revalidateOpenings(doc, 'live')
   }
 }

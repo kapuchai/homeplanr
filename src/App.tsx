@@ -18,6 +18,7 @@ import {
 } from './store/persistence/controller'
 import { exportImage } from './export/exportController'
 import { switchTool } from './editor2d/tools/toolRegistry'
+import { flushPendingNudge } from './editor2d/tools/keymap'
 import { CatalogPanel } from './app/CatalogPanel'
 import { PropertiesPanel } from './app/PropertiesPanel'
 import { ConfirmDialog } from './app/ConfirmDialog'
@@ -48,6 +49,7 @@ function FileMenu() {
   const canRecent = usePersistStore((s) => !!s.adapter?.readPath)
   const run = (fn: () => void | Promise<unknown>) => () => {
     setOpen(false)
+    flushPendingNudge() // menu actions act on the post-nudge doc
     void fn()
   }
   return (
@@ -173,10 +175,28 @@ function Toolbar() {
         {toolBtn('Measure', activeTool === 'measure', () => switchTool('measure'), 'Measure (M)')}
       </div>
       <div className="segmented">
-        <button type="button" disabled={!canUndo || !is2d} onClick={safeUndo} title="Undo (Ctrl+Z)">
+        <button
+          type="button"
+          disabled={!canUndo || !is2d}
+          onClick={() => {
+            // commit a pending nudge first — safeUndo silently no-ops
+            // behind an open tx, which would eat the click
+            flushPendingNudge()
+            safeUndo()
+          }}
+          title="Undo (Ctrl+Z)"
+        >
           ↩
         </button>
-        <button type="button" disabled={!canRedo || !is2d} onClick={safeRedo} title="Redo (Ctrl+Shift+Z)">
+        <button
+          type="button"
+          disabled={!canRedo || !is2d}
+          onClick={() => {
+            flushPendingNudge()
+            safeRedo()
+          }}
+          title="Redo (Ctrl+Shift+Z)"
+        >
           ↪
         </button>
       </div>
