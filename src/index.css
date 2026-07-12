@@ -572,6 +572,18 @@ textarea,
   max-width: 70%;
 }
 
+/* Floating zoom cluster over the 2D canvas (segmented look). */
+.canvas-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  pointer-events: auto;
+}
+
+.canvas-controls .zoom-level {
+  min-width: 52px; /* the % readout must not jiggle the row as digits change */
+}
+
 .empty-state {
   position: absolute;
   inset: 0;

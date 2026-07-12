@@ -11,15 +11,17 @@ import { add, perp, scale } from '../../geometry/vec'
 import { CATALOG } from '../../catalog'
 import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
+import { DimensionsLayer } from './DimensionsLayer'
 import { rotateHandlePos } from '../tools/handles'
 import { useThemeStore } from '../../theme/themeStore'
 import type { Theme2D } from '../../theme/theme2d'
 import type { WallSolid } from '../../geometry/wallSolids'
 
 /**
- * Read-only world rendering (M2). Layer order (bottom→top): rooms → labels
- * → walls (ONE path incl. patches; opening cover rects) → opening symbols
- * → furniture → selection outlines. All strokes non-scaling.
+ * Read-only world rendering (M2). Layer order (bottom→top): rooms → walls
+ * (ONE path incl. patches; opening cover rects) → opening symbols →
+ * furniture → room labels → wall dimensions → selection outlines. All
+ * strokes non-scaling.
  * M3a refactors to per-entity subscriptions when drags land.
  */
 const polyPath = (poly: readonly Vec2[]): string =>
@@ -44,6 +46,7 @@ export function WorldLayers() {
       <OpeningsLayer doc={doc} derived={derived} />
       <FurnitureLayer doc={doc} />
       <RoomLabels derived={derived} />
+      <DimensionsLayer />
       <SelectionLayer doc={doc} derived={derived} />
     </>
   )

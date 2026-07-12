@@ -4,6 +4,7 @@ import { useUiStore } from '../../store/uiStore'
 import { useConfirmStore } from '../../app/confirmStore'
 import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
+import { screenToWorld } from '../viewport/viewportMath'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
 import { abortTx, clearHistory, isTxActive } from '../../store/transactions'
 import { createToolRegistry } from './toolRegistry'
@@ -72,6 +73,7 @@ beforeEach(() => {
   useUiStore.getState().clearSelection()
   useUiStore.getState().setHovered(null)
   useUiStore.getState().setOptionsOpen(false)
+  useUiStore.getState().setViewMode('2d')
   if (useConfirmStore.getState().pending) useConfirmStore.getState().resolve('')
   useViewportStore.setState({ k: 100, tx: 0, ty: 0, width: 800, height: 600 })
   useInteractionStore.getState().clear()
@@ -219,6 +221,94 @@ describe('select tool drags', () => {
   })
 })
 
+describe('live measurement pills', () => {
+  const pills = () => useInteractionStore.getState().pills
+  const pillTexts = () => pills().map((p) => p.text)
+  const square = () =>
+    useDocStore.getState().addWallChain([vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+  const addBox = (x: number, y: number) =>
+    useDocStore.getState().addFurniture({
+      catalogItemId: 'test-box',
+      x,
+      y,
+      size: { w: 1, d: 0.6, h: 1 },
+    })
+
+  it('opening drag publishes width + gap pills tracking the live realized interval', () => {
+    const r = useDocStore.getState().addWallSegment(vec(0, 0), vec(6, 0))
+    const opId = useDocStore.getState().addOpening({ kind: 'door', wallId: r.wallId!, t: 0.5 })!
+    useUiStore.getState().setSelection([opId])
+    tool().onPointerDown(pe(vec(3, 0)), ctx)
+    tool().onPointerMove(pe(vec(3.1, 0)), ctx) // past slop: drag arms
+    tool().onPointerMove(pe(vec(3.6, 0)), ctx) // t → 0.6 ⇒ realized [3.15, 4.05]
+    expect(pillTexts()).toEqual(['0.90 m', '3.15 m', '1.95 m'])
+    tool().onPointerMove(pe(vec(4.2, 0)), ctx) // keeps tracking ⇒ [3.75, 4.65]
+    expect(pillTexts()).toEqual(['0.90 m', '3.75 m', '1.35 m'])
+    tool().onPointerUp(pe(vec(4.2, 0)), ctx)
+    expect(pills()).toEqual([])
+  })
+
+  it('furniture drag publishes edge distances + passive wall lengths', () => {
+    square()
+    const id = addBox(2, 1.5)
+    useUiStore.getState().setSelection([id])
+    tool().onPointerDown(pe(vec(2, 1.5), { ctrl: true }), ctx)
+    tool().onPointerMove(pe(vec(2.1, 1.5), { ctrl: true }), ctx) // arm
+    tool().onPointerMove(pe(vec(2, 1.5), { ctrl: true }), ctx) // measure at the center
+    const measure = pills().filter((p) => !p.tone)
+    const passive = pills().filter((p) => p.tone === 'passive')
+    expect(measure).toHaveLength(4)
+    expect(measure.every((p) => p.from && p.to)).toBe(true)
+    expect(passive.map((p) => p.text).sort()).toEqual(['3.00 m', '3.00 m', '4.00 m', '4.00 m'])
+    tool().onPointerUp(pe(vec(2, 1.5), { ctrl: true }), ctx)
+    expect(pills()).toEqual([])
+  })
+
+  it('group drag measures the grabbed item only', () => {
+    square()
+    const a = addBox(2, 1.5)
+    const b = addBox(2.6, 1.5)
+    useUiStore.getState().setSelection([a, b])
+    tool().onPointerDown(pe(vec(2, 1.5), { ctrl: true }), ctx) // grabs a
+    tool().onPointerMove(pe(vec(2.1, 1.5), { ctrl: true }), ctx)
+    tool().onPointerMove(pe(vec(2, 1.4), { ctrl: true }), ctx)
+    const dists = pills()
+      .filter((p) => !p.tone)
+      .map((p) => Math.hypot(p.to!.x - p.from!.x, p.to!.y - p.from!.y))
+      .sort((x, y) => x - y)
+    // a's clearances at (2, 1.4) — b's would be [0.825, …, 2.025]
+    expect(dists).toHaveLength(4)
+    expect(dists[0]).toBeCloseTo(1.025, 9)
+    expect(dists[1]).toBeCloseTo(1.225, 9)
+    expect(dists[2]).toBeCloseTo(1.425, 9)
+    expect(dists[3]).toBeCloseTo(1.425, 9)
+    // both items still moved rigidly
+    tool().onPointerUp(pe(vec(2, 1.4), { ctrl: true }), ctx)
+    expect(useDocStore.getState().doc.furniture[b]!.y).toBeCloseTo(1.4, 6)
+  })
+
+  it('wall drag publishes incident wall lengths; Esc abort clears pills', () => {
+    square()
+    tool().onPointerDown(pe(vec(2, 0)), ctx)
+    tool().onPointerMove(pe(vec(2, 0.1)), ctx) // arm
+    tool().onPointerMove(pe(vec(2, 0.5)), ctx) // side walls live-shrink to 2.5
+    expect(pillTexts().sort()).toEqual(['2.50 m', '2.50 m', '4.00 m'])
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(pills()).toEqual([])
+  })
+
+  it('node drag publishes incident wall lengths', () => {
+    const ids = square()
+    useUiStore.getState().setSelection([ids[0]!]) // makes the corner node hittable
+    tool().onPointerDown(pe(vec(0, 0)), ctx)
+    tool().onPointerMove(pe(vec(0.1, 0.1)), ctx) // arm
+    tool().onPointerMove(pe(vec(0, 1)), ctx)
+    expect(pillTexts().sort()).toEqual(['2.00 m', '4.12 m'])
+    tool().onPointerUp(pe(vec(0, 1)), ctx)
+    expect(pills()).toEqual([])
+  })
+})
+
 describe('keymap', () => {
   it('focus guard: typing "w" in an input does NOT switch tools', () => {
     handleKey(key('w', { editableTarget: true }), ctx, registry)
@@ -309,6 +399,126 @@ describe('keymap', () => {
     expect(useUiStore.getState().spaceHeld).toBe(true)
     handleKeyUp({ key: ' ' }, ctx)
     expect(useUiStore.getState().spaceHeld).toBe(false)
+  })
+})
+
+describe('2D viewport navigation', () => {
+  it('empty-space left-drag pans by the screen delta; selection and history untouched', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    const base = past()
+    tool().onPointerDown(pe(vec(8, 8)), ctx)
+    tool().onPointerMove(pe(vec(8.1, 8.1)), ctx) // past slop → pan engages
+    expect(isTxActive()).toBe(false)
+    tool().onPointerMove(pe(vec(9, 8.5)), ctx)
+    expect(isTxActive()).toBe(false)
+    tool().onPointerUp(pe(vec(9, 8.5)), ctx)
+    const vp = useViewportStore.getState()
+    expect(vp.tx).toBeCloseTo(100, 9) // full screen delta: (9−8)·100px
+    expect(vp.ty).toBeCloseTo(50, 9)
+    expect(useUiStore.getState().selection).toEqual([id])
+    expect(past()).toBe(base)
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('sub-slop press-release on empty space still clears the selection', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    tool().onPointerDown(pe(vec(8, 8)), ctx)
+    tool().onPointerMove(pe(vec(8.02, 8.02)), ctx) // ~2.8px < 4px slop
+    tool().onPointerUp(pe(vec(8.02, 8.02)), ctx)
+    expect(useUiStore.getState().selection).toHaveLength(0)
+    expect(useViewportStore.getState().tx).toBe(0)
+  })
+
+  it("cursorHint is 'grabbing' while panning and null after release", () => {
+    tool().onPointerDown(pe(vec(8, 8)), ctx)
+    tool().onPointerMove(pe(vec(8.5, 8.5)), ctx)
+    expect(useInteractionStore.getState().cursorHint).toBe('grabbing')
+    tool().onPointerUp(pe(vec(8.5, 8.5)), ctx)
+    expect(useInteractionStore.getState().cursorHint).toBeNull()
+  })
+
+  it('Escape mid-pan is consumed, ends the pan, and later moves stop panning', () => {
+    tool().onPointerDown(pe(vec(8, 8)), ctx)
+    tool().onPointerMove(pe(vec(8.5, 8.5)), ctx)
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(useInteractionStore.getState().cursorHint).toBeNull()
+    const { tx, ty } = useViewportStore.getState()
+    tool().onPointerMove(pe(vec(10, 10)), ctx)
+    expect(useViewportStore.getState().tx).toBe(tx)
+    expect(useViewportStore.getState().ty).toBe(ty)
+    expect(past()).toBe(0)
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('arrows pan when nothing is selected (Shift = 3×) — no tx, no undo entries', () => {
+    handleKey(key('ArrowLeft'), ctx, registry)
+    expect(useViewportStore.getState().tx).toBe(80)
+    handleKey(key('ArrowRight', { shiftKey: true }), ctx, registry)
+    expect(useViewportStore.getState().tx).toBe(-160)
+    handleKey(key('ArrowUp'), ctx, registry)
+    expect(useViewportStore.getState().ty).toBe(80)
+    handleKey(key('ArrowDown'), ctx, registry)
+    expect(useViewportStore.getState().ty).toBe(0)
+    expect(past()).toBe(0)
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('arrows pan with a wall selected (furniture filter empty); the wall stays put', () => {
+    const r = useDocStore.getState().addWallSegment(vec(0, 0), vec(4, 0))
+    useUiStore.getState().setSelection([r.wallId!])
+    const base = past()
+    handleKey(key('ArrowUp'), ctx, registry)
+    expect(useViewportStore.getState().ty).toBe(80)
+    expect(past()).toBe(base)
+    const w = useDocStore.getState().doc.walls[r.wallId!]!
+    expect(useDocStore.getState().doc.nodes[w.a]!.y).toBe(0)
+  })
+
+  it('arrows still nudge (never pan) with furniture selected', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    handleKey(key('ArrowRight'), ctx, registry)
+    flushNudgeForTests()
+    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+    expect(useViewportStore.getState().tx).toBe(0)
+  })
+
+  it('arrow pan is 2D-only', () => {
+    useUiStore.getState().setViewMode('3d')
+    handleKey(key('ArrowLeft'), ctx, registry)
+    expect(useViewportStore.getState().tx).toBe(0)
+  })
+
+  it("'+'/'=' zoom in and '-'/'_' zoom out, all about the viewport center", () => {
+    const before = screenToWorld(vec(400, 300), useViewportStore.getState())
+    handleKey(key('+'), ctx, registry)
+    expect(useViewportStore.getState().k).toBeCloseTo(125, 9) // ×1.25
+    const mid = screenToWorld(vec(400, 300), useViewportStore.getState())
+    expect(mid.x).toBeCloseTo(before.x, 9)
+    expect(mid.y).toBeCloseTo(before.y, 9)
+    handleKey(key('='), ctx, registry)
+    expect(useViewportStore.getState().k).toBeCloseTo(156.25, 9)
+    handleKey(key('-'), ctx, registry)
+    handleKey(key('_', { shiftKey: true }), ctx, registry)
+    expect(useViewportStore.getState().k).toBeCloseTo(100, 9)
+    const after = screenToWorld(vec(400, 300), useViewportStore.getState())
+    expect(after.x).toBeCloseTo(before.x, 9)
+    expect(after.y).toBeCloseTo(before.y, 9)
+  })
+
+  it('zoom keys are dropped in 3D view, while typing, and with Ctrl held', () => {
+    useUiStore.getState().setViewMode('3d')
+    handleKey(key('+'), ctx, registry)
+    expect(useViewportStore.getState().k).toBe(100)
+    useUiStore.getState().setViewMode('2d')
+    handleKey(key('+', { editableTarget: true }), ctx, registry)
+    expect(useViewportStore.getState().k).toBe(100)
+    handleKey(key('-', { ctrlKey: true }), ctx, registry)
+    expect(useViewportStore.getState().k).toBe(100)
+    handleKey(key('+'), ctx, registry)
+    expect(useViewportStore.getState().k).toBeCloseTo(125, 9)
   })
 })
 

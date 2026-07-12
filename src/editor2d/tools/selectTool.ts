@@ -13,16 +13,26 @@ import {
   wallBackCandidate,
 } from '../snap/candidates'
 import { beginTx, commitTx, abortTx, isTxActive } from '../../store/transactions'
+import { useViewportStore } from '../viewport/viewportStore'
+import { useAppSettings } from '../../store/appSettings'
 import { CATALOG } from '../../catalog'
 import { rotateHandlePos, HANDLE_RADIUS_PX } from './handles'
+import {
+  furnitureDragPills,
+  incidentWallIds,
+  openingDragPills,
+  wallLengthPills,
+  type MeasureInput,
+} from '../measure/liveMeasurements'
 import type { FurnitureId, NodeId, OpeningId, WallId } from '../../model/ids'
 
 /**
  * Select/move tool — drag branches per hit kind (plan-pinned):
  * furniture (single grab-offset / multi rigid), rotate handle (15° detents,
  * Ctrl free), opening slide (clamped along its wall), wall perpendicular
- * translate, node drag with drop-on-node merge. Every drag is one
- * transaction ⇒ one undo entry; Esc aborts.
+ * translate, node drag with drop-on-node merge, empty-space drag panning
+ * the viewport. Every entity drag is one transaction ⇒ one undo entry
+ * (panning opens none); Esc aborts.
  */
 const SLOP_PX = 4
 
@@ -35,6 +45,7 @@ type DragState =
       world: Vec2
       additive: boolean
     }
+  | { kind: 'panning'; lastScreen: Vec2 }
   | {
       kind: 'furniture'
       ids: FurnitureId[]
@@ -53,7 +64,15 @@ type DragState =
       center: Vec2
     }
   | { kind: 'node'; nodeId: NodeId; lastSnap: SnapResult | null }
-  | { kind: 'wall'; wallId: WallId; normal: Vec2; startWorld: Vec2; applied: number }
+  | {
+      kind: 'wall'
+      wallId: WallId
+      normal: Vec2
+      startWorld: Vec2
+      applied: number
+      /** Measurement scope, frozen at drag-arm (topology never changes mid-drag). */
+      pillWallIds: WallId[]
+    }
   | { kind: 'opening'; openingId: OpeningId; wallId: WallId }
 
 export function createSelectTool(): Tool {
@@ -69,6 +88,15 @@ export function createSelectTool(): Tool {
     ctx
       .ui()
       .selection.filter((id) => ctx.doc().furniture[id as FurnitureId]) as FurnitureId[]
+
+  // pills must measure the POST-mutation doc — snapshot AFTER the move applies
+  // (the destructures at the top of onPointerMove are stale by then)
+  const measureInput = (ctx: ToolContext): MeasureInput => ({
+    doc: ctx.doc(),
+    derived: ctx.derived(),
+    pxToWorld: ctx.pxToWorld(),
+    units: useAppSettings.getState().units,
+  })
 
   const beginFurnitureDrag = (
     ctx: ToolContext,
@@ -185,12 +213,19 @@ export function createSelectTool(): Tool {
 
         case 'pressed': {
           if (dist(state.screen, e.screen) < SLOP_PX) return
+          cycle = null // an engaged drag ends any click-cycling sequence
           const hit = state.hit
           if (!hit) {
-            state = { kind: 'idle' } // marquee is v1.5
+            // empty-space drag pans the viewport — SCREEN deltas only (world
+            // coords feed back under a moving viewport); no transaction, so
+            // undo history stays untouched
+            useViewportStore
+              .getState()
+              .panBy(e.screen.x - state.screen.x, e.screen.y - state.screen.y)
+            state = { kind: 'panning', lastScreen: e.screen }
+            ctx.interaction().set({ cursorHint: 'grabbing' })
             return
           }
-          cycle = null // an engaged drag ends any click-cycling sequence
           if (hit.kind === 'furniture') {
             beginFurnitureDrag(ctx, hit.id, state.world)
           } else if (hit.kind === 'node') {
@@ -209,6 +244,9 @@ export function createSelectTool(): Tool {
               normal: perp(normalize(sub(nb, na))),
               startWorld: state.world,
               applied: 0,
+              pillWallIds: [
+                ...new Set([hit.id, ...incidentWallIds(doc, w.a), ...incidentWallIds(doc, w.b)]),
+              ],
             }
             ctx.interaction().set({ gestureActive: true })
           } else if (hit.kind === 'opening') {
@@ -220,6 +258,14 @@ export function createSelectTool(): Tool {
           } else {
             state = { kind: 'idle' } // rooms don't drag
           }
+          return
+        }
+
+        case 'panning': {
+          useViewportStore
+            .getState()
+            .panBy(e.screen.x - state.lastScreen.x, e.screen.y - state.lastScreen.y)
+          state.lastScreen = e.screen
           return
         }
 
@@ -268,7 +314,12 @@ export function createSelectTool(): Tool {
               { quantize: false },
             )
           }
-          ctx.interaction().set({ snap, gestureActive: true })
+          ctx.interaction().set({
+            snap,
+            gestureActive: true,
+            // group drags measure the grabbed item only (matches guide behavior)
+            pills: furnitureDragPills(measureInput(ctx), state.grabbedId),
+          })
           return
         }
 
@@ -297,10 +348,7 @@ export function createSelectTool(): Tool {
         case 'node': {
           const node = doc.nodes[state.nodeId]
           if (!node) return
-          const incident = new Set<WallId>()
-          for (const w of Object.values(doc.walls)) {
-            if (w.a === state.nodeId || w.b === state.nodeId) incident.add(w.id)
-          }
+          const incident = new Set(incidentWallIds(doc, state.nodeId))
           const snap = resolveSnap(
             e.world,
             [
@@ -316,7 +364,12 @@ export function createSelectTool(): Tool {
           )
           state.lastSnap = snap
           ctx.actions().moveNode(state.nodeId, snap.point, { mode: 'live' })
-          ctx.interaction().set({ snap, gestureActive: true })
+          const mi = measureInput(ctx)
+          ctx.interaction().set({
+            snap,
+            gestureActive: true,
+            pills: wallLengthPills(mi, incidentWallIds(mi.doc, state.nodeId)),
+          })
           return
         }
 
@@ -327,6 +380,9 @@ export function createSelectTool(): Tool {
             ctx.actions().moveWall(state.wallId, scale(state.normal, step), { mode: 'live' })
             state.applied = target
           }
+          ctx.interaction().set({
+            pills: wallLengthPills(measureInput(ctx), state.pillWallIds),
+          })
           return
         }
 
@@ -338,6 +394,9 @@ export function createSelectTool(): Tool {
           if (!op || !wall || !na || !nb) return
           const { t } = closestPointOnSegment(e.world, na, nb)
           ctx.actions().updateOpening(state.openingId, { t }, { mode: 'live' })
+          ctx.interaction().set({
+            pills: openingDragPills(measureInput(ctx), state.openingId, e.world),
+          })
           return
         }
       }
@@ -366,6 +425,10 @@ export function createSelectTool(): Tool {
             }
           }
           state = { kind: 'idle' }
+          return
+        }
+        case 'panning': {
+          reset(ctx) // a pan is not a click — the selection stays as it was
           return
         }
         case 'furniture': {

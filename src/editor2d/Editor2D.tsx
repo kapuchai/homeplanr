@@ -9,11 +9,10 @@ import { useViewportTransform } from './viewport/useViewportTransform'
 import { GridLayer } from './viewport/GridLayer'
 import { WorldLayers } from './render/WorldLayers'
 import { InteractionOverlay } from './render/InteractionOverlay'
-import { docContentBounds } from './render/bounds'
-import { polygonBounds } from '../geometry/polygon'
 import { createToolRegistry } from './tools/toolRegistry'
-import { handleKey, handleKeyUp, toKeyInput } from './tools/keymap'
+import { handleKey, handleKeyUp, toKeyInput, zoomToFitContent } from './tools/keymap'
 import { EmptyState, StatusHint } from '../app/StatusHint'
+import { ZoomControls } from './ZoomControls'
 import type { EditorPointerEvent, ToolContext } from './tools/toolTypes'
 
 /**
@@ -52,8 +51,7 @@ export function Editor2D() {
     ro.observe(el)
     const r = el.getBoundingClientRect()
     useViewportStore.getState().setSize(r.width, r.height)
-    const doc = useDocStore.getState().doc
-    useViewportStore.getState().zoomToFit(polygonBounds(docContentBounds(doc, getDerived(doc))))
+    zoomToFitContent(useDocStore.getState().doc)
     return () => ro.disconnect()
   }, [])
 
@@ -238,7 +236,8 @@ export function Editor2D() {
 
   const spaceHeld = useUiStore((s) => s.spaceHeld)
   const activeToolId = useUiStore((s) => s.activeTool)
-  const cursor = spaceHeld ? 'grab' : registry.get(activeToolId).cursor(ctx)
+  const cursorHint = useInteractionStore((s) => s.cursorHint)
+  const cursor = spaceHeld ? 'grab' : (cursorHint ?? registry.get(activeToolId).cursor(ctx))
 
   return (
     <div
@@ -264,6 +263,7 @@ export function Editor2D() {
       </svg>
       <EmptyState />
       <StatusHint />
+      <ZoomControls />
     </div>
   )
 }

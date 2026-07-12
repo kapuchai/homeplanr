@@ -12,6 +12,10 @@ export interface DimensionPill {
   text: string
   /** Optional leader line from `at` to `to`. */
   to?: Vec2
+  /** With `to`: a dashed measure line from→to (perpendicular end ticks); the pill floats at `at`. */
+  from?: Vec2
+  /** 'passive' renders muted (context readouts, e.g. full wall lengths). */
+  tone?: 'measure' | 'passive'
 }
 
 export interface WallDrawPreview {
@@ -38,6 +42,8 @@ export interface InteractionState {
   pills: DimensionPill[]
   /** Mirrors transactions.isTxActive for cheap subscription by UI chrome. */
   gestureActive: boolean
+  /** Cursor override while a gesture owns the pointer (e.g. 'grabbing'). */
+  cursorHint: string | null
   set: (patch: Partial<Omit<InteractionState, 'set' | 'clear'>>) => void
   clear: () => void
 }
@@ -47,6 +53,8 @@ export const useInteractionStore = create<InteractionState>()((set) => ({
   snap: null,
   pills: [],
   gestureActive: false,
+  cursorHint: null,
   set: (patch) => set(patch),
-  clear: () => set({ preview: null, snap: null, pills: [], gestureActive: false }),
+  clear: () =>
+    set({ preview: null, snap: null, pills: [], gestureActive: false, cursorHint: null }),
 }))

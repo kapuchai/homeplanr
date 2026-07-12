@@ -6,7 +6,10 @@ import { getDerived } from '../../store/derived'
 import { polygonBounds } from '../../geometry/polygon'
 import { docContentBounds } from '../render/bounds'
 import { useViewportStore } from '../viewport/viewportStore'
+import { useAppSettings } from '../../store/appSettings'
+import { KEY_ZOOM_FACTOR } from '../viewport/viewportMath'
 import type { FurnitureId, NodeId, OpeningId, WallId } from '../../model/ids'
+import type { ProjectDocument } from '../../model/types'
 
 /**
  * THE keyboard entry point (plan-pinned):
@@ -46,6 +49,11 @@ export function toKeyInput(e: KeyboardEvent): KeyInput {
     preventDefault: () => e.preventDefault(),
     ...(editable && t instanceof HTMLElement ? { blurTarget: () => t.blur() } : {}),
   }
+}
+
+/** Fit the 2D view to the doc content — Shift+1 and the ZoomControls Fit button. */
+export function zoomToFitContent(doc: ProjectDocument): void {
+  useViewportStore.getState().zoomToFit(polygonBounds(docContentBounds(doc, getDerived(doc))))
 }
 
 interface NudgeState {
@@ -128,8 +136,9 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     return
   }
 
-  // tool hotkeys (blocked mid-gesture)
-  if (!isTxActive() && !e.ctrlKey && !e.altKey) {
+  // tool hotkeys (blocked mid-gesture; plain letters only — Shift+letter is
+  // reserved for view toggles like Shift+D)
+  if (!isTxActive() && !e.ctrlKey && !e.altKey && !e.shiftKey) {
     if (key.toLowerCase() === 'v') {
       registry.switchTo(ctx, 'select')
       return
@@ -167,10 +176,21 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     }
   }
 
-  // arrow nudge — coalesced into one tx committed after 300ms idle
+  // arrow nudge — coalesced into one tx committed after 300ms idle; with no
+  // furniture selected the arrows pan the 2D viewport (screen px, no tx)
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
     const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
-    if (!ids.length) return
+    if (!ids.length) {
+      if (ui.viewMode !== '2d') return
+      e.preventDefault()
+      const s = e.shiftKey ? 240 : 80
+      // camera moves toward the arrow ⇒ content slides the opposite way
+      useViewportStore.getState().panBy(
+        key === 'ArrowLeft' ? s : key === 'ArrowRight' ? -s : 0,
+        key === 'ArrowUp' ? s : key === 'ArrowDown' ? -s : 0,
+      )
+      return
+    }
     e.preventDefault()
     const step = (e.shiftKey ? 0.1 : 0.01) * (key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1)
     const dx = key === 'ArrowLeft' || key === 'ArrowRight' ? step : 0
@@ -204,8 +224,26 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
 
   // zoom to fit
   if (e.shiftKey && (key === '1' || key === '!')) {
-    const doc = ctx.doc()
-    useViewportStore.getState().zoomToFit(polygonBounds(docContentBounds(doc, getDerived(doc))))
+    zoomToFitContent(ctx.doc())
+    return
+  }
+
+  // wall-dimension labels (2D annotation layer)
+  if (e.shiftKey && !e.ctrlKey && !e.altKey && key.toLowerCase() === 'd' && ui.viewMode === '2d') {
+    const settings = useAppSettings.getState()
+    settings.setShowDimensions(!settings.showDimensions)
+    return
+  }
+
+  // keyboard zoom about the viewport center ('+'/'=' in, '-'/'_' out) —
+  // like wheel zoom, deliberately not isTxActive-gated
+  if (!e.ctrlKey && !e.altKey && ['+', '=', '-', '_'].includes(key) && ui.viewMode === '2d') {
+    e.preventDefault()
+    const vp = useViewportStore.getState()
+    vp.zoomAtPoint(
+      { x: vp.width / 2, y: vp.height / 2 },
+      key === '+' || key === '=' ? KEY_ZOOM_FACTOR : 1 / KEY_ZOOM_FACTOR,
+    )
     return
   }
 

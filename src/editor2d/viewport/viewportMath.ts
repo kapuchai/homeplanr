@@ -24,6 +24,8 @@ export interface Viewport {
 export const K_MIN = 5
 export const K_MAX = 1000
 export const K_DEFAULT = 60
+/** Zoom step per '+'/'−' key press and per ZoomControls button click. */
+export const KEY_ZOOM_FACTOR = 1.25
 
 export const clampK = (k: number): number => Math.min(K_MAX, Math.max(K_MIN, k))
 

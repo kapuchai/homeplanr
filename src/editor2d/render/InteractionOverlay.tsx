@@ -1,35 +1,14 @@
 import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
 import { useThemeStore } from '../../theme/themeStore'
-import type { Vec2 } from '../../geometry/vec'
+import { normalize, perp, scale, sub, type Vec2 } from '../../geometry/vec'
+import { Pill } from './Pill'
 
 /**
  * The ONLY per-frame render layer: tool previews, snap indicators,
  * alignment guides, and dimension pills — all fed from interactionStore.
  */
 const GUIDE_EXTENT = 2000 // world meters; effectively infinite lines
-
-function Pill({ at, text, k }: { at: Vec2; text: string; k: number }) {
-  const theme = useThemeStore((s) => s.theme)
-  const w = text.length * 6.6 + 12
-  return (
-    // counter-scale flips y back (world renders y-up) so text stays upright
-    <g transform={`translate(${at.x} ${at.y}) scale(${1 / k} ${-1 / k})`} pointerEvents="none">
-      <rect
-        x={-w / 2}
-        y={-20}
-        width={w}
-        height={18}
-        rx={5}
-        fill={theme.pillBg}
-        stroke={theme.pillBorder}
-      />
-      <text textAnchor="middle" y={-7} fontSize={11} fill={theme.text}>
-        {text}
-      </text>
-    </g>
-  )
-}
 
 export function InteractionOverlay() {
   const preview = useInteractionStore((s) => s.preview)
@@ -198,7 +177,37 @@ export function InteractionOverlay() {
 
   // --- dimension pills ---
   pills.forEach((p, i) => {
-    if (p.to) {
+    if (p.from && p.to) {
+      // measured span: dashed from→to line with perpendicular end ticks
+      const t = scale(perp(normalize(sub(p.to, p.from))), px(3))
+      const tick = (c: Vec2, key: string) => (
+        <line
+          key={key}
+          x1={c.x - t.x}
+          y1={c.y - t.y}
+          x2={c.x + t.x}
+          y2={c.y + t.y}
+          stroke={theme.textMuted}
+          strokeWidth={1}
+          vectorEffect="non-scaling-stroke"
+        />
+      )
+      els.push(
+        <line
+          key={`pm${i}`}
+          x1={p.from.x}
+          y1={p.from.y}
+          x2={p.to.x}
+          y2={p.to.y}
+          stroke={theme.textMuted}
+          strokeWidth={1}
+          strokeDasharray="3 3"
+          vectorEffect="non-scaling-stroke"
+        />,
+        tick(p.from, `pt${i}a`),
+        tick(p.to, `pt${i}b`),
+      )
+    } else if (p.to) {
       els.push(
         <line
           key={`pl${i}`}
@@ -213,7 +222,7 @@ export function InteractionOverlay() {
         />,
       )
     }
-    els.push(<Pill key={`p${i}`} at={p.at} text={p.text} k={k} />)
+    els.push(<Pill key={`p${i}`} at={p.at} text={p.text} k={k} tone={p.tone} />)
   })
 
   return <g pointerEvents="none">{els}</g>

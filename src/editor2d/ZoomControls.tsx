@@ -1,0 +1,60 @@
+import { useDocStore } from '../store/docStore'
+import { useAppSettings } from '../store/appSettings'
+import { useViewportStore } from './viewport/viewportStore'
+import { K_DEFAULT, KEY_ZOOM_FACTOR } from './viewport/viewportMath'
+import { zoomToFitContent } from './tools/keymap'
+
+/**
+ * Bottom-right zoom cluster: [−] [NN%] [+] [Fit] [Dim]. Every button swallows
+ * its mousedown — a focused button would re-trigger on the next Space press
+ * (the pan key). Subscribes only to `k` and the dimensions toggle.
+ */
+export function ZoomControls() {
+  const k = useViewportStore((s) => s.k)
+  const showDimensions = useAppSettings((s) => s.showDimensions)
+  const zoomAtCenter = (factor: number) => {
+    const vp = useViewportStore.getState()
+    vp.zoomAtPoint({ x: vp.width / 2, y: vp.height / 2 }, factor)
+  }
+  return (
+    <div className="canvas-controls segmented small">
+      <button
+        title="Zoom out (−)"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => zoomAtCenter(1 / KEY_ZOOM_FACTOR)}
+      >
+        −
+      </button>
+      <button
+        className="zoom-level"
+        title="Reset zoom"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => zoomAtCenter(K_DEFAULT / useViewportStore.getState().k)}
+      >
+        {Math.round((k / K_DEFAULT) * 100)}%
+      </button>
+      <button
+        title="Zoom in (+)"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => zoomAtCenter(KEY_ZOOM_FACTOR)}
+      >
+        +
+      </button>
+      <button
+        title="Zoom to fit (Shift+1)"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => zoomToFitContent(useDocStore.getState().doc)}
+      >
+        Fit
+      </button>
+      <button
+        className={showDimensions ? 'active' : ''}
+        title="Wall dimensions (Shift+D)"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => useAppSettings.getState().setShowDimensions(!showDimensions)}
+      >
+        Dim
+      </button>
+    </div>
+  )
+}
