@@ -133,6 +133,12 @@ Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
   `APPIMAGE_EXTRACT_AND_RUN=1` for bundling and use
   `--appimage-extract-and-run` to run AppImages.
 - **Playwright WebKit cannot launch on Arch** (Ubuntu-named libs); CI covers it.
+- **The pinned tauri-cli emits `Exec=homeplanr` WITHOUT `%F` and ships no
+  shared-mime XML** for `bundle.fileAssociations` — Linux double-click would
+  silently do nothing. `src-tauri/homeplanr.desktop` (literal template with
+  `Exec=homeplanr %F`) + `src-tauri/mime/homeplanr.xml` are wired via
+  `bundle.linux.{deb,rpm}.desktopTemplate/files`. If the CLI is ever bumped,
+  re-inspect a built .deb (`ar x` + `bsdtar`) before deleting them.
 - **Door-arc sweep flags are empirically pinned** (two user checks, y-down
   and y-up). Verify visually after any viewport-transform change; don't
   re-derive from theory.

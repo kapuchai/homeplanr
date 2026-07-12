@@ -1,0 +1,10 @@
+[Desktop Entry]
+Categories=Graphics;2DGraphics;
+Comment=Home planning app — draw floor plans in 2D, furnish them, and view in 3D
+Exec=homeplanr %F
+StartupWMClass=homeplanr
+Icon=homeplanr
+Name=homeplanr
+Terminal=false
+Type=Application
+MimeType=application/x-homeplanr
