@@ -5,28 +5,24 @@ import { useConfirmStore } from '../../app/confirmStore'
 import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
 import { screenToWorld } from '../viewport/viewportMath'
-import { getDerived, resetDerivedForTests } from '../../store/derived'
+import { resetDerivedForTests } from '../../store/derived'
 import { abortTx, clearHistory, isTxActive } from '../../store/transactions'
-import { createToolRegistry } from './toolRegistry'
+import { switchTool, toolContext, toolRegistry } from './toolRegistry'
+import { clearClipboardForTests, hasClipboard } from '../clipboard'
 import { handleKey, handleKeyUp, flushNudgeForTests, type KeyInput } from './keymap'
-import type { EditorPointerEvent, ToolContext } from './toolTypes'
+import type { EditorPointerEvent } from './toolTypes'
 import { emptyDocument } from '../../model/types'
 import { newProjectId, type FurnitureId } from '../../model/ids'
 import { vec, type Vec2 } from '../../geometry/vec'
 
 /**
  * Tool state machines driven by scripted event sequences against the REAL
- * document store — the plan's M3a regression net.
+ * document store — the plan's M3a regression net. Runs on the app-shared
+ * registry/context singletons: switchTool and the keymap must deactivate
+ * the very instances these tests drive.
  */
-const registry = createToolRegistry()
-const ctx: ToolContext = {
-  doc: () => useDocStore.getState().doc,
-  derived: () => getDerived(useDocStore.getState().doc),
-  actions: () => useDocStore.getState(),
-  ui: () => useUiStore.getState(),
-  interaction: () => useInteractionStore.getState(),
-  pxToWorld: () => 1 / useViewportStore.getState().k,
-}
+const registry = toolRegistry
+const ctx = toolContext
 
 const past = () => docTemporal.getState().pastStates.length
 const walls = () => Object.keys(useDocStore.getState().doc.walls).length
@@ -77,6 +73,8 @@ beforeEach(() => {
   if (useConfirmStore.getState().pending) useConfirmStore.getState().resolve('')
   useViewportStore.setState({ k: 100, tx: 0, ty: 0, width: 800, height: 600 })
   useInteractionStore.getState().clear()
+  useInteractionStore.getState().set({ pointerWorld: null }) // clear() spares it
+  clearClipboardForTests()
 })
 
 const addSofa = (x = 2, y = 2): FurnitureId =>
@@ -309,6 +307,93 @@ describe('live measurement pills', () => {
   })
 })
 
+describe('measure tool', () => {
+  const pills = () => useInteractionStore.getState().pills
+
+  beforeEach(() => registry.switchTo(ctx, 'measure'))
+
+  it('two clicks freeze a read-only pill; doc identity, history, tx untouched', () => {
+    useDocStore.getState().addWallSegment(vec(0, 0), vec(6, 0))
+    const pristine = useDocStore.getState().doc
+    const base = past()
+    tool().onPointerMove(pe(vec(1, 2)), ctx)
+    expect(pills()).toEqual([]) // no first point yet — snap only
+    click(vec(1, 2))
+    expect(isTxActive()).toBe(false)
+    tool().onPointerMove(pe(vec(3, 2)), ctx)
+    expect(pills()).toHaveLength(1)
+    expect(pills()[0]!.text).toBe('2.00 m')
+    click(vec(3, 2))
+    expect(pills()).toHaveLength(1)
+    expect(pills()[0]!.tone).toBe('measure')
+    expect(pills()[0]!.from!.x).toBeCloseTo(1, 9)
+    expect(pills()[0]!.from!.y).toBeCloseTo(2, 9)
+    expect(pills()[0]!.to!.x).toBeCloseTo(3, 9)
+    expect(pills()[0]!.to!.y).toBeCloseTo(2, 9)
+    // frozen pill survives hover moves after the 2nd click
+    tool().onPointerMove(pe(vec(5, 5)), ctx)
+    expect(pills()[0]!.text).toBe('2.00 m')
+    expect(useDocStore.getState().doc).toBe(pristine)
+    expect(past()).toBe(base)
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('node-to-node across a wall snaps to the exact wall length', () => {
+    useDocStore.getState().addWallSegment(vec(0, 0), vec(4, 0))
+    click(vec(0.03, 0.04)) // within the 10px node capture radius
+    tool().onPointerMove(pe(vec(3.95, 0.05)), ctx)
+    click(vec(3.95, 0.05))
+    expect(pills()).toHaveLength(1)
+    expect(pills()[0]!.text).toBe('4.00 m')
+  })
+
+  it('a 3rd click starts a fresh measurement', () => {
+    click(vec(0, 0))
+    click(vec(2, 0))
+    expect(pills()[0]!.text).toBe('2.00 m')
+    click(vec(10, 10)) // new first point — old pill gone
+    expect(pills()).toEqual([])
+    tool().onPointerMove(pe(vec(10, 13)), ctx)
+    expect(pills()[0]!.text).toBe('3.00 m')
+  })
+
+  it('Esc: pending point → true; frozen pill → true; idle → false (bubbles)', () => {
+    click(vec(1, 1))
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(pills()).toEqual([])
+    click(vec(1, 1))
+    click(vec(2, 1))
+    expect(pills()).toHaveLength(1)
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(pills()).toEqual([])
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(false)
+  })
+})
+
+describe('switchTool (shared keymap/toolbar switch path)', () => {
+  it('clears a frozen measure pill on switch (onDeactivate runs)', () => {
+    switchTool('measure')
+    click(vec(1, 1))
+    click(vec(3, 1))
+    expect(useInteractionStore.getState().pills).toHaveLength(1)
+    switchTool('select')
+    expect(useUiStore.getState().activeTool).toBe('select')
+    expect(useInteractionStore.getState().pills).toEqual([])
+  })
+
+  it('toolbar-style switch aborts a pending wall chain (regression: setActiveTool bypassed onDeactivate)', () => {
+    switchTool('draw-wall')
+    click(vec(0, 0)) // pending anchor publishes a preview
+    expect(useInteractionStore.getState().preview).not.toBeNull()
+    switchTool('select')
+    expect(useInteractionStore.getState().preview).toBeNull()
+    // and the dropped anchor is really gone: reactivating draws nothing yet
+    switchTool('draw-wall')
+    click(vec(2, 0))
+    expect(walls()).toBe(0) // first click of a NEW chain, not a segment
+  })
+})
+
 describe('keymap', () => {
   it('focus guard: typing "w" in an input does NOT switch tools', () => {
     handleKey(key('w', { editableTarget: true }), ctx, registry)
@@ -399,6 +484,138 @@ describe('keymap', () => {
     expect(useUiStore.getState().spaceHeld).toBe(true)
     handleKeyUp({ key: ' ' }, ctx)
     expect(useUiStore.getState().spaceHeld).toBe(false)
+  })
+})
+
+describe('clipboard copy/paste', () => {
+  const copy = () => handleKey(key('c', { ctrlKey: true }), ctx, registry)
+  const paste = () => handleKey(key('v', { ctrlKey: true }), ctx, registry)
+  const furnitureCount = () => Object.keys(useDocStore.getState().doc.furniture).length
+
+  it('Ctrl+C/Ctrl+V pastes at pointerWorld as ONE undo entry and selects the copy', () => {
+    const id = addSofa(2, 2)
+    useUiStore.getState().setSelection([id])
+    useInteractionStore.getState().set({ pointerWorld: vec(6, 7) })
+    copy()
+    const base = past()
+    paste()
+    expect(past()).toBe(base + 1)
+    const sel = useUiStore.getState().selection
+    expect(sel).toHaveLength(1)
+    expect(sel[0]).not.toBe(id)
+    const f = useDocStore.getState().doc.furniture[sel[0]! as FurnitureId]!
+    expect(f.x).toBeCloseTo(6, 9)
+    expect(f.y).toBeCloseTo(7, 9)
+    expect(f.catalogItemId).toBe('sofa-3')
+  })
+
+  it('multi-item paste preserves relative offsets around the centroid', () => {
+    const a = addSofa(2, 2)
+    const b = addSofa(4, 3)
+    useUiStore.getState().setSelection([a, b])
+    copy()
+    useInteractionStore.getState().set({ pointerWorld: vec(10, 10) })
+    const base = past()
+    paste()
+    expect(past()).toBe(base + 1)
+    const sel = useUiStore.getState().selection
+    expect(sel).toHaveLength(2)
+    const [fa, fb] = sel.map((s) => useDocStore.getState().doc.furniture[s as FurnitureId]!)
+    expect(fa!.x).toBeCloseTo(9, 9) // centroid (3, 2.5) → target (10, 10)
+    expect(fa!.y).toBeCloseTo(9.5, 9)
+    expect(fb!.x).toBeCloseTo(11, 9)
+    expect(fb!.y).toBeCloseTo(10.5, 9)
+  })
+
+  it('paste with the pointer off-canvas lands at the copy anchor + 0.25', () => {
+    const id = addSofa(2, 2)
+    useUiStore.getState().setSelection([id])
+    copy()
+    paste() // beforeEach left pointerWorld null
+    const f =
+      useDocStore.getState().doc.furniture[useUiStore.getState().selection[0]! as FurnitureId]!
+    expect(f.x).toBeCloseTo(2.25, 9)
+    expect(f.y).toBeCloseTo(2.25, 9)
+  })
+
+  it('clipboard survives replaceDocument — paste lands in the fresh doc', () => {
+    const id = addSofa(2, 2)
+    useUiStore.getState().setSelection([id])
+    copy()
+    useDocStore
+      .getState()
+      .replaceDocument(emptyDocument(newProjectId(), 'fresh', '2026-07-12T00:00:00.000Z'))
+    expect(furnitureCount()).toBe(0)
+    paste()
+    expect(furnitureCount()).toBe(1)
+  })
+
+  it('Ctrl+V is a no-op mid-transaction', () => {
+    const id = addSofa(2, 2)
+    useUiStore.getState().setSelection([id])
+    copy()
+    tool().onPointerDown(pe(vec(2, 2)), ctx)
+    tool().onPointerMove(pe(vec(3, 3)), ctx) // live drag → tx active
+    expect(isTxActive()).toBe(true)
+    paste()
+    expect(furnitureCount()).toBe(1)
+    tool().onKeyDown?.('Escape', ctx)
+  })
+
+  it('copying a wall-only selection leaves the clipboard empty', () => {
+    const r = useDocStore.getState().addWallSegment(vec(0, 0), vec(4, 0))
+    useUiStore.getState().setSelection([r.wallId!])
+    copy()
+    expect(hasClipboard()).toBe(false)
+    paste() // silent no-op
+    expect(furnitureCount()).toBe(0)
+  })
+
+  it('mirrored rides along through copy/paste', () => {
+    const id = addSofa(2, 2)
+    useDocStore.getState().transformFurniture(id, { mirrored: true })
+    useUiStore.getState().setSelection([id])
+    copy()
+    paste()
+    const f =
+      useDocStore.getState().doc.furniture[useUiStore.getState().selection[0]! as FurnitureId]!
+    expect(f.mirrored).toBe(true)
+  })
+
+  it('addFurnitureBatch commits N items as ONE undo entry', () => {
+    const base = past()
+    const ids = useDocStore.getState().addFurnitureBatch([
+      { catalogItemId: 'test-box', x: 1, y: 1, size: { w: 1, d: 1, h: 1 } },
+      { catalogItemId: 'test-box', x: 3, y: 1, size: { w: 1, d: 1, h: 1 } },
+    ])
+    expect(ids).toHaveLength(2)
+    expect(past()).toBe(base + 1)
+  })
+})
+
+describe('flip (F)', () => {
+  it('F toggles mirrored on every selected item in ONE undo entry; false deletes the field', () => {
+    const a = addSofa(2, 2)
+    const b = addSofa(6, 2)
+    useUiStore.getState().setSelection([a, b])
+    const base = past()
+    handleKey(key('f'), ctx, registry)
+    expect(past()).toBe(base + 1)
+    expect(useDocStore.getState().doc.furniture[a]!.mirrored).toBe(true)
+    expect(useDocStore.getState().doc.furniture[b]!.mirrored).toBe(true)
+    handleKey(key('f'), ctx, registry)
+    expect(past()).toBe(base + 2)
+    expect('mirrored' in useDocStore.getState().doc.furniture[a]!).toBe(false)
+    expect('mirrored' in useDocStore.getState().doc.furniture[b]!).toBe(false)
+  })
+
+  it('F without selected furniture falls through (no entry)', () => {
+    const r = useDocStore.getState().addWallSegment(vec(0, 0), vec(4, 0))
+    useUiStore.getState().setSelection([r.wallId!])
+    const base = past()
+    handleKey(key('f'), ctx, registry)
+    expect(past()).toBe(base)
+    expect(isTxActive()).toBe(false)
   })
 })
 

@@ -17,6 +17,8 @@ export function StatusHint() {
     text = `Click a wall to place the ${openingKind} · stays armed for more · Esc to finish`
   } else if (tool === 'place-furniture') {
     text = 'Click to place · R rotates the ghost · Esc to finish'
+  } else if (tool === 'measure') {
+    text = 'Click two points to measure · Esc clears'
   } else if (selection.length > 1) {
     text = `${selection.length} selected · drag moves all · R rotates · Ctrl+D duplicates · Del deletes`
   } else if (selection.length === 1) {
@@ -24,7 +26,7 @@ export function StatusHint() {
   } else if (empty) {
     text = 'Press W and click to draw your first wall'
   } else {
-    text = 'V select · W wall · D door · N window · Space pan · Shift+1 fit'
+    text = 'V select · W wall · D door · N window · M measure · Space pan · Shift+1 fit'
   }
 
   return <div className="status-hint">{text}</div>

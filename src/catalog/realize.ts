@@ -7,17 +7,21 @@ import {
 } from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { collectParts, type Part } from './builder'
+import { collectParts, mirrorPart, type Part } from './builder'
 import type { CatalogItem } from './types'
 
 /**
  * Realize a catalog item's part list into merged BufferGeometries —
  * ONE geometry per material slot per item (a sofa = 2 draw calls), cached
- * per item id for the app lifetime; every scene instance shares them.
+ * per item id for the app lifetime (mirrored variants under id+'|m');
+ * every scene instance shares them.
  *
  * Parts are authored in item-local plan-style coords (x right, y depth,
  * z up) and the geometries stay in that frame — the r3f plan group's
- * rotation handles world orientation.
+ * rotation handles world orientation. `mirrored` reflects across
+ * item-local x = 0 (FurnitureInstance.mirrored) by re-emitting each part
+ * through mirrorPart — the same part-level transform builder.mirrorX
+ * uses, never a negative-scale matrix, so winding stays valid.
  */
 export interface RealizedItem {
   groups: { mat: string; geometry: BufferGeometry }[]
@@ -47,11 +51,13 @@ function partGeometry(p: Part): BufferGeometry {
   return geo
 }
 
-export function realizeItem(item: CatalogItem): RealizedItem {
-  const hit = cache.get(item.id)
+export function realizeItem(item: CatalogItem, opts?: { mirrored?: boolean }): RealizedItem {
+  const key = opts?.mirrored ? `${item.id}|m` : item.id
+  const hit = cache.get(key)
   if (hit) return hit
 
-  const parts = collectParts((b) => item.build3d(b, item.dims))
+  let parts = collectParts((b) => item.build3d(b, item.dims))
+  if (opts?.mirrored) parts = parts.map(mirrorPart)
   const bySlot = new Map<string, BufferGeometry[]>()
   for (const p of parts) {
     ;(bySlot.get(p.mat) ?? bySlot.set(p.mat, []).get(p.mat)!).push(partGeometry(p))
@@ -63,6 +69,6 @@ export function realizeItem(item: CatalogItem): RealizedItem {
     for (const g of geos) g.dispose()
   }
   const realized: RealizedItem = { groups }
-  cache.set(item.id, realized)
+  cache.set(key, realized)
   return realized
 }

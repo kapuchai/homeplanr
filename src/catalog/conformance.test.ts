@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CATALOG, CATEGORY_ORDER } from './index'
 import { PALETTE } from './palette'
-import { collectParts, partsBounds } from './builder'
+import { collectParts, mirrorPart, partsBounds, type Builder } from './builder'
 import { symbolFor } from './symbolFromParts'
 import type { SymbolPrim } from './types'
 
@@ -78,6 +78,20 @@ describe('catalog conformance', () => {
     for (const item of items) {
       expect(CATEGORY_ORDER).toContain(item.category)
     }
+  })
+
+  it('mirrorX builder helper and instance mirroring agree', () => {
+    // deliberately asymmetric probe parts exercising every mirrored field:
+    // off-center boxes with full Euler rot, a rounded box, an axis+scale
+    // cylinder
+    const emit = (b: Builder) => {
+      b.box('a', { size: [0.4, 0.3, 0.2], at: [0.25, -0.1, 0.05], rot: [0.3, 0.2, 0.1] })
+      b.box('a', { size: [0.2, 0.15, 0.1], at: [-0.15, 0.2, 0], round: 0.02 })
+      b.cylinder('b', { r: 0.05, h: 0.4, at: [0.3, 0.1, 0], axis: 'y', scale: [1, 1.2, 1] })
+    }
+    const originals = collectParts(emit)
+    const viaMirrorX = collectParts((b) => b.mirrorX(() => emit(b)))
+    expect(viaMirrorX.slice(originals.length)).toEqual(originals.map(mirrorPart))
   })
 
   for (const item of items) {

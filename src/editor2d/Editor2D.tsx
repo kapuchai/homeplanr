@@ -1,19 +1,18 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { useInteractionStore } from './session/interactionStore'
-import { getDerived } from '../store/derived'
 import { useViewportStore } from './viewport/viewportStore'
 import { screenToWorld, wheelZoomFactor } from './viewport/viewportMath'
 import { useViewportTransform } from './viewport/useViewportTransform'
 import { GridLayer } from './viewport/GridLayer'
 import { WorldLayers } from './render/WorldLayers'
 import { InteractionOverlay } from './render/InteractionOverlay'
-import { createToolRegistry } from './tools/toolRegistry'
+import { toolContext, toolRegistry } from './tools/toolRegistry'
 import { handleKey, handleKeyUp, toKeyInput, zoomToFitContent } from './tools/keymap'
 import { EmptyState, StatusHint } from '../app/StatusHint'
 import { ZoomControls } from './ZoomControls'
-import type { EditorPointerEvent, ToolContext } from './tools/toolTypes'
+import type { EditorPointerEvent } from './tools/toolTypes'
 
 /**
  * 2D editor shell: viewport interactions + the tool event pipeline.
@@ -27,18 +26,10 @@ export function Editor2D() {
   const gridRef = useRef<HTMLDivElement>(null)
   useViewportTransform(worldRef, gridRef)
 
-  const registry = useMemo(() => createToolRegistry(), [])
-  const ctx = useMemo<ToolContext>(
-    () => ({
-      doc: () => useDocStore.getState().doc,
-      derived: () => getDerived(useDocStore.getState().doc),
-      actions: () => useDocStore.getState(),
-      ui: () => useUiStore.getState(),
-      interaction: () => useInteractionStore.getState(),
-      pxToWorld: () => 1 / useViewportStore.getState().k,
-    }),
-    [],
-  )
+  // the app-shared registry/context: the toolbar switches tools on the SAME
+  // instances (via switchTool), so onDeactivate always sees this state
+  const registry = toolRegistry
+  const ctx = toolContext
 
   // size tracking + first fit
   useEffect(() => {
@@ -161,13 +152,17 @@ export function Editor2D() {
       if (!pendingMove) return
       const e = pendingMove
       pendingMove = null
+      const n = normalize(e)
+      // cursor tracking for paste targets — rAF-coalesced ⇒ ≤1 write/frame,
+      // read imperatively (nothing subscribes)
+      useInteractionStore.getState().set({ pointerWorld: n.world })
       if (panning && e.pointerId === panning.pointerId) {
         useViewportStore.getState().panBy(e.clientX - panning.lastX, e.clientY - panning.lastY)
         panning.lastX = e.clientX
         panning.lastY = e.clientY
         return
       }
-      activeTool().onPointerMove(normalize(e), ctx)
+      activeTool().onPointerMove(n, ctx)
     }
     const onPointerMove = (e: PointerEvent) => {
       pendingMove = e
@@ -193,10 +188,14 @@ export function Editor2D() {
     const onDblClick = (e: MouseEvent) => {
       activeTool().onDoubleClick?.(normalize(e as PointerEvent), ctx)
     }
+    const onPointerLeave = () => {
+      useInteractionStore.getState().set({ pointerWorld: null })
+    }
     el.addEventListener('pointerdown', onPointerDown)
     el.addEventListener('pointermove', onPointerMove)
     el.addEventListener('pointerup', onPointerUp)
     el.addEventListener('pointercancel', onPointerCancel)
+    el.addEventListener('pointerleave', onPointerLeave)
     el.addEventListener('dblclick', onDblClick)
     return () => {
       if (rafId) cancelAnimationFrame(rafId)
@@ -204,6 +203,7 @@ export function Editor2D() {
       el.removeEventListener('pointermove', onPointerMove)
       el.removeEventListener('pointerup', onPointerUp)
       el.removeEventListener('pointercancel', onPointerCancel)
+      el.removeEventListener('pointerleave', onPointerLeave)
       el.removeEventListener('dblclick', onDblClick)
     }
   }, [ctx, registry])

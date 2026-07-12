@@ -7,7 +7,7 @@ import { useDocStore } from './docStore'
  * Per-frame tool ephemera (ghost previews, snap indicators) live in the
  * editor's interactionStore (M3), not here.
  */
-export type ToolId = 'select' | 'draw-wall' | 'place-opening' | 'place-furniture'
+export type ToolId = 'select' | 'draw-wall' | 'place-opening' | 'place-furniture' | 'measure'
 export type ViewMode = '2d' | '3d'
 
 export interface ToolParams {

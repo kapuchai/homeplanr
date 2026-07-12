@@ -44,6 +44,12 @@ export interface InteractionState {
   gestureActive: boolean
   /** Cursor override while a gesture owns the pointer (e.g. 'grabbing'). */
   cursorHint: string | null
+  /**
+   * Last pointer position in world coords, null while off-canvas. CURSOR
+   * state, not gesture state — clear() leaves it alone; nothing subscribes
+   * (read imperatively, e.g. as the paste target).
+   */
+  pointerWorld: Vec2 | null
   set: (patch: Partial<Omit<InteractionState, 'set' | 'clear'>>) => void
   clear: () => void
 }
@@ -54,6 +60,7 @@ export const useInteractionStore = create<InteractionState>()((set) => ({
   pills: [],
   gestureActive: false,
   cursorHint: null,
+  pointerWorld: null,
   set: (patch) => set(patch),
   clear: () =>
     set({ preview: null, snap: null, pills: [], gestureActive: false, cursorHint: null }),

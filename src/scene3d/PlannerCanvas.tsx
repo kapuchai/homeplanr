@@ -110,7 +110,10 @@ function OpeningFixtures({ doc, solid }: { doc: ProjectDocument; solid: WallSoli
 
 function Furniture3D({ f }: { f: FurnitureInstance }) {
   const item = CATALOG[f.catalogItemId]
-  const realized = useMemo(() => (item ? realizeItem(item) : null), [item])
+  const realized = useMemo(
+    () => (item ? realizeItem(item, { mirrored: !!f.mirrored }) : null),
+    [item, f.mirrored],
+  )
   if (!item || !realized) {
     // unknown item: placeholder box of the stored size
     return (

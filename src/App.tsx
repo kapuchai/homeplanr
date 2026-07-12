@@ -16,6 +16,7 @@ import {
   saveProjectAs,
   usePersistStore,
 } from './store/persistence/controller'
+import { switchTool } from './editor2d/tools/toolRegistry'
 import { CatalogPanel } from './app/CatalogPanel'
 import { PropertiesPanel } from './app/PropertiesPanel'
 import { ConfirmDialog } from './app/ConfirmDialog'
@@ -117,7 +118,6 @@ function Toolbar() {
   const viewMode = useUiStore((s) => s.viewMode)
   const setViewMode = useUiStore((s) => s.setViewMode)
   const activeTool = useUiStore((s) => s.activeTool)
-  const setActiveTool = useUiStore((s) => s.setActiveTool)
   const setToolParams = useUiStore((s) => s.setToolParams)
   const openingKind = useUiStore((s) => s.toolParams.openingKind)
   const canUndo = useStore(docTemporal, (s) => s.pastStates.length > 0)
@@ -141,14 +141,15 @@ function Toolbar() {
       <FileMenu />
       <ProjectName />
       <div className="segmented" style={{ marginLeft: 12 }}>
-        {toolBtn('Select', activeTool === 'select', () => setActiveTool('select'), 'Select (V)')}
-        {toolBtn('Wall', activeTool === 'draw-wall', () => setActiveTool('draw-wall'), 'Draw walls (W)')}
+        {/* switchTool (never setActiveTool): the outgoing tool must deactivate */}
+        {toolBtn('Select', activeTool === 'select', () => switchTool('select'), 'Select (V)')}
+        {toolBtn('Wall', activeTool === 'draw-wall', () => switchTool('draw-wall'), 'Draw walls (W)')}
         {toolBtn(
           'Door',
           activeTool === 'place-opening' && openingKind === 'door',
           () => {
             setToolParams({ openingKind: 'door' })
-            setActiveTool('place-opening')
+            switchTool('place-opening')
           },
           'Place door (D)',
         )}
@@ -157,10 +158,11 @@ function Toolbar() {
           activeTool === 'place-opening' && openingKind === 'window',
           () => {
             setToolParams({ openingKind: 'window' })
-            setActiveTool('place-opening')
+            switchTool('place-opening')
           },
           'Place window (N)',
         )}
+        {toolBtn('Measure', activeTool === 'measure', () => switchTool('measure'), 'Measure (M)')}
       </div>
       <div className="segmented">
         <button type="button" disabled={!canUndo || !is2d} onClick={safeUndo} title="Undo (Ctrl+Z)">

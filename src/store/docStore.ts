@@ -43,6 +43,7 @@ export interface DocState {
   updateOpening: (id: OpeningId, patch: Parameters<typeof openings.updateOpening>[2], opts?: { mode?: MutationMode }) => void
   // furniture
   addFurniture: (params: Parameters<typeof furniture.addFurniture>[1]) => FurnitureId
+  addFurnitureBatch: (items: Parameters<typeof furniture.addFurnitureBatch>[1]) => FurnitureId[]
   transformFurniture: (id: FurnitureId, patch: Parameters<typeof furniture.transformFurniture>[2], opts?: Parameters<typeof furniture.transformFurniture>[3]) => void
   resizeFurniture: (id: FurnitureId, size: Parameters<typeof furniture.resizeFurniture>[2]) => void
   renameFurniture: (id: FurnitureId, name: string) => void
@@ -86,6 +87,7 @@ export const useDocStore = create<DocState>()(
           addOpening: (params, opts) => mutate((d) => openings.addOpening(d, params, opts)),
           updateOpening: (id, patch, opts) => mutate((d) => openings.updateOpening(d, id, patch, opts)),
           addFurniture: (params) => mutate((d) => furniture.addFurniture(d, params)),
+          addFurnitureBatch: (items) => mutate((d) => furniture.addFurnitureBatch(d, items)),
           transformFurniture: (id, patch, opts) => mutate((d) => furniture.transformFurniture(d, id, patch, opts)),
           resizeFurniture: (id, size) => mutate((d) => furniture.resizeFurniture(d, id, size)),
           renameFurniture: (id, name) => mutate((d) => furniture.renameFurniture(d, id, name)),

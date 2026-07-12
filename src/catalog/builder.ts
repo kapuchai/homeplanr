@@ -40,11 +40,29 @@ export interface Builder {
   cylinder: (mat: string, p: Omit<CylinderPart, 'kind' | 'mat'>) => void
   /**
    * Run `fn` and duplicate every part it emitted, mirrored across x = 0.
-   * Implemented PART-LEVEL: negate center x and rotZ — never a negative
-   * scale matrix (that inverts triangle winding and back-face culls
-   * mirrored parts into invisibility).
+   * Implemented PART-LEVEL via mirrorPart — never a negative scale matrix
+   * (that inverts triangle winding and back-face culls mirrored parts
+   * into invisibility).
    */
   mirrorX: (fn: () => void) => void
+}
+
+/**
+ * Reflect one part across item-local x = 0 — the transform behind both
+ * builder.mirrorX and mirrored instances (realizeItem): negate center x;
+ * boxes also negate rotY/rotZ (rotX kept — it conjugates to itself under
+ * the reflection). Scale magnitudes untouched; never a negative-scale
+ * matrix, so triangle winding survives.
+ */
+export function mirrorPart(part: Part): Part {
+  if (part.kind === 'box') {
+    return {
+      ...part,
+      at: [-part.at[0], part.at[1], part.at[2]],
+      ...(part.rot ? { rot: [part.rot[0], -part.rot[1], -part.rot[2]] as V3 } : {}),
+    }
+  }
+  return { ...part, at: [-part.at[0], part.at[1], part.at[2]] }
 }
 
 export function collectParts(fn: (b: Builder) => void): Part[] {
@@ -56,20 +74,7 @@ export function collectParts(fn: (b: Builder) => void): Part[] {
       const start = parts.length
       inner()
       const emitted = parts.slice(start)
-      for (const part of emitted) {
-        if (part.kind === 'box') {
-          parts.push({
-            ...part,
-            at: [-part.at[0], part.at[1], part.at[2]],
-            ...(part.rot ? { rot: [part.rot[0], -part.rot[1], -part.rot[2]] as V3 } : {}),
-          })
-        } else {
-          parts.push({
-            ...part,
-            at: [-part.at[0], part.at[1], part.at[2]],
-          })
-        }
-      }
+      for (const part of emitted) parts.push(mirrorPart(part))
     },
   }
   fn(b)

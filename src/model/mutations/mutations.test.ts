@@ -13,7 +13,7 @@ import {
 } from './walls'
 import { addOpening } from './openings'
 import { renameRoom } from './rooms'
-import { duplicateFurniture, addFurniture } from './furniture'
+import { addFurniture, addFurnitureBatch, duplicateFurniture, transformFurniture } from './furniture'
 import { vec } from '../../geometry/vec'
 import { MERGE_EPS } from '../../geometry/constants'
 import { dist } from '../../geometry/vec'
@@ -323,5 +323,45 @@ describe('furniture', () => {
     const [copy] = duplicateFurniture(d, [id])
     expect(d.furniture[copy!]!.x).toBeCloseTo(1.25, 9)
     expect(d.furniture[copy!]!.y).toBeCloseTo(2.25, 9)
+  })
+
+  it('transformFurniture mirrored: true writes the flag, false deletes it', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'sofa-3',
+      x: 1,
+      y: 2,
+      size: { w: 2.2, d: 0.95, h: 0.85 },
+    })
+    expect('mirrored' in d.furniture[id]!).toBe(false)
+    transformFurniture(d, id, { mirrored: true })
+    expect(d.furniture[id]!.mirrored).toBe(true)
+    transformFurniture(d, id, { mirrored: false })
+    expect('mirrored' in d.furniture[id]!).toBe(false)
+  })
+
+  it('duplicateFurniture carries mirrored', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'sofa-3',
+      x: 1,
+      y: 2,
+      size: { w: 2.2, d: 0.95, h: 0.85 },
+      mirrored: true,
+    })
+    const [copy] = duplicateFurniture(d, [id])
+    expect(d.furniture[copy!]!.mirrored).toBe(true)
+  })
+
+  it('addFurnitureBatch adds every item with the shared validation', () => {
+    const d = doc()
+    const ids = addFurnitureBatch(d, [
+      { catalogItemId: 'test-box', x: 1.004, y: 0, size: { w: 1, d: 1, h: 1 } },
+      { catalogItemId: 'test-box', x: 5, y: 5, size: { w: 99, d: 1, h: 1 } },
+    ])
+    expect(ids).toHaveLength(2)
+    expect(Object.keys(d.furniture)).toHaveLength(2)
+    expect(d.furniture[ids[0]!]!.x).toBeCloseTo(1, 9) // 1cm quantization
+    expect(d.furniture[ids[1]!]!.size.w).toBe(5) // SIZE_MAX clamp
   })
 })

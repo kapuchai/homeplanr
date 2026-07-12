@@ -1,5 +1,6 @@
 import type { ToolContext } from './toolTypes'
-import type { ToolRegistry } from './toolRegistry'
+import { switchTool, type ToolRegistry } from './toolRegistry'
+import { buildPasteParams, copyFurniture, hasClipboard, pasteTarget } from '../clipboard'
 import { useConfirmStore } from '../../app/confirmStore'
 import { isTxActive, safeRedo, safeUndo, beginTx, commitTx } from '../../store/transactions'
 import { getDerived } from '../../store/derived'
@@ -130,6 +131,23 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     return
   }
 
+  // copy/paste — module clipboard, survives New/Open (the focus guard above
+  // keeps native copy/paste working inside text inputs)
+  if (e.ctrlKey && key.toLowerCase() === 'c') {
+    if (isTxActive()) return
+    copyFurniture(ctx.doc(), ui.selection) // silent no-op without furniture
+    return
+  }
+  if (e.ctrlKey && key.toLowerCase() === 'v') {
+    e.preventDefault()
+    if (isTxActive() || !hasClipboard()) return
+    const ids = ctx
+      .actions()
+      .addFurnitureBatch(buildPasteParams(pasteTarget(ctx.interaction().pointerWorld)))
+    ui.setSelection(ids)
+    return
+  }
+
   if (key === ' ') {
     e.preventDefault()
     if (!ui.spaceHeld) ui.setSpaceHeld(true)
@@ -140,21 +158,25 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   // reserved for view toggles like Shift+D)
   if (!isTxActive() && !e.ctrlKey && !e.altKey && !e.shiftKey) {
     if (key.toLowerCase() === 'v') {
-      registry.switchTo(ctx, 'select')
+      switchTool('select')
       return
     }
     if (key.toLowerCase() === 'w') {
-      registry.switchTo(ctx, 'draw-wall')
+      switchTool('draw-wall')
       return
     }
     if (key.toLowerCase() === 'd') {
       ui.setToolParams({ openingKind: 'door' })
-      registry.switchTo(ctx, 'place-opening')
+      switchTool('place-opening')
       return
     }
     if (key.toLowerCase() === 'n') {
       ui.setToolParams({ openingKind: 'window' })
-      registry.switchTo(ctx, 'place-opening')
+      switchTool('place-opening')
+      return
+    }
+    if (key.toLowerCase() === 'm') {
+      switchTool('measure')
       return
     }
   }
@@ -170,6 +192,20 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
         ctx.actions().transformFurniture(id as FurnitureId, {
           rotation: f.rotation + (dir * Math.PI) / 2,
         })
+      }
+      commitTx()
+      return
+    }
+  }
+
+  // flip selected furniture (mirror across item-local x) — one entry
+  if (!isTxActive() && key.toLowerCase() === 'f' && !e.ctrlKey) {
+    const ids = ui.selection.filter((id) => ctx.doc().furniture[id as FurnitureId])
+    if (ids.length) {
+      beginTx()
+      for (const id of ids) {
+        const f = ctx.doc().furniture[id as FurnitureId]!
+        ctx.actions().transformFurniture(id as FurnitureId, { mirrored: !f.mirrored })
       }
       commitTx()
       return
@@ -252,7 +288,7 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     const tool = registry.get(ui.activeTool)
     if (tool.onKeyDown?.('Escape', ctx)) return // ① gesture / tool state
     if (ui.activeTool !== 'select') {
-      registry.switchTo(ctx, 'select') // ② back to select
+      switchTool('select') // ② back to select
       return
     }
     ui.clearSelection() // ③ deselect

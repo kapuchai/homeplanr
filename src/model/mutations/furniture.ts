@@ -14,18 +14,18 @@ const ELEV_MAX = 3
 const clampSize = (v: number) => Math.min(SIZE_MAX, Math.max(SIZE_MIN, v))
 const q = (v: number) => Math.round(v * 100) / 100 // 1cm quantization
 
-export function addFurniture(
-  doc: ProjectDocument,
-  params: {
-    catalogItemId: string
-    x: number
-    y: number
-    rotation?: number
-    size: { w: number; d: number; h: number }
-    elevation?: number
-    name?: string
-  },
-): FurnitureId {
+export interface AddFurnitureParams {
+  catalogItemId: string
+  x: number
+  y: number
+  rotation?: number
+  size: { w: number; d: number; h: number }
+  elevation?: number
+  name?: string
+  mirrored?: boolean
+}
+
+export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): FurnitureId {
   const id = newFurnitureId()
   doc.furniture[id] = {
     id,
@@ -40,14 +40,23 @@ export function addFurniture(
     },
     elevation: Math.min(ELEV_MAX, Math.max(ELEV_MIN, params.elevation ?? 0)),
     ...(params.name ? { name: params.name } : {}),
+    ...(params.mirrored ? { mirrored: true } : {}),
   }
   return id
+}
+
+/** Batch add (paste); the docStore wires it as ONE set ⇒ one undo entry. */
+export function addFurnitureBatch(
+  doc: ProjectDocument,
+  items: readonly AddFurnitureParams[],
+): FurnitureId[] {
+  return items.map((params) => addFurniture(doc, params))
 }
 
 export function transformFurniture(
   doc: ProjectDocument,
   id: FurnitureId,
-  patch: Partial<Pick<FurnitureInstance, 'x' | 'y' | 'rotation' | 'elevation'>>,
+  patch: Partial<Pick<FurnitureInstance, 'x' | 'y' | 'rotation' | 'elevation' | 'mirrored'>>,
   opts: { quantize?: boolean } = {},
 ): void {
   const f = doc.furniture[id]
@@ -58,6 +67,10 @@ export function transformFurniture(
   if (patch.rotation !== undefined) f.rotation = patch.rotation
   if (patch.elevation !== undefined) {
     f.elevation = Math.min(ELEV_MAX, Math.max(ELEV_MIN, patch.elevation))
+  }
+  if (patch.mirrored !== undefined) {
+    if (patch.mirrored) f.mirrored = true
+    else delete f.mirrored // absent = false — files stay clean
   }
 }
 
