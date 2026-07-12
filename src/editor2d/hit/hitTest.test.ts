@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hitTestAll, hitTestTop } from './hitTest'
+import { hitTestAll, hitTestRect, hitTestTop } from './hitTest'
 import { buildFixtureDoc } from '../../test/fixtureDoc'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
 import { vec } from '../../geometry/vec'
@@ -65,5 +65,68 @@ describe('hitTestAll on the fixture apartment', () => {
       nodeCandidates: new Set([n.id]),
     })
     expect(withNodes.some((h) => h.kind === 'node')).toBe(true)
+  })
+})
+
+describe('hitTestRect (marquee) on the fixture apartment', () => {
+  resetDerivedForTests()
+  const doc = buildFixtureDoc()
+  const derived = getDerived(doc)
+  const kinds = (a: import('./hitTest').EntityRef[]) => new Set(a.map((h) => h.kind))
+
+  it('a rect crossing a wall EDGE selects it (intersection, not containment)', () => {
+    // south wall runs y=0 from x=0..8; rect straddles it near x=2
+    const hits = hitTestRect(doc, derived, vec(1.8, -0.3), vec(2.2, 0.3))
+    expect(hits.some((h) => h.kind === 'wall')).toBe(true)
+  })
+
+  it('a rect fully inside a room selects nothing (rooms are not marquee targets)', () => {
+    const hits = hitTestRect(doc, derived, vec(0.8, 3.8), vec(1.2, 4.2))
+    expect(hits).toHaveLength(0)
+  })
+
+  it('a rect over the whole plan selects walls, openings, and furniture — never rooms/nodes', () => {
+    const hits = hitTestRect(doc, derived, vec(-1, -1), vec(11, 6))
+    expect(hits.length).toBe(
+      Object.keys(doc.walls).length +
+        Object.keys(doc.openings).length +
+        Object.keys(doc.furniture).length,
+    )
+    expect(kinds(hits).has('room')).toBe(false)
+    expect(kinds(hits).has('node')).toBe(false)
+  })
+
+  it('furniture selects by its ROTATED footprint, not its AABB', () => {
+    const d2 = buildFixtureDoc()
+    const rot = Object.values(d2.furniture)[0]!
+    // a 2.2×0.95 item at (20,20) rotated 45°: long axis along the (1,1)
+    // diagonal. (20.7,20.7) is INSIDE the rotated shape (local u≈0.99<1.1,
+    // v=0) but OUTSIDE the unrotated AABB (y>20.475). (21.05,19.6) is inside
+    // the unrotated AABB but OUTSIDE the rotated shape (local |v|≈1.03>0.475).
+    d2.furniture[rot.id] = {
+      ...rot,
+      x: 20,
+      y: 20,
+      size: { w: 2.2, d: 0.95, h: 0.8 },
+      rotation: Math.PI / 4,
+    }
+    resetDerivedForTests()
+    const der2 = getDerived(d2)
+    const hits = hitTestRect(d2, der2, vec(20.68, 20.68), vec(20.72, 20.72))
+    expect(hits.some((h) => h.kind === 'furniture' && h.id === rot.id)).toBe(true)
+    const miss = hitTestRect(d2, der2, vec(21.03, 19.58), vec(21.07, 19.62))
+    expect(miss.some((h) => h.kind === 'furniture' && h.id === rot.id)).toBe(false)
+  })
+
+  it('an opening selects when the rect covers its span on the wall', () => {
+    const solid = Object.values(derived.wallSolids).find((s) => s.openings.length > 0)!
+    const op = solid.openings[0]!
+    const mid = (op.u0 + op.u1) / 2
+    const c = vec(
+      solid.frame.origin.x + solid.frame.dir.x * mid,
+      solid.frame.origin.y + solid.frame.dir.y * mid,
+    )
+    const hits = hitTestRect(doc, derived, vec(c.x - 0.1, c.y - 0.1), vec(c.x + 0.1, c.y + 0.1))
+    expect(hits.some((h) => h.kind === 'opening' && h.id === op.openingId)).toBe(true)
   })
 })

@@ -138,8 +138,12 @@ export function Editor2D() {
       buttonBit: number
     } | null = null
     let gesturePointerId: number | null = null
+    // right-button press: converts to a pan once it moves past the slop
+    // (the sub-slop right CLICK is reserved for the context menu, M4)
+    let rightPress: { pointerId: number; startX: number; startY: number } | null = null
     let pendingMove: PointerEvent | null = null
     let rafId = 0
+    const RIGHT_DRAG_SLOP_PX = 4
 
     const normalize = (e: PointerEvent): EditorPointerEvent => {
       const rect = el.getBoundingClientRect()
@@ -162,7 +166,7 @@ export function Editor2D() {
       pendingMove = null
       // pointer actions act on the post-nudge doc (mirrors the keymap flush)
       flushPendingNudge()
-      if (gesturePointerId !== null || panning) return
+      if (gesturePointerId !== null || panning || rightPress) return
       if (e.button === 1 || (e.button === 0 && useUiStore.getState().spaceHeld)) {
         e.preventDefault()
         panning = {
@@ -171,6 +175,13 @@ export function Editor2D() {
           lastY: e.clientY,
           buttonBit: e.button === 1 ? 4 : 1,
         }
+        useInteractionStore.getState().set({ cursorHint: 'grabbing' })
+        el.setPointerCapture(e.pointerId)
+        return
+      }
+      if (e.button === 2) {
+        e.preventDefault()
+        rightPress = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY }
         el.setPointerCapture(e.pointerId)
         return
       }
@@ -187,12 +198,37 @@ export function Editor2D() {
       // cursor tracking for paste targets — rAF-coalesced ⇒ ≤1 write/frame,
       // read imperatively (nothing subscribes)
       useInteractionStore.getState().set({ pointerWorld: n.world })
+      if (rightPress && e.pointerId === rightPress.pointerId) {
+        if ((e.buttons & 2) === 0) {
+          // chorded right-release fires no pointerup — drop the ghost press
+          if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+          rightPress = null
+          return
+        }
+        const moved = Math.hypot(e.clientX - rightPress.startX, e.clientY - rightPress.startY)
+        if (moved > RIGHT_DRAG_SLOP_PX) {
+          // right-drag becomes a pan (buttons bit 2 ends it on release);
+          // lastX/Y = press point, so content stays pinned under the cursor
+          panning = {
+            pointerId: e.pointerId,
+            lastX: rightPress.startX,
+            lastY: rightPress.startY,
+            buttonBit: 2,
+          }
+          useInteractionStore.getState().set({ cursorHint: 'grabbing' })
+          rightPress = null
+          // fall through to the panning branch below with THIS move
+        } else {
+          return
+        }
+      }
       if (panning) {
         if (e.pointerId !== panning.pointerId) return
         if ((e.buttons & panning.buttonBit) === 0) {
           // chorded release: the initiating button lifted, another is held
           if (el.hasPointerCapture(panning.pointerId)) el.releasePointerCapture(panning.pointerId)
           panning = null
+          useInteractionStore.getState().set({ cursorHint: null })
           return
         }
         useViewportStore.getState().panBy(e.clientX - panning.lastX, e.clientY - panning.lastY)
@@ -205,19 +241,34 @@ export function Editor2D() {
     }
     const onPointerMove = (e: PointerEvent) => {
       // foreign pointers are filtered at ENQUEUE time: the single coalescing
-      // slot must never let a second pointer overwrite (starve) the gesture
-      // or pan pointer's queued move for that frame
+      // slot must never let a second pointer overwrite (starve) the gesture,
+      // pan, or right-press pointer's queued move for that frame
       if (panning && e.pointerId !== panning.pointerId) return
-      if (!panning && gesturePointerId !== null && e.pointerId !== gesturePointerId) return
+      if (rightPress && e.pointerId !== rightPress.pointerId) return
+      if (
+        !panning &&
+        !rightPress &&
+        gesturePointerId !== null &&
+        e.pointerId !== gesturePointerId
+      ) {
+        return
+      }
       pendingMove = e
       if (!rafId) rafId = requestAnimationFrame(flushMove)
     }
     const onPointerUp = (e: PointerEvent) => {
       if (pendingMove) flushMove()
+      if (rightPress && e.pointerId === rightPress.pointerId) {
+        // sub-slop right CLICK — reserved for the context menu (M4)
+        if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+        rightPress = null
+        return
+      }
       if (panning) {
         if (e.pointerId !== panning.pointerId) return
         if (el.hasPointerCapture(panning.pointerId)) el.releasePointerCapture(panning.pointerId)
         panning = null
+        useInteractionStore.getState().set({ cursorHint: null })
         return
       }
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
@@ -226,7 +277,11 @@ export function Editor2D() {
       activeTool().onPointerUp(normalize(e), ctx)
     }
     const onPointerCancel = (e: PointerEvent) => {
-      if (panning?.pointerId === e.pointerId) panning = null
+      if (panning?.pointerId === e.pointerId) {
+        panning = null
+        useInteractionStore.getState().set({ cursorHint: null })
+      }
+      if (rightPress?.pointerId === e.pointerId) rightPress = null
       // pointercancel mid-gesture must abort (plan-pinned) — tools handle
       // Escape identically; cancels of foreign pointers don't reach the tool
       if (gesturePointerId === null || e.pointerId === gesturePointerId) {

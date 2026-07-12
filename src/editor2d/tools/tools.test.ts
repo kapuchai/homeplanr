@@ -623,22 +623,68 @@ describe('flip (F)', () => {
 })
 
 describe('2D viewport navigation', () => {
-  it('empty-space left-drag pans by the screen delta; selection and history untouched', () => {
-    const id = addSofa()
-    useUiStore.getState().setSelection([id])
+  // 0.3.0 deliberate rewrite: empty-space left-drag is MARQUEE SELECT now —
+  // panning lives on Space/middle/right-drag (Editor2D layer) + wheel/arrows
+  it('empty-space left-drag draws a marquee: intersecting entities select, viewport and history untouched', () => {
+    const id = addSofa(2, 2) // sofa 2.2×0.95 at (2,2)
+    const far = addSofa(9, 9)
+    useDocStore.getState().addWallSegment(vec(0, 4), vec(4, 4))
     const base = past()
-    tool().onPointerDown(pe(vec(8, 8)), ctx)
-    tool().onPointerMove(pe(vec(8.1, 8.1)), ctx) // past slop → pan engages
+    tool().onPointerDown(pe(vec(0.5, 0.5)), ctx)
+    tool().onPointerMove(pe(vec(1.5, 1.6)), ctx) // past slop → marquee engages
     expect(isTxActive()).toBe(false)
-    tool().onPointerMove(pe(vec(9, 8.5)), ctx)
+    expect(useInteractionStore.getState().preview?.kind).toBe('marquee')
+    tool().onPointerMove(pe(vec(4.5, 4.5)), ctx) // box covers sofa + wall
+    const sel = useUiStore.getState().selection
+    expect(sel).toContain(id)
+    expect(sel.some((s) => useDocStore.getState().doc.walls[s as never])).toBe(true)
+    expect(sel).not.toContain(far)
+    tool().onPointerUp(pe(vec(4.5, 4.5)), ctx)
+    expect(useUiStore.getState().selection).toEqual(sel) // committed as-is
+    expect(useInteractionStore.getState().preview).toBeNull()
+    expect(useViewportStore.getState().tx).toBe(0) // no pan
+    expect(past()).toBe(base) // selection is not undoable
     expect(isTxActive()).toBe(false)
-    tool().onPointerUp(pe(vec(9, 8.5)), ctx)
-    const vp = useViewportStore.getState()
-    expect(vp.tx).toBeCloseTo(100, 9) // full screen delta: (9−8)·100px
-    expect(vp.ty).toBeCloseTo(50, 9)
-    expect(useUiStore.getState().selection).toEqual([id])
-    expect(past()).toBe(base)
-    expect(isTxActive()).toBe(false)
+  })
+
+  it('Shift+marquee ADDS to the selection; Esc mid-marquee restores the prior one', () => {
+    const a = addSofa(2, 2)
+    const b = addSofa(9, 9)
+    useUiStore.getState().setSelection([b])
+    tool().onPointerDown(pe(vec(0.5, 0.5), { shift: true }), ctx)
+    tool().onPointerMove(pe(vec(4, 4), { shift: true }), ctx)
+    expect(new Set(useUiStore.getState().selection)).toEqual(new Set([a, b]))
+    // cancel: prior selection restored, preview gone
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(useUiStore.getState().selection).toEqual([b])
+    expect(useInteractionStore.getState().preview).toBeNull()
+  })
+
+  it('marquee touching an entity edge selects it (intersection, not containment)', () => {
+    useDocStore.getState().addWallSegment(vec(0, 2), vec(10, 2))
+    tool().onPointerDown(pe(vec(1, 1)), ctx)
+    tool().onPointerMove(pe(vec(3, 3)), ctx) // box crosses the wall, doesn't contain it
+    const sel = useUiStore.getState().selection
+    expect(sel).toHaveLength(1)
+    expect(useDocStore.getState().doc.walls[sel[0]! as never]).toBeDefined()
+    tool().onPointerUp(pe(vec(3, 3)), ctx)
+  })
+
+  it('a marquee can START on a room floor (boxing furniture inside a room)', () => {
+    useDocStore
+      .getState()
+      .addWallChain([vec(0, 0), vec(6, 0), vec(6, 5), vec(0, 5), vec(0, 0)])
+    const sofa = addSofa(3, 2.5) // inside the room
+    tool().onPointerDown(pe(vec(1.5, 1.5)), ctx) // room floor: click-selects the room…
+    tool().onPointerMove(pe(vec(4.5, 3.5)), ctx) // …but a DRAG is the marquee
+    const sel = useUiStore.getState().selection
+    expect(sel).toContain(sofa)
+    // non-additive marquee: the room from the initial press is dropped
+    expect(sel.some((id) => useDocStore.getState().doc.rooms[id as never])).toBe(false)
+    // walls untouched by the box stay unselected
+    expect(sel.some((id) => useDocStore.getState().doc.walls[id as never])).toBe(false)
+    tool().onPointerUp(pe(vec(4.5, 3.5)), ctx)
+    expect(useUiStore.getState().selection).toContain(sofa)
   })
 
   it('sub-slop press-release on empty space still clears the selection', () => {
@@ -651,23 +697,13 @@ describe('2D viewport navigation', () => {
     expect(useViewportStore.getState().tx).toBe(0)
   })
 
-  it("cursorHint is 'grabbing' while panning and null after release", () => {
-    tool().onPointerDown(pe(vec(8, 8)), ctx)
-    tool().onPointerMove(pe(vec(8.5, 8.5)), ctx)
-    expect(useInteractionStore.getState().cursorHint).toBe('grabbing')
-    tool().onPointerUp(pe(vec(8.5, 8.5)), ctx)
-    expect(useInteractionStore.getState().cursorHint).toBeNull()
-  })
-
-  it('Escape mid-pan is consumed, ends the pan, and later moves stop panning', () => {
+  it('Escape mid-marquee is consumed; later moves are inert hovers', () => {
     tool().onPointerDown(pe(vec(8, 8)), ctx)
     tool().onPointerMove(pe(vec(8.5, 8.5)), ctx)
     expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
-    expect(useInteractionStore.getState().cursorHint).toBeNull()
-    const { tx, ty } = useViewportStore.getState()
     tool().onPointerMove(pe(vec(10, 10)), ctx)
-    expect(useViewportStore.getState().tx).toBe(tx)
-    expect(useViewportStore.getState().ty).toBe(ty)
+    expect(useInteractionStore.getState().preview).toBeNull()
+    expect(useUiStore.getState().selection).toHaveLength(0)
     expect(past()).toBe(0)
     expect(isTxActive()).toBe(false)
   })
@@ -1131,5 +1167,38 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     expect(isTxActive()).toBe(false)
     expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9) // reverted
     void stuck
+  })
+})
+
+describe('M3 (0.3.0): Ctrl+A and zoom-to-selection', () => {
+  it('Ctrl+A selects walls, openings, and furniture — never rooms or nodes', () => {
+    useDocStore
+      .getState()
+      .addWallChain([vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const doc0 = useDocStore.getState().doc
+    const wallId = Object.keys(doc0.walls)[0]! as never
+    useDocStore.getState().addOpening({ kind: 'door', wallId, t: 0.5 })
+    const sofa = addSofa(2, 1.5)
+    handleKey(key('a', { ctrlKey: true }), ctx, registry)
+    const sel = new Set(useUiStore.getState().selection)
+    const doc = useDocStore.getState().doc
+    expect(sel.size).toBe(4 + 1 + 1) // 4 walls + 1 door + 1 sofa
+    expect(sel.has(sofa)).toBe(true)
+    for (const id of Object.keys(doc.rooms)) expect(sel.has(id)).toBe(false)
+    for (const id of Object.keys(doc.nodes)) expect(sel.has(id)).toBe(false)
+  })
+
+  it('Shift+2 zooms to the selection; no-op with nothing selected', () => {
+    addSofa(2, 2)
+    const far = addSofa(40, 40)
+    const before = { ...useViewportStore.getState() }
+    handleKey(key('2', { shiftKey: true }), ctx, registry) // nothing selected
+    expect(useViewportStore.getState().tx).toBe(before.tx)
+    useUiStore.getState().setSelection([far])
+    handleKey(key('2', { shiftKey: true }), ctx, registry)
+    const vp = useViewportStore.getState()
+    // the selected far sofa is now centered: world(40,40) maps near screen center
+    const cx = (40 * vp.k + vp.tx) / 1 // screenX = world.x * k + tx (y-up flip aside)
+    expect(Math.abs(cx - vp.width / 2)).toBeLessThan(vp.width / 4)
   })
 })

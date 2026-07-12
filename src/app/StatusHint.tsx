@@ -26,7 +26,8 @@ export function StatusHint() {
   } else if (empty) {
     text = 'Press W and click to draw your first wall'
   } else {
-    text = 'V select · W wall · D door · N window · M measure · Space pan · Shift+1 fit'
+    text =
+      'V select · W wall · D door · N window · M measure · drag selects · right-drag pans · Shift+1 fit'
   }
 
   return <div className="status-hint">{text}</div>

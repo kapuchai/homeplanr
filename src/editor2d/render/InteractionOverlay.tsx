@@ -83,6 +83,23 @@ export function InteractionOverlay() {
       />,
     )
   }
+  if (preview?.kind === 'marquee') {
+    els.push(
+      <rect
+        key="marquee"
+        x={Math.min(preview.a.x, preview.b.x)}
+        y={Math.min(preview.a.y, preview.b.y)}
+        width={Math.abs(preview.b.x - preview.a.x)}
+        height={Math.abs(preview.b.y - preview.a.y)}
+        fill={theme.accentSoft}
+        fillOpacity={0.15}
+        stroke={theme.accent}
+        strokeWidth={1}
+        strokeDasharray="4 3"
+        vectorEffect="non-scaling-stroke"
+      />,
+    )
+  }
 
   // --- snap indicators ---
   if (snap?.primary) {

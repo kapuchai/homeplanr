@@ -34,7 +34,13 @@ export interface GhostPreview {
   valid: boolean
 }
 
-export type ToolPreview = WallDrawPreview | GhostPreview | null
+export interface MarqueePreview {
+  kind: 'marquee'
+  a: Vec2
+  b: Vec2
+}
+
+export type ToolPreview = WallDrawPreview | GhostPreview | MarqueePreview | null
 
 export interface InteractionState {
   preview: ToolPreview

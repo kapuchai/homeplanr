@@ -14,7 +14,7 @@ import {
 } from '../../store/transactions'
 import { getDerived } from '../../store/derived'
 import { polygonBounds } from '../../geometry/polygon'
-import { docContentBounds } from '../render/bounds'
+import { docContentBounds, selectionContentBounds } from '../render/bounds'
 import { useViewportStore } from '../viewport/viewportStore'
 import { useAppSettings } from '../../store/appSettings'
 import { KEY_ZOOM_FACTOR } from '../viewport/viewportMath'
@@ -168,6 +168,20 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   if (e.ctrlKey && key.toLowerCase() === 'y') {
     e.preventDefault()
     safeRedo()
+    return
+  }
+
+  // select all — walls/openings/furniture; rooms are derived and bare nodes
+  // are manipulation targets, so bulk selection skips both (matches marquee)
+  if (e.ctrlKey && key.toLowerCase() === 'a') {
+    e.preventDefault()
+    if (isTxActive()) return
+    const d = ctx.doc()
+    ui.setSelection([
+      ...Object.keys(d.walls),
+      ...Object.keys(d.openings),
+      ...Object.keys(d.furniture),
+    ])
     return
   }
 
@@ -333,6 +347,17 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   // zoom to fit
   if (e.shiftKey && (key === '1' || key === '!')) {
     zoomToFitContent(ctx.doc())
+    return
+  }
+
+  // zoom to selection
+  if (e.shiftKey && (key === '2' || key === '@')) {
+    if (ui.selection.length) {
+      const d = ctx.doc()
+      useViewportStore
+        .getState()
+        .zoomToFit(polygonBounds(selectionContentBounds(d, getDerived(d), ui.selection)))
+    }
     return
   }
 

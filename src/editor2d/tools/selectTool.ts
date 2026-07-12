@@ -1,6 +1,6 @@
 import type { Tool, ToolContext } from './toolTypes'
 import type { EntityRef } from '../hit/hitTest'
-import { hitTestAll } from '../hit/hitTest'
+import { hitTestAll, hitTestRect } from '../hit/hitTest'
 import type { Vec2 } from '../../geometry/vec'
 import { add, dist, dot, normalize, perp, scale, sub } from '../../geometry/vec'
 import { closestPointOnSegment } from '../../geometry/segment'
@@ -13,7 +13,6 @@ import {
   wallBackCandidate,
 } from '../snap/candidates'
 import { beginTx, commitTx, abortTx, type TxToken } from '../../store/transactions'
-import { useViewportStore } from '../viewport/viewportStore'
 import { useAppSettings } from '../../store/appSettings'
 import { CATALOG } from '../../catalog'
 import { rotateHandlePos, HANDLE_RADIUS_PX } from './handles'
@@ -30,9 +29,10 @@ import type { FurnitureId, NodeId, OpeningId, WallId } from '../../model/ids'
  * Select/move tool — drag branches per hit kind (plan-pinned):
  * furniture (single grab-offset / multi rigid), rotate handle (15° detents,
  * Ctrl free), opening slide (clamped along its wall), wall perpendicular
- * translate, node drag with drop-on-node merge, empty-space drag panning
- * the viewport. Every entity drag is one transaction ⇒ one undo entry
- * (panning opens none); Esc aborts.
+ * translate, node drag with drop-on-node merge, empty-space drag = MARQUEE
+ * select (0.3.0 — panning lives on Space/middle/right-drag in Editor2D).
+ * Every entity drag is one transaction ⇒ one undo entry (marquee opens
+ * none); Esc aborts (marquee Esc restores the prior selection).
  */
 const SLOP_PX = 4
 
@@ -45,7 +45,14 @@ type DragState =
       world: Vec2
       additive: boolean
     }
-  | { kind: 'panning'; lastScreen: Vec2 }
+  | {
+      kind: 'marquee'
+      origin: Vec2
+      /** Selection to restore on Esc-cancel. */
+      prev: string[]
+      /** Union base for additive (Shift) marquees; [] otherwise. */
+      base: string[]
+    }
   | {
       kind: 'furniture'
       tx: TxToken
@@ -225,15 +232,16 @@ export function createSelectTool(): Tool {
           if (dist(state.screen, e.screen) < SLOP_PX) return
           cycle = null // an engaged drag ends any click-cycling sequence
           const hit = state.hit
+          const startMarquee = (origin: Vec2, additive: boolean) => {
+            // empty-space (or room-floor) drag = marquee select (0.3.0;
+            // panning moved to Space/middle/right-drag). No transaction —
+            // selection is not undoable, history stays untouched.
+            const prev = [...ui.selection]
+            state = { kind: 'marquee', origin, prev, base: additive ? prev : [] }
+            tool.onPointerMove(e, ctx) // apply THIS move to the fresh marquee
+          }
           if (!hit) {
-            // empty-space drag pans the viewport — SCREEN deltas only (world
-            // coords feed back under a moving viewport); no transaction, so
-            // undo history stays untouched
-            useViewportStore
-              .getState()
-              .panBy(e.screen.x - state.screen.x, e.screen.y - state.screen.y)
-            state = { kind: 'panning', lastScreen: e.screen }
-            ctx.interaction().set({ cursorHint: 'grabbing' })
+            startMarquee(state.world, state.additive)
             return
           }
           if (hit.kind === 'furniture') {
@@ -264,16 +272,29 @@ export function createSelectTool(): Tool {
             state = { kind: 'opening', tx: beginTx(), openingId: hit.id, wallId: op.wallId }
             ctx.interaction().set({ gestureActive: true })
           } else {
-            state = { kind: 'idle' } // rooms don't drag
+            // rooms don't drag — a drag STARTING on a room floor is the
+            // marquee (boxing furniture inside a room must work; a sub-slop
+            // click still selects the room via the pointer-up path)
+            startMarquee(state.world, state.additive)
           }
           return
         }
 
-        case 'panning': {
-          useViewportStore
-            .getState()
-            .panBy(e.screen.x - state.lastScreen.x, e.screen.y - state.lastScreen.y)
-          state.lastScreen = e.screen
+        case 'marquee': {
+          // live-updating selection: what you see boxed is what you get
+          const hits = hitTestRect(doc, ctx.derived(), state.origin, e.world)
+          const ids = new Set(state.base)
+          for (const h of hits) ids.add(h.id)
+          const next = [...ids]
+          const cur = ui.selection
+          // hit order is deterministic — skip the store write (and the
+          // per-frame re-render of every selection subscriber) when equal
+          if (next.length !== cur.length || next.some((id, i) => id !== cur[i])) {
+            ui.setSelection(next)
+          }
+          ctx.interaction().set({
+            preview: { kind: 'marquee', a: state.origin, b: e.world },
+          })
           return
         }
 
@@ -435,8 +456,8 @@ export function createSelectTool(): Tool {
           state = { kind: 'idle' }
           return
         }
-        case 'panning': {
-          reset(ctx) // a pan is not a click — the selection stays as it was
+        case 'marquee': {
+          reset(ctx) // selection was applied live; just drop the preview
           return
         }
         case 'furniture': {
@@ -490,7 +511,8 @@ export function createSelectTool(): Tool {
         // covers 'pressed' too: a pointercancel (dispatched as Escape) while
         // pressed must not leave a stuck press that later fires a phantom
         // click. Abort only a tx THIS gesture owns — never a foreign one
-        // (e.g. a pending arrow-nudge run while panning).
+        // (e.g. a pending arrow-nudge run).
+        if (state.kind === 'marquee') ctx.ui().setSelection(state.prev) // cancel = restore
         if ('tx' in state) abortTx(state.tx)
         reset(ctx)
         return true

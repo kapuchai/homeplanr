@@ -3,8 +3,8 @@ import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
 import { dist, sub } from '../../geometry/vec'
-import { distToSegment } from '../../geometry/segment'
-import { pointInOBB, pointInPolygonWithHoles } from '../../geometry/polygon'
+import { distToSegment, segSegIntersection } from '../../geometry/segment'
+import { pointInOBB, pointInPolygon, pointInPolygonWithHoles } from '../../geometry/polygon'
 
 /**
  * Geometric hit-testing (never DOM-based). Priority order (plan-pinned):
@@ -108,3 +108,107 @@ export const hitTestTop = (
   pxToWorld: number,
   opts: HitOptions = {},
 ): EntityRef | null => hitTestAll(doc, derived, world, pxToWorld, opts)[0] ?? null
+
+// ---------- rect (marquee) selection ----------
+
+const pointInRect = (p: Vec2, min: Vec2, max: Vec2): boolean =>
+  p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y
+
+function segIntersectsRect(p: Vec2, q: Vec2, min: Vec2, max: Vec2): boolean {
+  if (pointInRect(p, min, max) || pointInRect(q, min, max)) return true
+  const c1 = { x: min.x, y: min.y }
+  const c2 = { x: max.x, y: min.y }
+  const c3 = { x: max.x, y: max.y }
+  const c4 = { x: min.x, y: max.y }
+  return (
+    segSegIntersection(p, q, c1, c2) !== null ||
+    segSegIntersection(p, q, c2, c3) !== null ||
+    segSegIntersection(p, q, c3, c4) !== null ||
+    segSegIntersection(p, q, c4, c1) !== null
+  )
+}
+
+function polyIntersectsRect(poly: readonly Vec2[], min: Vec2, max: Vec2): boolean {
+  if (poly.some((p) => pointInRect(p, min, max))) return true
+  // rect fully inside the polygon
+  if (pointInPolygon({ x: min.x, y: min.y }, poly)) return true
+  for (let i = 0; i < poly.length; i++) {
+    if (segIntersectsRect(poly[i]!, poly[(i + 1) % poly.length]!, min, max)) return true
+  }
+  return false
+}
+
+/** Quad of a segment inflated by half-thickness (the rendered band). */
+function bandQuad(p: Vec2, q: Vec2, halfT: number): Vec2[] | null {
+  const dx = q.x - p.x
+  const dy = q.y - p.y
+  const len = Math.hypot(dx, dy)
+  if (len < 1e-9) return null
+  const nx = (-dy / len) * halfT
+  const ny = (dx / len) * halfT
+  return [
+    { x: p.x + nx, y: p.y + ny },
+    { x: q.x + nx, y: q.y + ny },
+    { x: q.x - nx, y: q.y - ny },
+    { x: p.x - nx, y: p.y - ny },
+  ]
+}
+
+/**
+ * Marquee selection: INTERSECTION semantics — anything whose RENDERED shape
+ * touches the rect selects (walls/openings count their thickness band, not
+ * just the centerline — matching click hit-testing). Walls, openings, and
+ * furniture only: bare nodes are manipulation targets (not bulk-selectable)
+ * and rooms are derived, so sweeping a plan must not grab them.
+ */
+export function hitTestRect(
+  doc: ProjectDocument,
+  derived: DerivedGeometry,
+  a: Vec2,
+  b: Vec2,
+): EntityRef[] {
+  const min = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) }
+  const max = { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) }
+  const hits: EntityRef[] = []
+
+  for (const solid of Object.values(derived.wallSolids)) {
+    if (!solid.openings.length) continue
+    const wall = doc.walls[solid.wallId]
+    if (!wall) continue
+    const { origin, dir } = solid.frame
+    for (const op of solid.openings) {
+      const p = { x: origin.x + dir.x * op.u0, y: origin.y + dir.y * op.u0 }
+      const q = { x: origin.x + dir.x * op.u1, y: origin.y + dir.y * op.u1 }
+      const quad = bandQuad(p, q, wall.thickness / 2)
+      if (quad ? polyIntersectsRect(quad, min, max) : segIntersectsRect(p, q, min, max)) {
+        hits.push({ kind: 'opening', id: op.openingId })
+      }
+    }
+  }
+
+  for (const f of Object.values(doc.furniture)) {
+    const cos = Math.cos(f.rotation)
+    const sin = Math.sin(f.rotation)
+    const hw = f.size.w / 2
+    const hh = f.size.d / 2
+    const corners = [
+      { x: -hw, y: -hh },
+      { x: hw, y: -hh },
+      { x: hw, y: hh },
+      { x: -hw, y: hh },
+    ].map((p) => ({ x: f.x + p.x * cos - p.y * sin, y: f.y + p.x * sin + p.y * cos }))
+    if (polyIntersectsRect(corners, min, max)) hits.push({ kind: 'furniture', id: f.id })
+  }
+
+  for (const w of Object.values(doc.walls)) {
+    const na = doc.nodes[w.a]
+    const nb = doc.nodes[w.b]
+    if (!na || !nb) continue
+    const quad = bandQuad(na, nb, w.thickness / 2)
+    if (quad ? polyIntersectsRect(quad, min, max) : segIntersectsRect(na, nb, min, max)) {
+      hits.push({ kind: 'wall', id: w.id })
+    }
+  }
+
+  return hits
+}
