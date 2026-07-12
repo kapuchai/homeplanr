@@ -45,3 +45,23 @@ export const FLOOR_MATERIALS: FloorMaterialId[] = [
   'darkFloor',
   'carpetFloor',
 ]
+
+/** Per-side wall paint presets (Wall.paintFront/paintBack reference these ids). */
+export const WALL_PAINTS: readonly { id: string; name: string; color: string }[] = [
+  { id: 'white', name: 'White', color: '#f5f3ee' },
+  { id: 'warmWhite', name: 'Warm white', color: '#f3ede1' },
+  { id: 'cream', name: 'Cream', color: '#efe6d0' },
+  { id: 'lightGray', name: 'Light gray', color: '#dcdcd8' },
+  { id: 'greige', name: 'Greige', color: '#cfc8bc' },
+  { id: 'sand', name: 'Sand', color: '#e3cfa8' },
+  { id: 'blush', name: 'Blush', color: '#e8cfc4' },
+  { id: 'sage', name: 'Sage', color: '#c3cfb8' },
+  { id: 'olive', name: 'Olive', color: '#7d8468' },
+  { id: 'paleBlue', name: 'Pale blue', color: '#c5d5e0' },
+  { id: 'denim', name: 'Denim', color: '#5b7590' },
+  { id: 'terracotta', name: 'Terracotta', color: '#c07a56' },
+  { id: 'charcoal', name: 'Charcoal', color: '#4a4d52' },
+  { id: 'deepNavy', name: 'Deep navy', color: '#33415c' },
+]
+
+export const WALL_PAINT_IDS: ReadonlySet<string> = new Set(WALL_PAINTS.map((p) => p.id))

@@ -49,6 +49,28 @@ All milestones M0–M6 of the v1 plan are complete and user-verified.
   must pass dims/footprint/height/material checks. 2D symbols are DERIVED
   from `build3d` parts (`symbolFromParts.ts`) — do not hand-author symbols.
 
+## Schema change checklist (bumping schema N → N+1)
+
+1. Run `npx vite-node scripts/makeGoldens.ts` and commit the OUTGOING-version
+   goldens BEFORE bumping — the script names files by the current
+   `SCHEMA_VERSION` and refuses to overwrite (goldens are byte-frozen).
+2. Bump `SCHEMA_VERSION` and the `ProjectDocument.schemaVersion` literal in
+   `src/model/types.ts`.
+3. Write `MIGRATIONS[N]` in `src/store/persistence/serialize.ts` — pure
+   (never mutate the input), total (never throw on junk; the whitelist
+   prunes after), and NO warnings pushed.
+4. Extend the validator whitelist for the new fields — value-validate with
+   silent normalization (invalid → field absent, no warning); for open
+   registries (paint ids, floor material ids) accept any non-empty string
+   and rely on the render-side fallback, so patch-release additions stay
+   forward-compatible.
+5. Tests (`src/store/persistence/migrations.test.ts`): EVERY historical
+   golden opens with healed=false and zero warnings; forward-refusal at
+   N+1; a vN recovery blob decodes; new-field roundtrip + invalid-value
+   normalization.
+6. Invariant: migrations are silent — old files open clean and upgrade on
+   the next explicit save.
+
 ## Verification gates (used at every milestone; keep using them)
 
 1. `npm test` + typecheck + lint + build — all zero-noise.

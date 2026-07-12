@@ -14,7 +14,6 @@ export function updateSettings(
     s.gridSize = Math.min(1, Math.max(0.01, patch.gridSize))
   }
   if (patch.snapEnabled !== undefined) s.snapEnabled = patch.snapEnabled
-  if (patch.unitDisplay !== undefined) s.unitDisplay = patch.unitDisplay
   if (patch.defaultWallThickness !== undefined) {
     s.defaultWallThickness = Math.min(0.6, Math.max(0.03, patch.defaultWallThickness))
   }

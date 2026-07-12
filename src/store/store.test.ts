@@ -4,7 +4,7 @@ import { abortTx, beginTx, canRedo, canUndo, clearHistory, commitTx, isTxActive,
 import { getDerived, resetDerivedForTests } from './derived'
 import { parseDocument, serializeDocument, ForwardVersionError, InvalidDocumentError } from './persistence/serialize'
 import { decideRecovery, decodeRecovery, encodeRecovery } from './persistence/recovery'
-import { emptyDocument } from '../model/types'
+import { SCHEMA_VERSION, emptyDocument } from '../model/types'
 import { newProjectId, type NodeId, type WallId } from '../model/ids'
 import { vec } from '../geometry/vec'
 
@@ -259,11 +259,9 @@ describe('serialization', () => {
   })
 
   it('forward schemaVersion refuses with ForwardVersionError', () => {
-    const json = serializeDocument(useDocStore.getState().doc).replace(
-      '"schemaVersion": 1',
-      '"schemaVersion": 99',
-    )
-    expect(() => parseDocument(json)).toThrow(ForwardVersionError)
+    const obj = JSON.parse(serializeDocument(useDocStore.getState().doc))
+    obj.schemaVersion = SCHEMA_VERSION + 1
+    expect(() => parseDocument(JSON.stringify(obj))).toThrow(ForwardVersionError)
   })
 
   it('garbage input throws InvalidDocumentError', () => {

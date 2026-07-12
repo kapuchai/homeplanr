@@ -12,6 +12,8 @@ export interface WallNode {
   y: number
 }
 
+export type WallFinishId = 'paint' | 'brick' | 'concrete' | 'tile'
+
 export interface Wall {
   id: WallId
   /** Undirected edge; the a→b order fixes opening `t`, hinge, and swing semantics. */
@@ -21,6 +23,16 @@ export interface Wall {
   thickness: number
   /** m */
   height: number
+  /**
+   * Paint on the front face — front = the +perp(dir a→b) side, with
+   * perp(v)=(−v.y,v.x) in plan y-down space: the SAME side Door.swing calls
+   * 'front'. Values are WALL_PAINTS preset ids; absent = default paint.
+   */
+  paintFront?: string
+  /** Paint on the back face (−perp side); WALL_PAINTS id, absent = default. */
+  paintBack?: string
+  /** Surface finish on both faces; absent = 'paint'. */
+  finish?: WallFinishId
 }
 
 export interface OpeningBase {
@@ -75,19 +87,20 @@ export interface FurnitureInstance {
   size: { w: number; d: number; h: number }
   /** m above the floor (0 = on floor). */
   elevation: number
+  /** Reflection across item-local x=0, applied before rotation; absent = false. */
+  mirrored?: boolean
 }
 
 export interface ProjectSettings {
   /** m — base grid unit; display tiers and snap derive from it. */
   gridSize: number
   snapEnabled: boolean
-  unitDisplay: 'm' | 'cm'
   defaultWallThickness: number
   defaultWallHeight: number
 }
 
 export interface ProjectDocument {
-  schemaVersion: 1
+  schemaVersion: 2
   id: string
   name: string
   /** ISO strings. Mutations never touch updatedAt — serialize() stamps it. */
@@ -101,7 +114,7 @@ export interface ProjectDocument {
   furniture: Record<FurnitureId, FurnitureInstance>
 }
 
-export const SCHEMA_VERSION = 1 as const
+export const SCHEMA_VERSION = 2 as const
 
 /** Pinned defaults (plan: "DEFAULTS"). All meters. */
 export const DEFAULTS = {
@@ -124,7 +137,6 @@ export function defaultSettings(): ProjectSettings {
   return {
     gridSize: DEFAULTS.gridSize,
     snapEnabled: true,
-    unitDisplay: 'm',
     defaultWallThickness: DEFAULTS.wallThickness,
     defaultWallHeight: DEFAULTS.wallHeight,
   }
