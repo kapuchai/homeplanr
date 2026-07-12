@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildPatchSolids, buildWallSolid, type WallSolid } from './wallSolids'
 import { computeWallOutlines } from './wallOutline'
-import { area } from './polygon'
+import { area, signedArea } from './polygon'
+import { add, perp, scale, sub } from './vec'
 import { fixture } from '../test/fixtures'
 import { asNodeId, asOpeningId, asWallId } from '../model/ids'
 import type { Opening, Wall, WallNode } from '../model/types'
@@ -160,6 +161,78 @@ describe('buildWallSolid', () => {
     )
     expect(s.prisms).toHaveLength(1)
     expect(area(s.prisms[0]!.polygon)).toBeCloseTo(area(out.wallPolygons[w1.id]!), 9)
+  })
+})
+
+describe('wall-local frame (pinned: +v ≡ +perp(a→b) ≡ door-swing front)', () => {
+  it('wall-local frame maps +perp side to +v', () => {
+    // Diagonal wall a=(1,2)→b=(4,6): dir=(0.6,0.8). The +perp flank starts at
+    // u=0.5 (as a real miter would), so a mirrored frame cannot map it onto
+    // the −perp flank unnoticed.
+    const wall: Wall = { id: asWallId('w'), a: asNodeId('na'), b: asNodeId('nb'), thickness: 0.2, height: 2.5 }
+    const a: WallNode = { id: asNodeId('na'), x: 1, y: 2 }
+    const b: WallNode = { id: asNodeId('nb'), x: 4, y: 6 }
+    const A = { x: a.x, y: a.y }
+    const B = { x: b.x, y: b.y }
+    const dir = { x: 0.6, y: 0.8 }
+    const side = scale(perp(dir), 0.1) // +perp(a→b) · thickness/2
+    const outline = [
+      sub(A, side),
+      sub(B, side),
+      add(B, side),
+      add(add(A, scale(dir, 0.5)), side),
+    ]
+    const s = buildWallSolid(wall, a, b, [], outline, [0.5, 5])
+    expect(s.prisms).toHaveLength(1)
+    const ring = s.prisms[0]!.polygon
+    const notch = ring.find((q) => Math.abs(q.x - 0.5) < 1e-9)
+    expect(notch).toBeDefined()
+    expect(notch!.y).toBeCloseTo(0.1, 9)
+    // a proper (non-reflecting) frame keeps the outline's positive winding
+    expect(signedArea(ring)).toBeGreaterThan(0)
+  })
+
+  it('junction tiling: prisms through the frame + patches cover the 2D outline union', () => {
+    const fx = fixture(
+      [
+        ['nw', -2, 0],
+        ['nc', 0, 0],
+        ['ne', 2, 0],
+        ['ns', 0, 2],
+      ],
+      [
+        ['w1', 'nw', 'nc', 0.3],
+        ['w2', 'nc', 'ne', 0.3],
+        ['w3', 'nc', 'ns', 0.3],
+      ],
+    )
+    const out = computeWallOutlines(fx.nodes, fx.walls)
+    const patches = buildPatchSolids(fx.nodes, fx.walls, out.nodePatches)
+    expect(patches).toHaveLength(1)
+
+    let prismArea = 0
+    for (const w of Object.values(fx.walls)) {
+      const outline = out.wallPolygons[w.id]!
+      const s = buildWallSolid(w, fx.nodes[w.a]!, fx.nodes[w.b]!, [], outline, out.wallCores[w.id]!)
+      expect(s.prisms).toHaveLength(1)
+      const prism = s.prisms[0]!
+      expect(prism.z0).toBe(0)
+      expect(prism.z1).toBe(2.5)
+      // place the prism exactly like the 3D side: origin + dir·u + perp(dir)·v
+      const { origin, dir } = s.frame
+      const world = prism.polygon.map((q) => add(origin, add(scale(dir, q.x), scale(perp(dir), q.y))))
+      // frame round-trip reproduces the 2D outline (a mirrored frame would not)
+      expect(world).toHaveLength(outline.length)
+      for (const p of outline) {
+        expect(world.some((q) => Math.abs(q.x - p.x) < 1e-9 && Math.abs(q.y - p.y) < 1e-9)).toBe(true)
+      }
+      prismArea += area(world)
+    }
+    const patchArea = patches.reduce((s, p) => s + area(p.polygon), 0)
+    const outlineArea =
+      Object.values(out.wallPolygons).reduce((s, p) => s + area(p), 0) +
+      Object.values(out.nodePatches).reduce((s, p) => s + area(p), 0)
+    expect(prismArea + patchArea).toBeCloseTo(outlineArea, 6)
   })
 })
 

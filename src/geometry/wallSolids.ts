@@ -9,11 +9,13 @@ import { GEOM_EPS } from './constants'
 /**
  * 3D wall geometry as prism decomposition — the no-CSG approach.
  *
- * Everything here is wall-LOCAL 2D math: u along a→b, v lateral (+perp side),
- * z up. The 3D layer extrudes prisms and places them via `frame`. Openings
- * are only legal inside the straight core (between the innermost miter
- * vertices, provided by computeWallOutlines), so every cut plane slices a
- * plain rectangle — watertight by construction.
+ * Everything here is wall-LOCAL 2D math: u along a→b, v the +perp(a→b)
+ * lateral, z up. PINNED: local +v ≡ +perp(a→b) ≡ the door-swing 'front'
+ * side; the 3D layer extrudes prisms and places them via `frame` as
+ * origin + dir·u + perp(dir)·v. Openings are only legal inside the straight
+ * core (between the innermost miter vertices, provided by
+ * computeWallOutlines), so every cut plane slices a plain rectangle —
+ * watertight by construction.
  *
  * Contract with OpeningFixtures/2D covers: `openings` in the result are the
  * REALIZED intervals (post-clamp). Consumers must never re-derive from raw
@@ -70,11 +72,11 @@ export function buildWallSolid(
   const frame: WallFrame = { origin: A, dir, length }
   const H = wall.height
 
-  // Outline → wall-local coordinates.
+  // Outline → wall-local coordinates: u = dot(off, dir), v = dot(off, perp(dir)).
   const local = outline.map((p) => {
     const dx = p.x - A.x
     const dy = p.y - A.y
-    return { x: dx * dir.x + dy * dir.y, y: dx * dir.y - dy * dir.x }
+    return { x: dx * dir.x + dy * dir.y, y: dy * dir.x - dx * dir.y }
   })
   if (local.length < 3 || length <= GEOM_EPS) {
     return { wallId: wall.id, frame, prisms: [], openings: [], clamped: false }
