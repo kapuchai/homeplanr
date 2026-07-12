@@ -139,6 +139,14 @@ Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
   `Exec=homeplanr %F`) + `src-tauri/mime/homeplanr.xml` are wired via
   `bundle.linux.{deb,rpm}.desktopTemplate/files`. If the CLI is ever bumped,
   re-inspect a built .deb (`ar x` + `bsdtar`) before deleting them.
+- **CI AppImages bundle Ubuntu 22.04's `libwayland-*` → white window on
+  rolling distros** (`Could not create default EGL display: EGL_BAD_PARAMETER`
+  in the launch log): host mesa ≥24 can't bring up EGL against 2022
+  libwayland, while mesa itself is host-provided. release.yml repacks the
+  AppImage without `usr/lib/libwayland-*` (verified fix on CachyOS/AMD
+  Wayland). Local `tauri build` AppImages never had the issue (they bundle
+  the build host's own libwayland). If bundling ever changes, re-test a CI
+  AppImage on a rolling distro before shipping.
 - **Door-arc sweep flags are empirically pinned** (two user checks, y-down
   and y-up). Verify visually after any viewport-transform change; don't
   re-derive from theory.
