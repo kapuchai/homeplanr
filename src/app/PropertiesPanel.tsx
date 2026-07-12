@@ -5,7 +5,7 @@ import { useAppSettings } from '../store/appSettings'
 import { formatArea, fromDisplayLength, lengthUnitLabel, toDisplayLength } from '../format/units'
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
-import { FLOOR_MATERIALS, SCENE_MATERIALS, type FloorMaterialId } from '../catalog/palette'
+import { FLOOR_MATERIALS } from '../catalog/palette'
 import { CATALOG } from '../catalog'
 import type { FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
 
@@ -287,6 +287,20 @@ export function PropertiesPanel() {
           fromDisplay={(v) => (v * Math.PI) / 180}
           onCommit={(v) => a.transformFurniture(furniture.id, { rotation: v })}
         />
+        <Row>
+          <span>Mirror</span>
+          <div className="segmented small">
+            <button
+              type="button"
+              className={furniture.mirrored ? 'active' : ''}
+              onClick={() =>
+                a.transformFurniture(furniture.id, { mirrored: !furniture.mirrored })
+              }
+            >
+              Flip
+            </button>
+          </div>
+        </Row>
         <LengthField label="Width" value={furniture.size.w} onCommit={(v) => a.resizeFurniture(furniture.id, { w: v })} />
         <LengthField label="Depth" value={furniture.size.d} onCommit={(v) => a.resizeFurniture(furniture.id, { d: v })} />
         <LengthField label="Height" value={furniture.size.h} onCommit={(v) => a.resizeFurniture(furniture.id, { h: v })} />
@@ -314,14 +328,14 @@ export function PropertiesPanel() {
         <Row>
           <span>Floor</span>
           <div className="swatches">
-            {FLOOR_MATERIALS.map((m: FloorMaterialId) => (
+            {FLOOR_MATERIALS.map((f) => (
               <button
-                key={m}
+                key={f.id}
                 type="button"
-                title={m}
-                className={`swatch${(room.floorMaterialId ?? 'woodFloor') === m ? ' active' : ''}`}
-                style={{ background: SCENE_MATERIALS[m].color }}
-                onClick={() => a.setRoomFloorMaterial(room.id, m)}
+                title={f.name}
+                className={`swatch${(room.floorMaterialId ?? 'woodFloor') === f.id ? ' active' : ''}`}
+                style={{ background: f.color }}
+                onClick={() => a.setRoomFloorMaterial(room.id, f.id)}
               />
             ))}
           </div>
@@ -372,7 +386,8 @@ export function PropertiesPanel() {
         onCommit={(v) => a.updateSettings({ defaultWallHeight: v })}
       />
       <p className="hint">
-        W draw · D door · N window · V select · Del delete · Ctrl+Z undo · Space pan · Shift+1 fit
+        W draw · D door · N window · M measure · V select · Del delete · Ctrl+Z undo · Space pan ·
+        Shift+1 fit
       </p>
     </aside>
   )

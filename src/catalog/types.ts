@@ -21,6 +21,7 @@ export type MaterialId =
   | 'ceramic'
   | 'glass'
   | 'screenBlack'
+  | 'foliage'
 
 export type CatalogCategory =
   | 'living'

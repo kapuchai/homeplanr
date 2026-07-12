@@ -26,25 +26,45 @@ export const PALETTE: Record<MaterialId, MaterialSpec> = {
   ceramic: { color: '#f7f8f7', roughness: 0.12, metalness: 0 },
   glass: { color: '#cfe4ee', roughness: 0.08, metalness: 0, opacity: 0.35 },
   screenBlack: { color: '#14161a', roughness: 0.3, metalness: 0 },
+  foliage: { color: '#6b8f5f', roughness: 0.95, metalness: 0 },
 }
 
 /** Scene-level materials (not per-item slots). */
 export const SCENE_MATERIALS = {
   wallPaint: { color: '#f5f3ee', roughness: 0.9, metalness: 0 },
-  woodFloor: { color: '#d3b891', roughness: 0.55, metalness: 0 },
-  ceramicFloor: { color: '#e8e8e4', roughness: 0.25, metalness: 0 },
-  darkFloor: { color: '#8a6a48', roughness: 0.55, metalness: 0 },
-  carpetFloor: { color: '#b8b2a4', roughness: 1.0, metalness: 0 },
   ground: { color: '#dcdcd8', roughness: 1.0, metalness: 0 },
 } as const
 
-export type FloorMaterialId = 'woodFloor' | 'ceramicFloor' | 'darkFloor' | 'carpetFloor'
-export const FLOOR_MATERIALS: FloorMaterialId[] = [
-  'woodFloor',
-  'ceramicFloor',
-  'darkFloor',
-  'carpetFloor',
+/** Floor registry — the single source; sceneMaterials/PropertiesPanel/2D tint all read this. */
+export type FloorTextureKind = 'plank' | 'tile' | 'stone' | null
+export interface FloorSpec {
+  id: string
+  name: string
+  color: string
+  roughness: number
+  texture: FloorTextureKind
+}
+// The first four ids predate v0.2.0 and are referenced by existing documents — never rename.
+export const FLOOR_MATERIALS: readonly FloorSpec[] = [
+  { id: 'woodFloor', name: 'Wood', color: '#d3b891', roughness: 0.55, texture: 'plank' },
+  { id: 'parquetLight', name: 'Light parquet', color: '#e0c9a2', roughness: 0.5, texture: 'plank' },
+  { id: 'laminateGray', name: 'Gray laminate', color: '#b9b0a4', roughness: 0.45, texture: 'plank' },
+  { id: 'darkFloor', name: 'Dark wood', color: '#8a6a48', roughness: 0.55, texture: 'plank' },
+  { id: 'ceramicFloor', name: 'White tile', color: '#e8e8e4', roughness: 0.25, texture: 'tile' },
+  { id: 'tileGray', name: 'Gray tile', color: '#c9c9c4', roughness: 0.25, texture: 'tile' },
+  { id: 'terracotta', name: 'Terracotta', color: '#c07a56', roughness: 0.6, texture: 'tile' },
+  { id: 'marble', name: 'Marble', color: '#e9e7e2', roughness: 0.15, texture: 'stone' },
+  { id: 'stoneGray', name: 'Stone', color: '#a8a49c', roughness: 0.7, texture: 'stone' },
+  { id: 'concrete', name: 'Concrete', color: '#b5b3ae', roughness: 0.85, texture: null },
+  { id: 'carpetFloor', name: 'Carpet', color: '#b8b2a4', roughness: 1.0, texture: null },
 ]
+
+export const FLOOR_IDS: ReadonlySet<string> = new Set(FLOOR_MATERIALS.map((f) => f.id))
+
+/** Unknown/absent ids fall back to the default wood floor (render-side leniency). */
+export function floorSpec(id: string | undefined): FloorSpec {
+  return (id !== undefined && FLOOR_MATERIALS.find((f) => f.id === id)) || FLOOR_MATERIALS[0]!
+}
 
 /** Per-side wall paint presets (Wall.paintFront/paintBack reference these ids). */
 export const WALL_PAINTS: readonly { id: string; name: string; color: string }[] = [

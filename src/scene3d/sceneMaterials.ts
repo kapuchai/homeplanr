@@ -1,5 +1,5 @@
 import { MeshStandardMaterial } from 'three'
-import { PALETTE, SCENE_MATERIALS, type FloorMaterialId } from '../catalog/palette'
+import { PALETTE, SCENE_MATERIALS, floorSpec } from '../catalog/palette'
 import type { MaterialId } from '../catalog/types'
 
 /** Singleton three materials — created once, shared by every mesh. */
@@ -36,7 +36,13 @@ export function sceneMaterial(id: keyof typeof SCENE_MATERIALS): MeshStandardMat
   return m
 }
 
+const floorCache = new Map<string, MeshStandardMaterial>()
 export function floorMaterial(id: string | undefined): MeshStandardMaterial {
-  const valid: FloorMaterialId[] = ['woodFloor', 'ceramicFloor', 'darkFloor', 'carpetFloor']
-  return sceneMaterial(valid.includes(id as FloorMaterialId) ? (id as FloorMaterialId) : 'woodFloor')
+  const spec = floorSpec(id)
+  let m = floorCache.get(spec.id)
+  if (!m) {
+    m = new MeshStandardMaterial({ color: spec.color, roughness: spec.roughness, metalness: 0 })
+    floorCache.set(spec.id, m)
+  }
+  return m
 }
