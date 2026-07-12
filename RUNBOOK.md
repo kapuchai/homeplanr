@@ -4,12 +4,15 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.1.0, 2026-07-12)
+## State (as of v0.2.0, 2026-07-12)
 
 Shipped: 2D editor (walls/doors/windows/furniture, snapping, undo), 3D view,
-18-item procedural catalog, native `.homeplanr` persistence with crash
-recovery, Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
-All milestones M0–M6 of the v1 plan are complete and user-verified.
+35-item procedural catalog with iso thumbnails, native `.homeplanr`
+persistence with crash recovery + silent forward migrations (schema v2),
+theming (dark mode, 6 accents), units (m/cm/ft-in), measure/dimension tools,
+per-side wall paint + finishes, 11 floors, first-person walk with collision,
+plan PNG/SVG export + 3D screenshot, file association + single instance,
+Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
 
 ## Commands
 
@@ -17,9 +20,11 @@ All milestones M0–M6 of the v1 plan are complete and user-verified.
 |---|---|
 | Dev (native window, HMR) | `npm run tauri dev` |
 | Dev (browser only) | `npm run dev` |
-| Unit tests (249) | `npm test` |
+| Unit tests (512) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Typecheck / lint | `npm run typecheck` / `npm run lint` |
+| Color-token lint | `npm run lint:colors` (raw colors outside the allowed dirs fail CI) |
+| Goldens (pre-schema-bump ONLY) | `npx vite-node scripts/makeGoldens.ts` — refuses to overwrite |
 | Local bundles | `npm run tauri build` (deb/rpm); AppImage on this Arch box needs `APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=1 npm run tauri build -- --bundles appimage` (no fuse2 installed) |
 | Run local AppImage | `./src-tauri/target/release/bundle/appimage/*.AppImage --appimage-extract-and-run` |
 | Release | push a `v*` tag → `release.yml` builds both OSes + drafts the GitHub release; dry-run anytime via `gh workflow run release.yml` |
@@ -48,6 +53,27 @@ All milestones M0–M6 of the v1 plan are complete and user-verified.
 - The catalog **conformance suite** is the authoring oracle: every new item
   must pass dims/footprint/height/material checks. 2D symbols are DERIVED
   from `build3d` parts (`symbolFromParts.ts`) — do not hand-author symbols.
+- **Wall-local frame sign**: `+v` ≡ `+perp(a→b)` ≡ the door-swing 'front'
+  side (`paintFront`). `wallSolids.test.ts` (junction/T-junction tiling) and
+  `prismGeometry.test.ts` (front/back face buckets) pin it — never re-derive
+  the sign from a cross product (that reflection was the v0.1 mirror bug).
+- **Collision passability oracle = doors only** (`scene3d/walk/collision.ts`):
+  blocking rects are the wall's outline u-span minus door intervals; windows
+  always block. Never decide passability from eye-height prism slices.
+- **Keymap 3D matrix**: in the 3D view only the file accelerators
+  (Ctrl+N/O/S/Shift+S) stay live — every editing/navigation key is 2D-only,
+  and walk mode owns its keys inside WalkControls.
+- **Thumbnail pipeline disposes after warmup**: one shared offscreen
+  renderer, dropped after the last warmup item (cached data-URLs outlive
+  it) — never a second persistent GL context.
+- **MAX_SUBSTEP < PLAYER_RADIUS** (anti-tunnel invariant, asserted in a
+  collision test) — keep it true when tuning either constant.
+- **Components carry no raw colors** — theme tokens only; `npm run
+  lint:colors` gates it (raw colors legal only in src/theme, src/catalog,
+  tests, and proceduralTextures.ts).
+- **Migrations are silent**: a schema-version upgrade never pushes warnings
+  and never marks the doc dirty — old files open clean and upgrade only on
+  the next explicit save.
 
 ## Schema change checklist (bumping schema N → N+1)
 
@@ -79,6 +105,14 @@ All milestones M0–M6 of the v1 plan are complete and user-verified.
 4. Packaged AppImage pass before tagging (dev and package have SEPARATE
    localStorage — recovery/recents don't carry over).
 5. CI green before considering a push done (`gh run watch`).
+6. Dark-mode visual pass — 2D and 3D — after any theme-touching change.
+7. Walk-mode look: pointer-capture drag on WebKitGTK in `npm run tauri dev`
+   (no text selection, no dropped drags).
+8. Packaged file-association double-click: cold start AND second-instance
+   relay into the already-running window.
+9. Catalog thumbnails render; then force a context loss (devtools
+   `WEBGL_lose_context`) and confirm cards fall back to SVG symbols.
+10. PNG and SVG exports open in an external viewer.
 
 ## Platform quirks (hard-won; don't re-learn)
 
@@ -102,6 +136,20 @@ All milestones M0–M6 of the v1 plan are complete and user-verified.
 - **Door-arc sweep flags are empirically pinned** (two user checks, y-down
   and y-up). Verify visually after any viewport-transform change; don't
   re-derive from theory.
+- **single-instance MUST stay the FIRST Rust plugin** registered in lib.rs —
+  it decides whether the process runs at all; a second launch relays its
+  argv/cwd into the callback and exits before any other plugin or window
+  exists.
+- **argv `.homeplanr` paths are fs-scope-granted in Rust BEFORE the frontend
+  reads them** — cold start in `.setup()` (parked for `take_launch_file`),
+  second instance before the `open-file` emit. Move the `allow_file` call
+  and double-click opens fail with a scope error.
+- **The goldens runner is `npx vite-node`** — node 26 type-stripping can't
+  resolve the repo's extensionless TS imports, so plain
+  `node scripts/makeGoldens.ts` won't run.
+- **App settings share the dev/packaged localStorage split** — theme,
+  accent, and units set under `tauri dev` don't carry into a packaged build
+  (same storage as recovery/recents; see gate 4).
 - pkill sweeps of `vite`/`tauri dev` return exit 143/144 in this harness —
   harmless.
 

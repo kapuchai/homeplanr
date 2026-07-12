@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "homeplanr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.kapuchai.homeplanr",
   "build": {
     "frontendDist": "../dist",
@@ -29,6 +29,15 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": ["homeplanr"],
+        "name": "homeplanr project",
+        "description": "homeplanr floor-plan project",
+        "mimeType": "application/x-homeplanr",
+        "role": "Editor"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
