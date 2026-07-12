@@ -1,21 +1,31 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { PMREMGenerator, ACESFilmicToneMapping } from 'three'
+import {
+  PMREMGenerator,
+  ACESFilmicToneMapping,
+  type BufferGeometry,
+  type MeshStandardMaterial,
+} from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { useThemeStore } from '../theme/themeStore'
 import { getDerived, type DerivedRoom } from '../store/derived'
 import { useSceneDoc } from './useSceneDoc'
-import { buildFloorMeshData, buildPrismMeshData } from './mesh/prismGeometry'
+import {
+  buildFloorMeshData,
+  buildPrismMeshData,
+  buildWallFaceMeshData,
+  mergeMeshData,
+} from './mesh/prismGeometry'
 import { toBufferGeometry } from './mesh/toBufferGeometry'
 import { fitCameraPose, sceneBBox, type SceneBBox } from './mesh/fitCamera'
-import { floorMaterial, itemMaterial, sceneMaterial } from './sceneMaterials'
+import { floorMaterial, itemMaterial, sceneMaterial, wallFaceMaterial } from './sceneMaterials'
 import { CATALOG } from '../catalog'
 import { realizeItem } from '../catalog/realize'
 import type { WallSolid, PatchSolid } from '../geometry/wallSolids'
-import type { FurnitureInstance, ProjectDocument } from '../model/types'
+import type { FurnitureInstance, ProjectDocument, Wall } from '../model/types'
 import type { MaterialId } from '../catalog/types'
 
 /**
@@ -30,17 +40,44 @@ import type { MaterialId } from '../catalog/types'
  *   (2D stays fully usable). Dev flag ?failgl=1 forces creation failure.
  */
 
-function WallMeshes({ solid }: { solid: WallSolid }) {
-  const geos = useMemo(
-    () => solid.prisms.map((p) => toBufferGeometry(buildPrismMeshData(p))),
-    [solid],
-  )
-  useEffect(() => () => geos.forEach((g) => g.dispose()), [geos])
+/**
+ * Wall solids → meshes. Unstyled walls (no per-side paint, no finish)
+ * collapse to ONE merged geometry with the default paint (single draw
+ * call). Styled walls split into ≤3 face buckets: front/back get
+ * wallFaceMaterial(paint, finish); trim (end caps, miter slants, jambs,
+ * top/bottom caps) keeps the neutral default wallPaint.
+ */
+function WallMeshes({ solid, wall }: { solid: WallSolid; wall: Wall | undefined }) {
+  const paintFront = wall?.paintFront
+  const paintBack = wall?.paintBack
+  const finish = wall?.finish
+  const meshes = useMemo(() => {
+    const out: { geo: BufferGeometry; material: MeshStandardMaterial }[] = []
+    if (paintFront === undefined && paintBack === undefined && finish === undefined) {
+      if (solid.prisms.length) {
+        const merged = mergeMeshData(solid.prisms.map((p) => buildPrismMeshData(p)))
+        out.push({ geo: toBufferGeometry(merged), material: sceneMaterial('wallPaint') })
+      }
+      return out
+    }
+    const faces = buildWallFaceMeshData(solid.prisms)
+    if (faces.front) {
+      out.push({ geo: toBufferGeometry(faces.front), material: wallFaceMaterial(paintFront, finish) })
+    }
+    if (faces.back) {
+      out.push({ geo: toBufferGeometry(faces.back), material: wallFaceMaterial(paintBack, finish) })
+    }
+    if (faces.trim) {
+      out.push({ geo: toBufferGeometry(faces.trim), material: sceneMaterial('wallPaint') })
+    }
+    return out
+  }, [solid, paintFront, paintBack, finish])
+  useEffect(() => () => meshes.forEach((m) => m.geo.dispose()), [meshes])
   const angle = Math.atan2(solid.frame.dir.y, solid.frame.dir.x)
   return (
     <group position={[solid.frame.origin.x, solid.frame.origin.y, 0]} rotation={[0, 0, angle]}>
-      {geos.map((g, i) => (
-        <mesh key={i} geometry={g} material={sceneMaterial('wallPaint')} castShadow receiveShadow />
+      {meshes.map((m, i) => (
+        <mesh key={i} geometry={m.geo} material={m.material} castShadow receiveShadow />
       ))}
     </group>
   )
@@ -315,7 +352,7 @@ export function PlannerCanvas() {
         />
         <group rotation-x={-Math.PI / 2}>
           {Object.values(derived.wallSolids).map((s) => (
-            <WallMeshes key={s.wallId} solid={s} />
+            <WallMeshes key={s.wallId} solid={s} wall={doc.walls[s.wallId]} />
           ))}
           {Object.values(derived.wallSolids).map((s) =>
             s.openings.length ? <OpeningFixtures key={`fx-${s.wallId}`} doc={doc} solid={s} /> : null,

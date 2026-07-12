@@ -33,7 +33,7 @@ export interface DocState {
   addWallChain: (points: readonly Vec2[], opts?: Parameters<typeof walls.addWallChain>[2]) => WallId[]
   moveNode: (id: NodeId, p: Vec2, opts?: { mode?: MutationMode }) => void
   moveWall: (id: WallId, delta: Vec2, opts?: { mode?: MutationMode }) => void
-  updateWall: (id: WallId, patch: { thickness?: number; height?: number }, opts?: { mode?: MutationMode }) => void
+  updateWall: (id: WallId, patch: Parameters<typeof walls.updateWall>[2], opts?: { mode?: MutationMode }) => void
   setWallLength: (id: WallId, length: number, opts?: { mode?: MutationMode }) => void
   splitWall: (id: WallId, s: number, opts?: { mode?: MutationMode }) => NodeId | null
   mergeNodes: (survivor: NodeId, loser: NodeId, opts?: { mode?: MutationMode }) => void
@@ -51,6 +51,7 @@ export interface DocState {
   // rooms / project
   renameRoom: (id: RoomId, name: string) => void
   setRoomFloorMaterial: (id: RoomId, materialId: string | undefined) => void
+  paintRoomWalls: (id: RoomId, paintId: string | undefined) => void
   renameProject: (name: string) => void
   updateSettings: (patch: Partial<ProjectSettings>) => void
   // document lifecycle
@@ -94,6 +95,7 @@ export const useDocStore = create<DocState>()(
           duplicateFurniture: (ids) => mutate((d) => furniture.duplicateFurniture(d, ids)),
           renameRoom: (id, name) => mutate((d) => rooms.renameRoom(d, id, name)),
           setRoomFloorMaterial: (id, mat) => mutate((d) => rooms.setRoomFloorMaterial(d, id, mat)),
+          paintRoomWalls: (id, paintId) => mutate((d) => rooms.paintRoomWalls(d, id, paintId)),
           renameProject: (name) => mutate((d) => project.renameProject(d, name)),
           updateSettings: (patch) => mutate((d) => project.updateSettings(d, patch)),
           newDocument: (name = 'Untitled') =>

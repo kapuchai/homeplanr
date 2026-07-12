@@ -1,6 +1,9 @@
 import type { ProjectDocument, Room } from '../types'
 import { newRoomId, type RoomId, type WallId } from '../ids'
 import { detectFaces } from '../../geometry/faces'
+import { pointInPolygonWithHoles } from '../../geometry/polygon'
+import { add, normalize, perp, scale, sub } from '../../geometry/vec'
+import { applyWallPaint } from './walls'
 
 /**
  * Room reconciliation: keeps room identity (id, name, floorMaterialId)
@@ -105,4 +108,47 @@ export function setRoomFloorMaterial(
   if (!room) return
   if (materialId) room.floorMaterialId = materialId
   else delete room.floorMaterialId
+}
+
+/**
+ * Paint every wall face that looks into this room (outer cycle + island
+ * walls from holeCycles) with one WALL_PAINTS id; undefined/unknown ids
+ * reset those faces to default. Doc-only: the room polygon is reconstructed
+ * by re-running detectFaces and matching the room's wall-ID fingerprint
+ * (same join as store/derived.ts) — mutations cannot read the derived layer.
+ * Side probe: wall midpoint ± perp(a→b)·(thickness/2 + 1cm); the +perp probe
+ * inside the room paints paintFront (front ≡ +perp, see model/types.ts),
+ * the −perp probe paints paintBack, neither skips the wall.
+ * One call = one undo entry; no pipeline run (paint never alters topology).
+ */
+export function paintRoomWalls(
+  doc: ProjectDocument,
+  roomId: RoomId,
+  paintId: string | undefined,
+): void {
+  const room = doc.rooms[roomId]
+  if (!room) return
+  const fingerprint = (ids: readonly WallId[]) => [...ids].sort().join('|')
+  const roomKey = fingerprint([...room.wallCycle, ...room.holeCycles.flat()])
+  const face = detectFaces(doc.nodes, doc.walls).find(
+    (f) => fingerprint([...f.wallSet, ...f.holeCycles.flat()]) === roomKey,
+  )
+  if (!face) return
+  const wallIds = new Set<WallId>([...room.wallCycle, ...room.holeCycles.flat()])
+  for (const id of wallIds) {
+    const w = doc.walls[id]
+    const na = w && doc.nodes[w.a]
+    const nb = w && doc.nodes[w.b]
+    if (!w || !na || !nb) continue
+    const side = perp(normalize(sub(nb, na)))
+    const mid = { x: (na.x + nb.x) / 2, y: (na.y + nb.y) / 2 }
+    const off = w.thickness / 2 + 0.01
+    if (pointInPolygonWithHoles(add(mid, scale(side, off)), face.polygon, face.holePolygons)) {
+      applyWallPaint(w, 'paintFront', paintId)
+    } else if (
+      pointInPolygonWithHoles(add(mid, scale(side, -off)), face.polygon, face.holePolygons)
+    ) {
+      applyWallPaint(w, 'paintBack', paintId)
+    }
+  }
 }

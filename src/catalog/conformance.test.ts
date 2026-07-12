@@ -12,6 +12,11 @@ import type { SymbolPrim } from './types'
  */
 const items = Object.values(CATALOG)
 
+// The 0.3m height bound catches cm→m typos; flat floor coverings are a
+// legitimate class — they get a 0.015m floor instead. All other checks
+// still apply.
+const FLAT_ITEMS = new Set(['rug'])
+
 function symbolBounds(prims: SymbolPrim[]): { minX: number; minY: number; maxX: number; maxY: number } {
   let minX = Infinity
   let minY = Infinity
@@ -101,9 +106,16 @@ describe('catalog conformance', () => {
         expect(item.dims.w).toBeLessThanOrEqual(3.5)
         expect(item.dims.d).toBeGreaterThanOrEqual(0.2)
         expect(item.dims.d).toBeLessThanOrEqual(3.5)
-        expect(item.dims.h).toBeGreaterThanOrEqual(0.3)
+        expect(item.dims.h).toBeGreaterThanOrEqual(FLAT_ITEMS.has(item.id) ? 0.015 : 0.3)
         expect(item.dims.h).toBeLessThanOrEqual(2.5)
       })
+
+      if (item.defaultElevation !== undefined) {
+        it('defaultElevation within the mount range [0, 3]', () => {
+          expect(item.defaultElevation).toBeGreaterThanOrEqual(0)
+          expect(item.defaultElevation).toBeLessThanOrEqual(3)
+        })
+      }
 
       it('derived symbol stays within the footprint (+2cm)', () => {
         // symbols are DERIVED from the 3D parts (symbolFromParts) — this

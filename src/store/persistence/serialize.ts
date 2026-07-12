@@ -277,14 +277,15 @@ export function validateParsedObject(raw: unknown): ParseResult {
       }
       const id = asFurnitureId(key)
       const sz = size as { w: number; d: number; h: number }
-      const clamp = (n: number) => Math.min(5, Math.max(0.1, n))
+      // w/d floor 0.1; h floor 0.01 — flat items (rug) are legitimately thin
+      const clamp = (n: number, min: number) => Math.min(5, Math.max(min, n))
       doc.furniture[id] = {
         id,
         catalogItemId: v.catalogItemId as string,
         x: v.x as number,
         y: v.y as number,
         rotation: v.rotation as number,
-        size: { w: clamp(sz.w), d: clamp(sz.d), h: clamp(sz.h) },
+        size: { w: clamp(sz.w, 0.1), d: clamp(sz.d, 0.1), h: clamp(sz.h, 0.01) },
         elevation: isFiniteNum(v.elevation) ? Math.min(3, Math.max(0, v.elevation)) : 0,
         ...(isStr(v.name) && v.name ? { name: v.name } : {}),
         ...(v.mirrored === true ? { mirrored: true } : {}),

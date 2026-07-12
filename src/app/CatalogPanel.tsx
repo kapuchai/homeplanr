@@ -1,6 +1,7 @@
-import { useRef } from 'react'
-import { CATALOG_BY_CATEGORY, CATEGORY_ORDER, type CatalogItem } from '../catalog'
+import { useEffect, useReducer, useRef } from 'react'
+import { CATALOG, CATALOG_BY_CATEGORY, CATEGORY_ORDER, type CatalogItem } from '../catalog'
 import { symbolFor } from '../catalog/symbolFromParts'
+import { ensureThumbnails, getThumbnail } from '../catalog/thumbnails'
 import { SymbolRenderer } from '../editor2d/render/SymbolRenderer'
 import { useUiStore } from '../store/uiStore'
 import { useDocStore } from '../store/docStore'
@@ -97,11 +98,14 @@ function ItemCard({ item }: { item: CatalogItem }) {
       y: over.world.y,
       rotation: 0,
       size: { ...item.dims },
+      elevation: item.defaultElevation ?? 0,
     })
     ui.setSelection([id])
     ui.setActiveTool('select')
     ui.setToolParams({ catalogItemId: null })
   }
+
+  const thumb = getThumbnail(item)
 
   return (
     <button
@@ -112,17 +116,28 @@ function ItemCard({ item }: { item: CatalogItem }) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <svg width={52} height={52} viewBox="-26 -26 52 52" aria-hidden>
-        <g transform={`scale(${viewScale})`}>
-          <SymbolRenderer prims={symbolFor(item)} />
-        </g>
-      </svg>
+      {thumb ? (
+        <img src={thumb} width={64} height={64} alt="" draggable={false} style={{ pointerEvents: 'none' }} />
+      ) : (
+        <svg width={52} height={52} viewBox="-26 -26 52 52" aria-hidden>
+          <g transform={`scale(${viewScale})`}>
+            <SymbolRenderer prims={symbolFor(item)} />
+          </g>
+        </svg>
+      )}
       <span>{item.name}</span>
     </button>
   )
 }
 
 export function CatalogPanel() {
+  // isometric thumbnails warm up in idle slices; each progress tick
+  // re-renders the cards so they swap from SVG symbols to renders
+  const [, bump] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => {
+    void ensureThumbnails(Object.values(CATALOG), () => bump())
+  }, [])
+
   return (
     <aside className="catalog-panel">
       {CATEGORY_ORDER.map((cat) => {

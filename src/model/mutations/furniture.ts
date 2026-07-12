@@ -6,12 +6,14 @@ import { newFurnitureId, type FurnitureId } from '../ids'
  * rooms — no pipeline runs here; live drags mutate directly.
  */
 
-const SIZE_MIN = 0.1
+const SIZE_MIN = 0.1 // footprint (w/d) floor
+const HEIGHT_MIN = 0.01 // flat items (rugs) are legitimately ~2cm high
 const SIZE_MAX = 5
 const ELEV_MIN = 0
 const ELEV_MAX = 3
 
 const clampSize = (v: number) => Math.min(SIZE_MAX, Math.max(SIZE_MIN, v))
+const clampHeight = (v: number) => Math.min(SIZE_MAX, Math.max(HEIGHT_MIN, v))
 const q = (v: number) => Math.round(v * 100) / 100 // 1cm quantization
 
 export interface AddFurnitureParams {
@@ -36,7 +38,7 @@ export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): 
     size: {
       w: clampSize(params.size.w),
       d: clampSize(params.size.d),
-      h: clampSize(params.size.h),
+      h: clampHeight(params.size.h),
     },
     elevation: Math.min(ELEV_MAX, Math.max(ELEV_MIN, params.elevation ?? 0)),
     ...(params.name ? { name: params.name } : {}),
@@ -83,7 +85,7 @@ export function resizeFurniture(
   if (!f) return
   if (size.w !== undefined) f.size.w = clampSize(size.w)
   if (size.d !== undefined) f.size.d = clampSize(size.d)
-  if (size.h !== undefined) f.size.h = clampSize(size.h)
+  if (size.h !== undefined) f.size.h = clampHeight(size.h)
 }
 
 export function renameFurniture(doc: ProjectDocument, id: FurnitureId, name: string): void {

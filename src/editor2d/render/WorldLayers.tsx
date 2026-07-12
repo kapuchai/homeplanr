@@ -4,10 +4,11 @@ import { useUiStore } from '../../store/uiStore'
 import { useAppSettings } from '../../store/appSettings'
 import { formatArea } from '../../format/units'
 import { useViewportStore } from '../viewport/viewportStore'
-import { getDerived, type DerivedGeometry } from '../../store/derived'
+import { getDerived, type DerivedGeometry, type DerivedRoom } from '../../store/derived'
 import type { ProjectDocument } from '../../model/types'
 import type { Vec2 } from '../../geometry/vec'
-import { add, perp, scale } from '../../geometry/vec'
+import { add, normalize, perp, scale, sub } from '../../geometry/vec'
+import { FLOOR_IDS, floorSpec, WALL_PAINTS } from '../../catalog/palette'
 import { CATALOG } from '../../catalog'
 import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
@@ -30,7 +31,38 @@ const polyPath = (poly: readonly Vec2[]): string =>
 const worldPoint = (s: WallSolid, u: number, v: number): Vec2 =>
   add(add(s.frame.origin, scale(s.frame.dir, u)), scale(perp(s.frame.dir), v))
 
-function roomFill(roomId: string, theme: Theme2D): string {
+/**
+ * Light tint of a floor color: mix(color, white, 0.55) — channels lerp
+ * toward 255 (no hex literal here; lint:colors). Memoized per (id, theme).
+ */
+const floorTints = new WeakMap<Theme2D, Map<string, string>>()
+function floorTint(floorId: string, theme: Theme2D): string {
+  let byId = floorTints.get(theme)
+  if (!byId) {
+    byId = new Map()
+    floorTints.set(theme, byId)
+  }
+  const hit = byId.get(floorId)
+  if (hit) return hit
+  const hex = floorSpec(floorId).color
+  const mixed = [0, 1, 2]
+    .map((i) => {
+      const c = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)
+      return Math.round(c + (255 - c) * 0.55)
+        .toString(16)
+        .padStart(2, '0')
+    })
+    .join('')
+  const out = '#' + mixed
+  byId.set(floorId, out)
+  return out
+}
+
+function roomFill(room: DerivedRoom, theme: Theme2D): string {
+  const floorId = room.room.floorMaterialId
+  if (floorId !== undefined && FLOOR_IDS.has(floorId)) return floorTint(floorId, theme)
+  // id-hash pastel — unchanged so docs without floor materials render as before
+  const roomId = room.roomId
   let h = 0
   for (let i = 0; i < roomId.length; i++) h = (h * 31 + roomId.charCodeAt(i)) >>> 0
   return theme.roomFills[h % theme.roomFills.length]!
@@ -61,7 +93,7 @@ function RoomsLayer({ derived }: { derived: DerivedGeometry }) {
           key={r.roomId}
           d={[polyPath(r.polygon), ...r.holePolygons.map(polyPath)].join(' ')}
           fillRule="evenodd"
-          fill={roomFill(r.roomId, theme)}
+          fill={roomFill(r, theme)}
           fillOpacity={0.6}
           stroke="none"
         />
@@ -249,8 +281,57 @@ function FurnitureLayer({ doc }: { doc: ProjectDocument }) {
 function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
   const selection = useUiStore((s) => s.selection)
   const hovered = useUiStore((s) => s.hoveredId)
+  const highlightSide = useUiStore((s) => s.highlightWallSide)
   const k = useViewportStore((s) => s.k)
   const theme = useThemeStore((s) => s.theme)
+
+  // per-side paint badges on selected walls: +perp dot = front (pinned)
+  const paintColor = (id: string | undefined) => WALL_PAINTS.find((p) => p.id === id)?.color
+  const sideBadges = selection
+    .map((id) => doc.walls[id as never])
+    .filter((w) => !!w)
+    .map((w) => {
+      const na = doc.nodes[w!.a]
+      const nb = doc.nodes[w!.b]
+      if (!na || !nb) return null
+      const side = perp(normalize(sub(nb, na)))
+      const mid = { x: (na.x + nb.x) / 2, y: (na.y + nb.y) / 2 }
+      const off = w!.thickness / 2 + 10 / k
+      const r = 5 / k
+      const dots = [
+        { side: 'front' as const, c: add(mid, scale(side, off)), paint: paintColor(w!.paintFront) },
+        { side: 'back' as const, c: add(mid, scale(side, -off)), paint: paintColor(w!.paintBack) },
+      ]
+      return (
+        <g key={`pb-${w!.id}`}>
+          {dots.map((d) => (
+            <g key={d.side}>
+              <circle
+                cx={d.c.x}
+                cy={d.c.y}
+                r={r}
+                fill={d.paint ?? theme.handleFill}
+                stroke={d.paint ? theme.pillBorder : theme.textMuted}
+                strokeWidth={1}
+                strokeDasharray={d.paint ? undefined : `${3 / k} ${2 / k}`}
+                vectorEffect="non-scaling-stroke"
+              />
+              {highlightSide === d.side && (
+                <circle
+                  cx={d.c.x}
+                  cy={d.c.y}
+                  r={r + 2.5 / k}
+                  fill="none"
+                  stroke={theme.accent}
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+            </g>
+          ))}
+        </g>
+      )
+    })
 
   // rotate handles: every selected furniture item shows one on its front side
   const handles = selection
@@ -357,6 +438,7 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
     <g style={{ pointerEvents: 'none' }}>
       {hovered && !selection.includes(hovered) && outline(hovered, theme.accentSoft, 1.5)}
       {selection.map((id) => outline(id, theme.accent, 1.5))}
+      {sideBadges}
       {handles}
     </g>
   )

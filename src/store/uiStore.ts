@@ -27,6 +27,8 @@ export interface UiState {
   spaceHeld: boolean
   snapSuspended: boolean
   optionsOpen: boolean
+  /** Wall side hovered in the paint rows of the properties panel (2D badge ring). */
+  highlightWallSide: 'front' | 'back' | null
   setActiveTool: (tool: ToolId) => void
   setToolParams: (patch: Partial<ToolParams>) => void
   setSelection: (ids: string[]) => void
@@ -37,6 +39,7 @@ export interface UiState {
   setSpaceHeld: (held: boolean) => void
   setSnapSuspended: (suspended: boolean) => void
   setOptionsOpen: (open: boolean) => void
+  setHighlightWallSide: (side: 'front' | 'back' | null) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -49,6 +52,7 @@ export const useUiStore = create<UiState>()(
     spaceHeld: false,
     snapSuspended: false,
     optionsOpen: false,
+    highlightWallSide: null,
     setActiveTool: (tool) => set({ activeTool: tool }),
     setToolParams: (patch) =>
       set((s) => ({ toolParams: { ...s.toolParams, ...patch } })),
@@ -65,6 +69,7 @@ export const useUiStore = create<UiState>()(
     setSpaceHeld: (held) => set({ spaceHeld: held }),
     setSnapSuspended: (suspended) => set({ snapSuspended: suspended }),
     setOptionsOpen: (open) => set({ optionsOpen: open }),
+    setHighlightWallSide: (side) => set({ highlightWallSide: side }),
   })),
 )
 

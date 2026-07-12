@@ -1,5 +1,6 @@
-import type { ProjectDocument, Wall, WallNode } from '../types'
+import type { ProjectDocument, Wall, WallFinishId, WallNode } from '../types'
 import { DEFAULTS } from '../types'
+import { WALL_PAINT_IDS } from '../../catalog/palette'
 import { newNodeId, newWallId, type FurnitureId, type NodeId, type OpeningId, type WallId } from '../ids'
 import type { Vec2 } from '../../geometry/vec'
 import { dist } from '../../geometry/vec'
@@ -156,16 +157,49 @@ export function setWallLength(
   runPipeline(doc, opts.mode ?? 'commit')
 }
 
+/**
+ * Apply a per-side paint value: a known WALL_PAINTS id assigns, anything
+ * else (undefined/unknown) deletes the field. Writes only on actual change
+ * (immer derived-reference stability). Shared with paintRoomWalls.
+ */
+export function applyWallPaint(
+  w: Wall,
+  key: 'paintFront' | 'paintBack',
+  paintId: string | undefined,
+): void {
+  const next = paintId !== undefined && WALL_PAINT_IDS.has(paintId) ? paintId : undefined
+  if (next === undefined) {
+    if (w[key] !== undefined) delete w[key]
+  } else if (w[key] !== next) {
+    w[key] = next
+  }
+}
+
+/** Finish rules: brick/concrete/tile assign; 'paint'/undefined/invalid delete. */
+function applyWallFinish(w: Wall, finish: WallFinishId | undefined): void {
+  const next =
+    finish === 'brick' || finish === 'concrete' || finish === 'tile' ? finish : undefined
+  if (next === undefined) {
+    if (w.finish !== undefined) delete w.finish
+  } else if (w.finish !== next) {
+    w.finish = next
+  }
+}
+
 export function updateWall(
   doc: ProjectDocument,
   wallId: WallId,
-  patch: Partial<Pick<Wall, 'thickness' | 'height'>>,
+  patch: Partial<Pick<Wall, 'thickness' | 'height' | 'paintFront' | 'paintBack' | 'finish'>>,
   opts: { mode?: MutationMode } = {},
 ): void {
   const w = doc.walls[wallId]
   if (!w) return
   if (patch.thickness !== undefined) w.thickness = Math.max(0.03, patch.thickness)
   if (patch.height !== undefined) w.height = Math.max(0.3, patch.height)
+  // key-presence checks: an explicit undefined value means "reset to default"
+  if ('paintFront' in patch) applyWallPaint(w, 'paintFront', patch.paintFront)
+  if ('paintBack' in patch) applyWallPaint(w, 'paintBack', patch.paintBack)
+  if ('finish' in patch) applyWallFinish(w, patch.finish)
   runPipeline(doc, opts.mode ?? 'commit')
 }
 

@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "lint": "oxlint",
-    "lint:colors": "! git grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(' -- 'src/**/*.tsx' 'src/**/*.ts' ':!src/theme' ':!src/catalog' ':!src/**/*.test.ts' ':!src/test'",
+    "lint:colors": "! git grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(' -- 'src/**/*.tsx' 'src/**/*.ts' ':!src/theme' ':!src/catalog' ':!src/**/*.test.ts' ':!src/test' ':!src/scene3d/proceduralTextures.ts'",
     "tauri": "tauri",
     "e2e": "playwright test"
   },

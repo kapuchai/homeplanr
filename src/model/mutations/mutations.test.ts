@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDocument, type ProjectDocument } from '../types'
+import { emptyDocument, type ProjectDocument, type WallFinishId } from '../types'
 import type { NodeId, OpeningId, WallId } from '../ids'
 import {
   addWallChain,
@@ -12,11 +12,18 @@ import {
   updateWall,
 } from './walls'
 import { addOpening } from './openings'
-import { renameRoom } from './rooms'
-import { addFurniture, addFurnitureBatch, duplicateFurniture, transformFurniture } from './furniture'
-import { vec } from '../../geometry/vec'
+import { paintRoomWalls, renameRoom } from './rooms'
+import {
+  addFurniture,
+  addFurnitureBatch,
+  duplicateFurniture,
+  resizeFurniture,
+  transformFurniture,
+} from './furniture'
+import { vec, type Vec2 } from '../../geometry/vec'
 import { MERGE_EPS } from '../../geometry/constants'
 import { dist } from '../../geometry/vec'
+import { produce } from 'immer'
 import fc from 'fast-check'
 
 const doc = (): ProjectDocument => emptyDocument('p_test', 'test', '2026-07-11T00:00:00.000Z')
@@ -310,6 +317,107 @@ describe('deleteEntities + mergeNodes', () => {
   })
 })
 
+describe('wall paint + finish (updateWall)', () => {
+  it('valid ids assign; invalid, undefined, or default values delete the fields', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(4, 0))
+    const w = () => d.walls[r.wallId!]!
+    updateWall(d, r.wallId!, { paintFront: 'sage', paintBack: 'charcoal', finish: 'brick' })
+    expect(w().paintFront).toBe('sage')
+    expect(w().paintBack).toBe('charcoal')
+    expect(w().finish).toBe('brick')
+    updateWall(d, r.wallId!, { paintFront: 'not-a-paint' }) // invalid → delete
+    expect('paintFront' in w()).toBe(false)
+    expect(w().paintBack).toBe('charcoal') // untouched key stays
+    updateWall(d, r.wallId!, { paintBack: undefined }) // explicit reset → delete
+    expect('paintBack' in w()).toBe(false)
+    updateWall(d, r.wallId!, { finish: 'stucco' as WallFinishId }) // invalid → delete
+    expect('finish' in w()).toBe(false)
+    updateWall(d, r.wallId!, { finish: 'tile' })
+    updateWall(d, r.wallId!, { finish: 'paint' }) // 'paint' = default → delete
+    expect('finish' in w()).toBe(false)
+  })
+
+  it('a no-op paint/finish patch keeps document identity under immer', () => {
+    const base = produce(doc(), (draft) => {
+      const r = addWallSegment(draft, vec(0, 0), vec(4, 0))
+      updateWall(draft, r.wallId!, { paintFront: 'sage', finish: 'brick' })
+    })
+    const wallId = Object.keys(base.walls)[0]! as WallId
+    const next = produce(base, (draft) =>
+      updateWall(draft, wallId, { paintFront: 'sage', paintBack: 'nope', finish: 'brick' }),
+    )
+    expect(next).toBe(base)
+  })
+})
+
+describe('paintRoomWalls', () => {
+  /** Directed lookup: the wall whose a-node sits at pa and b-node at pb. */
+  const wallAt = (d: ProjectDocument, pa: Vec2, pb: Vec2) =>
+    Object.values(d.walls).find(
+      (w) => dist(d.nodes[w.a]!, pa) < 1e-9 && dist(d.nodes[w.b]!, pb) < 1e-9,
+    )!
+
+  it('rect room: paints the room-facing side per wall a→b orientation', () => {
+    const d = doc()
+    // three walls drawn a→b around the boundary…
+    addWallChain(d, [vec(0, 0), vec(4, 0), vec(4, 4), vec(0, 4)])
+    // …closed by a wall whose +perp (front) faces AWAY from the interior
+    addWallSegment(d, vec(0, 0), vec(0, 4))
+    expect(roomCount(d)).toBe(1)
+    paintRoomWalls(d, firstRoom(d).id, 'sage')
+    // dir (1,0) → +perp (0,1) → y>0 = interior → front
+    const south = wallAt(d, vec(0, 0), vec(4, 0))
+    expect(south.paintFront).toBe('sage')
+    expect('paintBack' in south).toBe(false)
+    // dir (0,1) → +perp (−1,0) → x<4 = interior → front
+    expect(wallAt(d, vec(4, 0), vec(4, 4)).paintFront).toBe('sage')
+    // dir (−1,0) → +perp (0,−1) → y<4 = interior → front
+    expect(wallAt(d, vec(4, 4), vec(0, 4)).paintFront).toBe('sage')
+    // dir (0,1) at x=0 → +perp (−1,0) → x<0 = outside → back
+    const west = wallAt(d, vec(0, 0), vec(0, 4))
+    expect(west.paintBack).toBe('sage')
+    expect('paintFront' in west).toBe(false)
+  })
+
+  it('island hole cycle: paints the hole walls on their room-facing side', () => {
+    const d = doc()
+    square(d, 8)
+    addWallChain(d, [vec(3, 3), vec(5, 3), vec(5, 5), vec(3, 5), vec(3, 3)])
+    const outer = Object.values(d.rooms).find((r) => r.holeCycles.length === 1)!
+    const islandRoom = Object.values(d.rooms).find((r) => r.id !== outer.id)!
+    paintRoomWalls(d, outer.id, 'denim')
+    // island wall (3,3)→(5,3): +perp (0,1) probe lands INSIDE the hole →
+    // skipped; the −perp probe lies on the room floor → back face painted
+    const islandSouth = wallAt(d, vec(3, 3), vec(5, 3))
+    expect(islandSouth.paintBack).toBe('denim')
+    expect('paintFront' in islandSouth).toBe(false)
+    // the outer boundary painted like a plain rect room
+    expect(wallAt(d, vec(0, 0), vec(8, 0)).paintFront).toBe('denim')
+    // painting the island's own room hits the island-facing front sides only
+    paintRoomWalls(d, islandRoom.id, 'sage')
+    expect(islandSouth.paintFront).toBe('sage')
+    expect(islandSouth.paintBack).toBe('denim')
+  })
+
+  it('unknown/undefined ids reset faces; a repeated apply keeps doc identity', () => {
+    const d0 = produce(doc(), (draft) => {
+      addWallChain(draft, [vec(0, 0), vec(4, 0), vec(4, 4), vec(0, 4), vec(0, 0)])
+    })
+    const roomId = Object.values(d0.rooms)[0]!.id
+    const d1 = produce(d0, (draft) => paintRoomWalls(draft, roomId, 'olive'))
+    expect(d1).not.toBe(d0)
+    for (const w of Object.values(d1.walls)) expect(w.paintFront).toBe('olive')
+    // one mutation = one immer set; already-applied → zero writes → same identity
+    const d2 = produce(d1, (draft) => paintRoomWalls(draft, roomId, 'olive'))
+    expect(d2).toBe(d1)
+    const d3 = produce(d2, (draft) => paintRoomWalls(draft, roomId, 'not-a-paint'))
+    for (const w of Object.values(d3.walls)) expect('paintFront' in w).toBe(false)
+    const d4 = produce(d3, (draft) => paintRoomWalls(draft, roomId, undefined))
+    expect(d4).toBe(d3)
+  })
+})
+
 describe('furniture', () => {
   it('duplicate offsets by 0.25 and quantizes to 1cm', () => {
     const d = doc()
@@ -351,6 +459,21 @@ describe('furniture', () => {
     })
     const [copy] = duplicateFurniture(d, [id])
     expect(d.furniture[copy!]!.mirrored).toBe(true)
+  })
+
+  it('placing a 0.02-high item keeps its height', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'rug',
+      x: 0,
+      y: 0,
+      size: { w: 2.0, d: 1.4, h: 0.02 },
+    })
+    expect(d.furniture[id]!.size.h).toBe(0.02)
+    // resize keeps the split floors too: h down to 1cm, w/d still 10cm
+    resizeFurniture(d, id, { h: 0.005, w: 0.005 })
+    expect(d.furniture[id]!.size.h).toBe(0.01)
+    expect(d.furniture[id]!.size.w).toBe(0.1)
   })
 
   it('addFurnitureBatch adds every item with the shared validation', () => {

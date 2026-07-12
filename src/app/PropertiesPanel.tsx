@@ -5,8 +5,9 @@ import { useAppSettings } from '../store/appSettings'
 import { formatArea, fromDisplayLength, lengthUnitLabel, toDisplayLength } from '../format/units'
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
-import { FLOOR_MATERIALS } from '../catalog/palette'
+import { FLOOR_MATERIALS, WALL_PAINTS } from '../catalog/palette'
 import { CATALOG } from '../catalog'
+import type { WallFinishId } from '../model/types'
 import type { FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
 
 /**
@@ -134,6 +135,64 @@ function Row({ children }: { children: React.ReactNode }) {
   return <div className="prop-row">{children}</div>
 }
 
+const WALL_FINISHES: readonly [WallFinishId, string][] = [
+  ['paint', 'Paint'],
+  ['brick', 'Brick'],
+  ['concrete', 'Concrete'],
+  ['tile', 'Tile'],
+]
+
+/**
+ * One ∅-default swatch + the 14 WALL_PAINTS presets.
+ * `current`: a paint id → that swatch active; undefined → ∅ active (field
+ * absent); null → nothing active (room row — walls may differ).
+ * `hoverSide` (wall rows only): row hover previews the side on the 2D badge.
+ */
+function PaintSwatchRow({
+  label,
+  current,
+  onPick,
+  hoverSide,
+}: {
+  label: string
+  current: string | null | undefined
+  onPick: (id: string | undefined) => void
+  hoverSide?: 'front' | 'back'
+}) {
+  const setHighlight = useUiStore((s) => s.setHighlightWallSide)
+  useEffect(() => {
+    if (!hoverSide) return undefined
+    return () => setHighlight(null) // clear a stuck highlight on unmount
+  }, [hoverSide, setHighlight])
+  return (
+    <div
+      className="prop-row paint-row"
+      onMouseEnter={hoverSide ? () => setHighlight(hoverSide) : undefined}
+      onMouseLeave={hoverSide ? () => setHighlight(null) : undefined}
+    >
+      <span>{label}</span>
+      <div className="swatches">
+        <button
+          type="button"
+          title="Default"
+          className={`swatch swatch-none${current === undefined ? ' active' : ''}`}
+          onClick={() => onPick(undefined)}
+        />
+        {WALL_PAINTS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            title={p.name}
+            className={`swatch${current === p.id ? ' active' : ''}`}
+            style={{ background: p.color }}
+            onClick={() => onPick(p.id)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection)
   const doc = useDocStore((s) => s.doc)
@@ -172,6 +231,33 @@ export function PropertiesPanel() {
           label="Height"
           value={wall.height}
           onCommit={(v) => a.updateWall(wall.id, { height: v })}
+        />
+        <Row>
+          <span>Finish</span>
+          <div className="segmented small finish-seg">
+            {WALL_FINISHES.map(([f, name]) => (
+              <button
+                key={f}
+                type="button"
+                className={(wall.finish ?? 'paint') === f ? 'active' : ''}
+                onClick={() => a.updateWall(wall.id, { finish: f })}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <PaintSwatchRow
+          label="Paint · front"
+          current={wall.paintFront}
+          hoverSide="front"
+          onPick={(id) => a.updateWall(wall.id, { paintFront: id })}
+        />
+        <PaintSwatchRow
+          label="Paint · back"
+          current={wall.paintBack}
+          hoverSide="back"
+          onPick={(id) => a.updateWall(wall.id, { paintBack: id })}
         />
       </aside>
     )
@@ -340,6 +426,11 @@ export function PropertiesPanel() {
             ))}
           </div>
         </Row>
+        <PaintSwatchRow
+          label="Wall paint"
+          current={null}
+          onPick={(id) => a.paintRoomWalls(room.id, id)}
+        />
         {dr && (
           <Row>
             <span>Area</span>

@@ -2,10 +2,11 @@ import type { CatalogCategory, CatalogItem } from './types'
 import { STARTER_ITEMS } from './items/starter'
 import { LIVING_ITEMS } from './items/living'
 import { MORE_ITEMS } from './items/more'
+import { EXPANSION_ITEMS } from './items/expansion'
 
 export type { CatalogItem, CatalogCategory, Dims, SymbolPrim, MaterialId } from './types'
 
-const ALL: CatalogItem[] = [...STARTER_ITEMS, ...LIVING_ITEMS, ...MORE_ITEMS]
+const ALL: CatalogItem[] = [...STARTER_ITEMS, ...LIVING_ITEMS, ...MORE_ITEMS, ...EXPANSION_ITEMS]
 
 export const CATALOG: Record<string, CatalogItem> = Object.fromEntries(
   ALL.map((item) => [item.id, item]),

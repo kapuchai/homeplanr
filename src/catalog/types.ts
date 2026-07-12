@@ -54,6 +54,11 @@ export interface CatalogItem {
   dims: Dims
   /** Back-against-wall capture + auto-rotate applies to this item. */
   wallSnap: boolean
+  /**
+   * Initial elevation for wall-mounted items (meters above the floor) —
+   * both placement paths copy it into the instance. Absent = 0 (on floor).
+   */
+  defaultElevation?: number
   /** Named material slots → default palette entries. */
   materials: Record<string, MaterialId>
   /**

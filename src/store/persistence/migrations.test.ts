@@ -120,6 +120,14 @@ describe('v2 fields (wall paint/finish, furniture mirror)', () => {
     expect(r.doc.furniture[item.id]!.mirrored).toBe(true)
   })
 
+  it('keeps flat furniture flat: 0.02m height survives the validator clamp', () => {
+    const { doc } = parseDocument(v1Full)
+    const item = Object.values(doc.furniture)[0]!
+    item.size = { ...item.size, h: 0.02 }
+    const r = parseDocument(serializeDocument(doc, '2026-07-12T00:00:00.000Z'))
+    expect(r.doc.furniture[item.id]!.size.h).toBeCloseTo(0.02, 9)
+  })
+
   it('normalizes invalid values to absent, silently', () => {
     const { doc } = parseDocument(v1Full)
     const json = JSON.parse(serializeDocument(doc, '2026-07-12T00:00:00.000Z'))

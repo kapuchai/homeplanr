@@ -637,3 +637,35 @@ textarea,
   color: var(--ghost);
   font-weight: 500;
 }
+
+/* ---- M5-Q wall paint UI (PropertiesPanel): swatch rows + finish segmented ---- */
+.paint-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.paint-row .swatches {
+  flex-wrap: wrap;
+}
+
+.swatch.swatch-none {
+  background: transparent;
+  border: 1px dashed var(--muted);
+}
+
+.finish-seg button {
+  padding: 4px 7px;
+  font-size: 11.5px;
+}
+
+/* ---- M5-R catalog card thumbnails: 64px isometric renders ---- */
+.catalog-card {
+  min-height: 96px;
+}
+
+.catalog-card img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}

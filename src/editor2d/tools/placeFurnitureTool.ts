@@ -69,6 +69,7 @@ export function createPlaceFurnitureTool(): Tool {
       y: snap.point.y,
       rotation: snap.rotation ?? rotation,
       size: { ...item.dims },
+      elevation: item.defaultElevation ?? 0,
     })
     ctx.ui().setSelection([id])
   }
