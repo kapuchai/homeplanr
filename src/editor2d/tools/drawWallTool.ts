@@ -9,6 +9,8 @@ import {
   wallPointCandidates,
 } from '../snap/candidates'
 import { safeUndo } from '../../store/transactions'
+import { useAppSettings } from '../../store/appSettings'
+import { formatLength } from '../../format/units'
 
 /**
  * Click-click wall drawing. Each click commits ONE segment (one undo entry
@@ -63,7 +65,7 @@ export function createDrawWallTool(): Tool {
       if (len > 0.01) {
         pills.push({
           at: { x: (chain.anchor.x + cursor.x) / 2, y: (chain.anchor.y + cursor.y) / 2 },
-          text: doc.settings.unitDisplay === 'cm' ? `${Math.round(len * 100)} cm` : `${len.toFixed(2)} m`,
+          text: formatLength(len, useAppSettings.getState().units),
         })
       }
       if (snap?.constraint?.kind === 'ray') {

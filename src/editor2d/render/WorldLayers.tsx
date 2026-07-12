@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useDocStore } from '../../store/docStore'
 import { useUiStore } from '../../store/uiStore'
+import { useAppSettings } from '../../store/appSettings'
+import { formatArea } from '../../format/units'
 import { useViewportStore } from '../viewport/viewportStore'
 import { getDerived, type DerivedGeometry } from '../../store/derived'
 import type { ProjectDocument } from '../../model/types'
@@ -65,16 +67,13 @@ function RoomsLayer({ derived }: { derived: DerivedGeometry }) {
 
 function RoomLabels({ derived }: { derived: DerivedGeometry }) {
   const k = useViewportStore((s) => s.k)
-  const unitDisplay = useDocStore((s) => s.doc.settings.unitDisplay)
+  const units = useAppSettings((s) => s.units)
   return (
     <g>
       {Object.values(derived.rooms).map((r) => {
         // hide labels for tiny rooms at the current zoom
         if (k * Math.sqrt(r.areaM2) < 48) return null
-        const area =
-          unitDisplay === 'cm'
-            ? `${Math.round(r.areaM2 * 10000)} cm²`
-            : `${r.areaM2.toFixed(1)} m²`
+        const area = formatArea(r.areaM2, units)
         return (
           <g
             key={r.roomId}

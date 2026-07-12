@@ -19,6 +19,26 @@ import {
 import { CatalogPanel } from './app/CatalogPanel'
 import { PropertiesPanel } from './app/PropertiesPanel'
 import { ConfirmDialog } from './app/ConfirmDialog'
+import { OptionsDialog } from './app/OptionsDialog'
+
+// unicode ⚙ renders inconsistently on WebKitGTK/Windows — inline SVG instead
+function GearIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="2.6" />
+      <path d="M8 1.6v2.1M8 12.3v2.1M14.4 8h-2.1M3.7 8H1.6M12.5 3.5 11 5M5 11l-1.5 1.5M12.5 12.5 11 11M5 5 3.5 3.5" />
+    </svg>
+  )
+}
 
 function FileMenu() {
   const [open, setOpen] = useState(false)
@@ -151,6 +171,15 @@ function Toolbar() {
         </button>
       </div>
       <div className="spacer" />
+      <button
+        type="button"
+        className="icon-btn"
+        title="Options"
+        aria-label="Options"
+        onClick={() => useUiStore.getState().setOptionsOpen(true)}
+      >
+        <GearIcon />
+      </button>
       <div className="segmented">
         <button type="button" className={is2d ? 'active' : ''} onClick={() => setViewMode('2d')}>
           2D
@@ -201,6 +230,7 @@ export default function App() {
           </>
         )}
       </main>
+      <OptionsDialog />
       <ConfirmDialog />
     </div>
   )

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
+import { useAppSettings } from '../store/appSettings'
+import { formatArea, fromDisplayLength, lengthUnitLabel, toDisplayLength } from '../format/units'
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { FLOOR_MATERIALS, SCENE_MATERIALS, type FloorMaterialId } from '../catalog/palette'
@@ -67,6 +69,30 @@ function NumField({
   )
 }
 
+/** NumField in the user's length unit; model values stay meters. */
+function LengthField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string
+  value: number
+  onCommit: (v: number) => void
+}) {
+  const units = useAppSettings((s) => s.units)
+  return (
+    <NumField
+      label={label}
+      value={value}
+      onCommit={onCommit}
+      unit={lengthUnitLabel(units)}
+      toDisplay={(v) => toDisplayLength(v, units)}
+      fromDisplay={(v) => fromDisplayLength(v, units)}
+      step={units === 'cm' ? 1 : 0.01}
+    />
+  )
+}
+
 function TextField({
   label,
   value,
@@ -111,6 +137,7 @@ function Row({ children }: { children: React.ReactNode }) {
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection)
   const doc = useDocStore((s) => s.doc)
+  const units = useAppSettings((s) => s.units)
   const a = useDocStore.getState()
 
   if (selection.length > 1) {
@@ -135,13 +162,13 @@ export function PropertiesPanel() {
     return (
       <aside className="props-panel">
         <h3>Wall</h3>
-        <NumField label="Length" value={length} onCommit={(v) => a.setWallLength(wall.id, v)} />
-        <NumField
+        <LengthField label="Length" value={length} onCommit={(v) => a.setWallLength(wall.id, v)} />
+        <LengthField
           label="Thickness"
           value={wall.thickness}
           onCommit={(v) => a.updateWall(wall.id, { thickness: v })}
         />
-        <NumField
+        <LengthField
           label="Height"
           value={wall.height}
           onCommit={(v) => a.updateWall(wall.id, { height: v })}
@@ -159,18 +186,18 @@ export function PropertiesPanel() {
     return (
       <aside className="props-panel">
         <h3>{opening.kind === 'door' ? 'Door' : 'Window'}</h3>
-        <NumField
+        <LengthField
           label="Width"
           value={opening.width}
           onCommit={(v) => a.updateOpening(opening.id, { width: v })}
         />
-        <NumField
+        <LengthField
           label="Height"
           value={opening.height}
           onCommit={(v) => a.updateOpening(opening.id, { height: v })}
         />
         {opening.kind === 'window' && (
-          <NumField
+          <LengthField
             label="Sill height"
             value={opening.sillHeight}
             onCommit={(v) => a.updateOpening(opening.id, { sillHeight: v })}
@@ -220,12 +247,12 @@ export function PropertiesPanel() {
         )}
         {L > 0 && (
           <>
-            <NumField
+            <LengthField
               label="From end A"
               value={u - opening.width / 2}
               onCommit={(v) => a.updateOpening(opening.id, { t: (v + opening.width / 2) / L })}
             />
-            <NumField
+            <LengthField
               label="From end B"
               value={L - u - opening.width / 2}
               onCommit={(v) =>
@@ -249,8 +276,8 @@ export function PropertiesPanel() {
           {...(item ? { placeholder: item.name } : {})}
           onCommit={(v) => a.renameFurniture(furniture.id, v)}
         />
-        <NumField label="X" value={furniture.x} onCommit={(v) => a.transformFurniture(furniture.id, { x: v })} />
-        <NumField label="Y" value={furniture.y} onCommit={(v) => a.transformFurniture(furniture.id, { y: v })} />
+        <LengthField label="X" value={furniture.x} onCommit={(v) => a.transformFurniture(furniture.id, { x: v })} />
+        <LengthField label="Y" value={furniture.y} onCommit={(v) => a.transformFurniture(furniture.id, { y: v })} />
         <NumField
           label="Rotation"
           value={furniture.rotation}
@@ -260,10 +287,10 @@ export function PropertiesPanel() {
           fromDisplay={(v) => (v * Math.PI) / 180}
           onCommit={(v) => a.transformFurniture(furniture.id, { rotation: v })}
         />
-        <NumField label="Width" value={furniture.size.w} onCommit={(v) => a.resizeFurniture(furniture.id, { w: v })} />
-        <NumField label="Depth" value={furniture.size.d} onCommit={(v) => a.resizeFurniture(furniture.id, { d: v })} />
-        <NumField label="Height" value={furniture.size.h} onCommit={(v) => a.resizeFurniture(furniture.id, { h: v })} />
-        <NumField
+        <LengthField label="Width" value={furniture.size.w} onCommit={(v) => a.resizeFurniture(furniture.id, { w: v })} />
+        <LengthField label="Depth" value={furniture.size.d} onCommit={(v) => a.resizeFurniture(furniture.id, { d: v })} />
+        <LengthField label="Height" value={furniture.size.h} onCommit={(v) => a.resizeFurniture(furniture.id, { h: v })} />
+        <LengthField
           label="Elevation"
           value={furniture.elevation}
           onCommit={(v) => a.transformFurniture(furniture.id, { elevation: v })}
@@ -302,7 +329,7 @@ export function PropertiesPanel() {
         {dr && (
           <Row>
             <span>Area</span>
-            <span className="readonly">{dr.areaM2.toFixed(1)} m²</span>
+            <span className="readonly">{formatArea(dr.areaM2, units)}</span>
           </Row>
         )}
       </aside>
@@ -314,7 +341,7 @@ export function PropertiesPanel() {
   return (
     <aside className="props-panel">
       <h3>Project</h3>
-      <NumField label="Grid size" value={s.gridSize} onCommit={(v) => a.updateSettings({ gridSize: v })} />
+      <LengthField label="Grid size" value={s.gridSize} onCommit={(v) => a.updateSettings({ gridSize: v })} />
       <Row>
         <span>Snapping</span>
         <div className="segmented small">
@@ -334,12 +361,12 @@ export function PropertiesPanel() {
           </button>
         </div>
       </Row>
-      <NumField
+      <LengthField
         label="Wall thickness"
         value={s.defaultWallThickness}
         onCommit={(v) => a.updateSettings({ defaultWallThickness: v })}
       />
-      <NumField
+      <LengthField
         label="Wall height"
         value={s.defaultWallHeight}
         onCommit={(v) => a.updateSettings({ defaultWallHeight: v })}

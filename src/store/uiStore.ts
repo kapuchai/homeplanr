@@ -26,6 +26,7 @@ export interface UiState {
   viewMode: ViewMode
   spaceHeld: boolean
   snapSuspended: boolean
+  optionsOpen: boolean
   setActiveTool: (tool: ToolId) => void
   setToolParams: (patch: Partial<ToolParams>) => void
   setSelection: (ids: string[]) => void
@@ -35,6 +36,7 @@ export interface UiState {
   setViewMode: (mode: ViewMode) => void
   setSpaceHeld: (held: boolean) => void
   setSnapSuspended: (suspended: boolean) => void
+  setOptionsOpen: (open: boolean) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -46,6 +48,7 @@ export const useUiStore = create<UiState>()(
     viewMode: '2d',
     spaceHeld: false,
     snapSuspended: false,
+    optionsOpen: false,
     setActiveTool: (tool) => set({ activeTool: tool }),
     setToolParams: (patch) =>
       set((s) => ({ toolParams: { ...s.toolParams, ...patch } })),
@@ -61,6 +64,7 @@ export const useUiStore = create<UiState>()(
     setViewMode: (mode) => set({ viewMode: mode }),
     setSpaceHeld: (held) => set({ spaceHeld: held }),
     setSnapSuspended: (suspended) => set({ snapSuspended: suspended }),
+    setOptionsOpen: (open) => set({ optionsOpen: open }),
   })),
 )
 

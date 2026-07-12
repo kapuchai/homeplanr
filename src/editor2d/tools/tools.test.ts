@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useDocStore, docTemporal } from '../../store/docStore'
 import { useUiStore } from '../../store/uiStore'
+import { useConfirmStore } from '../../app/confirmStore'
 import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
@@ -70,6 +71,8 @@ beforeEach(() => {
   resetDerivedForTests()
   useUiStore.getState().clearSelection()
   useUiStore.getState().setHovered(null)
+  useUiStore.getState().setOptionsOpen(false)
+  if (useConfirmStore.getState().pending) useConfirmStore.getState().resolve('')
   useViewportStore.setState({ k: 100, tx: 0, ty: 0, width: 800, height: 600 })
   useInteractionStore.getState().clear()
 })
@@ -306,5 +309,55 @@ describe('keymap', () => {
     expect(useUiStore.getState().spaceHeld).toBe(true)
     handleKeyUp({ key: ' ' }, ctx)
     expect(useUiStore.getState().spaceHeld).toBe(false)
+  })
+})
+
+describe('keymap modal guard', () => {
+  it('drops every shortcut while a confirm prompt is pending', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    const base = past()
+    void useConfirmStore.getState().prompt('Unsaved changes', 'Save?', [
+      { label: 'Save', value: 'save', variant: 'primary' },
+      { label: 'Cancel', value: 'cancel' },
+    ])
+    handleKey(key('w'), ctx, registry)
+    expect(useUiStore.getState().activeTool).toBe('select')
+    handleKey(key('Delete'), ctx, registry)
+    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+    handleKey(key('z', { ctrlKey: true }), ctx, registry)
+    expect(past()).toBe(base)
+    useConfirmStore.getState().resolve('cancel')
+  })
+
+  it('Escape resolves a pending confirm as its LAST button value', async () => {
+    const p = useConfirmStore.getState().prompt('Unsaved changes', 'Save?', [
+      { label: 'Save', value: 'save', variant: 'primary' },
+      { label: 'Discard', value: 'discard', variant: 'danger' },
+      { label: 'Cancel', value: 'cancel' },
+    ])
+    handleKey(key('Escape'), ctx, registry)
+    await expect(p).resolves.toBe('cancel')
+    expect(useConfirmStore.getState().pending).toBeNull()
+    // keys flow again once the prompt is settled
+    handleKey(key('w'), ctx, registry)
+    expect(useUiStore.getState().activeTool).toBe('draw-wall')
+  })
+
+  it('drops every shortcut while the Options dialog is open (Escape stays inert)', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    useUiStore.getState().setOptionsOpen(true)
+    handleKey(key('w'), ctx, registry)
+    expect(useUiStore.getState().activeTool).toBe('select')
+    handleKey(key('Delete'), ctx, registry)
+    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+    // the dialog owns Escape via its own listener — the keymap must not act
+    handleKey(key('Escape'), ctx, registry)
+    expect(useUiStore.getState().optionsOpen).toBe(true)
+    expect(useUiStore.getState().selection).toEqual([id])
+    useUiStore.getState().setOptionsOpen(false)
+    handleKey(key('w'), ctx, registry)
+    expect(useUiStore.getState().activeTool).toBe('draw-wall')
   })
 })

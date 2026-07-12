@@ -1,5 +1,6 @@
 import type { ToolContext } from './toolTypes'
 import type { ToolRegistry } from './toolRegistry'
+import { useConfirmStore } from '../../app/confirmStore'
 import { isTxActive, safeRedo, safeUndo, beginTx, commitTx } from '../../store/transactions'
 import { getDerived } from '../../store/derived'
 import { polygonBounds } from '../../geometry/polygon'
@@ -56,6 +57,15 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   // desktop app: never let the webview act like a browser
   if (e.key === 'F5' || (e.ctrlKey && ['r', 'p', 'f', 'j'].includes(e.key.toLowerCase()))) {
     e.preventDefault()
+    return
+  }
+  // modal guard: a pending confirm or the Options dialog swallows every key
+  // (Options handles its own Escape via a document listener)
+  const confirm = useConfirmStore.getState()
+  if (confirm.pending || ctx.ui().optionsOpen) {
+    if (e.key === 'Escape' && confirm.pending) {
+      confirm.resolve(confirm.pending.buttons[confirm.pending.buttons.length - 1]!.value)
+    }
     return
   }
   if (e.editableTarget) {
