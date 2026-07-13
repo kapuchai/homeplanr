@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDocument, type ProjectDocument, type WallFinishId } from '../types'
-import type { NodeId, OpeningId, WallId } from '../ids'
+import type { FurnitureId, NodeId, OpeningId, WallId } from '../ids'
 import {
   addWallChain,
   addWallSegment,
@@ -14,6 +14,8 @@ import {
 import { addOpening, updateOpening } from './openings'
 import { paintRoomWalls, renameRoom } from './rooms'
 import { addDimension, addLabel, updateAnnotation } from './annotations'
+import { pasteSubgraph } from './paste'
+import { alignFurniture, distributeFurniture } from './furniture'
 import {
   addFurniture,
   addFurnitureBatch,
@@ -555,5 +557,144 @@ describe('annotations (v3)', () => {
     deleteEntities(d, [r.wallId!, dim])
     expect(d.annotations[dim]).toBeUndefined()
     expect(d.walls[r.wallId!]).toBeUndefined()
+  })
+})
+
+describe('M9 (0.3.0): graph paste — the pipeline IS the merge semantics', () => {
+  const roomPayload = () => {
+    const src = doc()
+    addWallChain(src, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const living = Object.values(src.rooms)[0]!
+    renameRoom(src, living.id, 'Snug')
+    const nodes = Object.values(src.nodes)
+    const anchor = {
+      x: nodes.reduce((s, n) => s + n.x, 0) / nodes.length,
+      y: nodes.reduce((s, n) => s + n.y, 0) / nodes.length,
+    }
+    return {
+      payload: {
+        nodes: nodes.map((n) => ({ key: n.id, dx: n.x - anchor.x, dy: n.y - anchor.y })),
+        walls: Object.values(src.walls).map((w) => ({
+          key: w.id,
+          aKey: w.a,
+          bKey: w.b,
+          thickness: w.thickness,
+          height: w.height,
+        })),
+        openings: [],
+        roomMeta: [{ wallKeys: [...living.wallCycle], name: 'Snug' }],
+      },
+      srcWallIds: Object.keys(src.walls),
+    }
+  }
+
+  it('a DISJOINT paste recreates the room with fresh ids and its name', () => {
+    const { payload, srcWallIds } = roomPayload()
+    const d = doc()
+    const pasted = pasteSubgraph(d, payload, vec(20, 20))
+    expect(pasted).toHaveLength(4)
+    expect(Object.keys(d.walls)).toHaveLength(4)
+    expect(pasted.every((id) => !srcWallIds.includes(id))).toBe(true) // fresh ids
+    const rooms = Object.values(d.rooms)
+    expect(rooms).toHaveLength(1)
+    expect(rooms[0]!.name).toBe('Snug')
+  })
+
+  it('an OVERLAPPING paste welds through the pipeline (no duplicate walls, valid graph)', () => {
+    const { payload } = roomPayload()
+    const d = doc()
+    addWallChain(d, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const anchor = { x: 2, y: 1.5 } // paste EXACTLY on top of the existing room
+    pasteSubgraph(d, payload, anchor)
+    // welded: same four walls, no duplicated pairs, still exactly one room
+    expect(Object.keys(d.walls)).toHaveLength(4)
+    expect(Object.values(d.rooms)).toHaveLength(1)
+    const pairs = new Set(
+      Object.values(d.walls).map((w) => [w.a, w.b].sort().join('~')),
+    )
+    expect(pairs.size).toBe(4)
+  })
+
+  it('openings ride the pasted walls and re-clamp through the oracle', () => {
+    const src = doc()
+    const r = addWallSegment(src, vec(0, 0), vec(6, 0))
+    const op = addOpening(src, { kind: 'door', wallId: r.wallId!, t: 0.5 })!
+    const na = src.nodes[src.walls[r.wallId!]!.a]!
+    const nb = src.nodes[src.walls[r.wallId!]!.b]!
+    const anchor = { x: (na.x + nb.x) / 2, y: (na.y + nb.y) / 2 }
+    const payload = {
+      nodes: [na, nb].map((n) => ({ key: n.id, dx: n.x - anchor.x, dy: n.y - anchor.y })),
+      walls: [
+        {
+          key: r.wallId!,
+          aKey: na.id,
+          bKey: nb.id,
+          thickness: 0.15,
+          height: 2.5,
+        },
+      ],
+      openings: [
+        {
+          wallKey: r.wallId!,
+          kind: 'door' as const,
+          t: src.openings[op]!.t,
+          width: 0.9,
+          height: 2,
+          hinge: 'a' as const,
+          swing: 'front' as const,
+        },
+      ],
+      roomMeta: [],
+    }
+    const d = doc()
+    pasteSubgraph(d, payload, vec(3, 5))
+    expect(Object.keys(d.walls)).toHaveLength(1)
+    const doors = Object.values(d.openings)
+    expect(doors).toHaveLength(1)
+    expect(doors[0]!.kind).toBe('door')
+  })
+})
+
+describe('M9 (0.3.0): align / distribute', () => {
+  const box = (x: number, y: number, w = 1, dd = 1, rotation = 0): FurnitureId =>
+    addFurniture(doc2, { catalogItemId: 'test-box', x, y, rotation, size: { w, d: dd, h: 1 } })
+  let doc2: ProjectDocument
+  beforeEach2()
+  function beforeEach2() {
+    doc2 = doc()
+  }
+
+  it('align left lines up rotated footprints by their AABB edge', () => {
+    doc2 = doc()
+    const a = box(2, 0, 2, 1) // AABB minX = 1
+    const b = box(5, 2, 1, 1, Math.PI / 2) // rotated 90°: AABB half = d/2=0.5 → minX 4.5
+    alignFurniture(doc2, [a, b], 'left')
+    const fa = doc2.furniture[a]!
+    const fb = doc2.furniture[b]!
+    expect(fa.x - 1).toBeCloseTo(fb.x - 0.5, 6) // equal minX
+  })
+
+  it("align top uses SCREEN top (max data-y, the view renders y-up)", () => {
+    doc2 = doc()
+    const a = box(0, 1)
+    const b = box(3, 4)
+    alignFurniture(doc2, [a, b], 'top')
+    expect(doc2.furniture[a]!.y).toBeCloseTo(4, 6)
+    expect(doc2.furniture[b]!.y).toBeCloseTo(4, 6)
+  })
+
+  it('distribute equalizes edge gaps; stable order; <3 items is a no-op', () => {
+    doc2 = doc()
+    const a = box(0, 0, 1, 1)
+    const b = box(1.2, 0, 1, 1) // uneven gaps
+    const c = box(6, 0, 1, 1)
+    distributeFurniture(doc2, [a, b, c], 'x')
+    const xs = [a, b, c].map((id) => doc2.furniture[id]!.x)
+    expect(xs[0]).toBeCloseTo(0, 6) // ends pinned
+    expect(xs[2]).toBeCloseTo(6, 6)
+    const g1 = xs[1]! - 0.5 - (xs[0]! + 0.5)
+    const g2 = xs[2]! - 0.5 - (xs[1]! + 0.5)
+    expect(g1).toBeCloseTo(g2, 6)
+    distributeFurniture(doc2, [a, b], 'x') // no-op below 3
   })
 })

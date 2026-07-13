@@ -117,3 +117,100 @@ export function duplicateFurniture(
   }
   return created
 }
+
+// ---------- align / distribute (M9) ----------
+
+export type AlignEdge = 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY'
+
+/** AABB of the ROTATED footprint (mirror is symmetric — irrelevant). */
+function footprintAabb(f: FurnitureInstance): {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+} {
+  const cos = Math.abs(Math.cos(f.rotation))
+  const sin = Math.abs(Math.sin(f.rotation))
+  const hx = (f.size.w * cos + f.size.d * sin) / 2
+  const hy = (f.size.w * sin + f.size.d * cos) / 2
+  return { minX: f.x - hx, maxX: f.x + hx, minY: f.y - hy, maxY: f.y + hy }
+}
+
+/**
+ * Align in SCREEN terms (the 2D view renders y-up): 'top' = max data-y,
+ * 'bottom' = min data-y, left/right = min/max x. One set ⇒ one undo entry.
+ */
+export function alignFurniture(
+  doc: ProjectDocument,
+  ids: readonly FurnitureId[],
+  edge: AlignEdge,
+): void {
+  const items = ids.map((id) => doc.furniture[id]).filter((f): f is FurnitureInstance => !!f)
+  if (items.length < 2) return
+  const boxes = items.map(footprintAabb)
+  // NO quantization: these are precision commands — rounding centers to
+  // 1cm would leave "aligned" edges off by ≤1cm for odd-cm footprints
+  const move = (f: FurnitureInstance, dx: number, dy: number) => {
+    f.x = f.x + dx
+    f.y = f.y + dy
+  }
+  if (edge === 'left') {
+    const target = Math.min(...boxes.map((b) => b.minX))
+    items.forEach((f, i) => move(f, target - boxes[i]!.minX, 0))
+  } else if (edge === 'right') {
+    const target = Math.max(...boxes.map((b) => b.maxX))
+    items.forEach((f, i) => move(f, target - boxes[i]!.maxX, 0))
+  } else if (edge === 'bottom') {
+    const target = Math.min(...boxes.map((b) => b.minY)) // screen-bottom = min y
+    items.forEach((f, i) => move(f, 0, target - boxes[i]!.minY))
+  } else if (edge === 'top') {
+    const target = Math.max(...boxes.map((b) => b.maxY)) // screen-top = max y
+    items.forEach((f, i) => move(f, 0, target - boxes[i]!.maxY))
+  } else if (edge === 'centerX') {
+    const target = items.reduce((s, f) => s + f.x, 0) / items.length
+    items.forEach((f) => move(f, target - f.x, 0))
+  } else {
+    const target = items.reduce((s, f) => s + f.y, 0) / items.length
+    items.forEach((f) => move(f, 0, target - f.y))
+  }
+}
+
+/**
+ * Equal edge-gaps between footprints along the axis (Figma semantics);
+ * when the span cannot fit them (negative gap), fall back to equal center
+ * spacing. Order = current center order, stable.
+ */
+export function distributeFurniture(
+  doc: ProjectDocument,
+  ids: readonly FurnitureId[],
+  axis: 'x' | 'y',
+): void {
+  const items = ids.map((id) => doc.furniture[id]).filter((f): f is FurnitureInstance => !!f)
+  if (items.length < 3) return
+  const sorted = [...items].sort((a, b) => (axis === 'x' ? a.x - b.x : a.y - b.y))
+  const boxes = sorted.map(footprintAabb)
+  const lo = axis === 'x' ? Math.min(...boxes.map((b) => b.minX)) : Math.min(...boxes.map((b) => b.minY))
+  const hi = axis === 'x' ? Math.max(...boxes.map((b) => b.maxX)) : Math.max(...boxes.map((b) => b.maxY))
+  const sizes = boxes.map((b) => (axis === 'x' ? b.maxX - b.minX : b.maxY - b.minY))
+  const total = sizes.reduce((s, v) => s + v, 0)
+  const gap = (hi - lo - total) / (sorted.length - 1)
+  if (gap >= 0) {
+    let cursor = lo
+    sorted.forEach((f, i) => {
+      const half = sizes[i]! / 2
+      if (axis === 'x') f.x = cursor + half
+      else f.y = cursor + half
+      cursor += sizes[i]! + gap
+    })
+  } else {
+    // overlap: equal center spacing across the span
+    const centers = sorted.map((f) => (axis === 'x' ? f.x : f.y))
+    const c0 = centers[0]!
+    const c1 = centers[centers.length - 1]!
+    sorted.forEach((f, i) => {
+      const t = c0 + ((c1 - c0) * i) / (sorted.length - 1)
+      if (axis === 'x') f.x = t
+      else f.y = t
+    })
+  }
+}

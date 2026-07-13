@@ -14,7 +14,7 @@ import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { DimensionsLayer } from './DimensionsLayer'
 import { AnnotationsLayer } from './AnnotationsLayer'
 import { openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
-import { rotateHandlePos } from '../tools/handles'
+import { resizeHandlePositions, rotateHandlePos } from '../tools/handles'
 import { dimensionSpan, labelBox } from '../hit/hitTest'
 import { useThemeStore } from '../../theme/themeStore'
 
@@ -286,6 +286,24 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
         </g>
       )
     })
+  // corner resize handles (M9): single selected furniture only
+  const single = selection.length === 1 ? doc.furniture[selection[0]! as never] : undefined
+  const resizeHandles = single
+    ? resizeHandlePositions(single).map((c, i) => (
+        <rect
+          key={`rz-${i}`}
+          x={c.x - 4 / k}
+          y={c.y - 4 / k}
+          width={8 / k}
+          height={8 / k}
+          fill={theme.handleFill}
+          stroke={theme.accent}
+          strokeWidth={1.5}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))
+    : null
+
   const outline = (id: string, color: string, width: number) => {
     const wallPoly = derived.outlines.wallPolygons[id as never]
     if (wallPoly) {
@@ -400,6 +418,7 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
       {selection.map((id) => outline(id, theme.accent, 1.5))}
       {sideBadges}
       {handles}
+      {resizeHandles}
     </g>
   )
 }

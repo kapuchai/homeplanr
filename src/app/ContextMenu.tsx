@@ -3,8 +3,11 @@ import { useUiStore } from '../store/uiStore'
 import { useDocStore } from '../store/docStore'
 import { toolContext } from '../editor2d/tools/toolRegistry'
 import {
+  alignSelection,
   copySelection,
   deleteSelection,
+  distributeSelection,
+  duplicateRoom,
   duplicateSelection,
   flipSelection,
   pasteClipboard,
@@ -78,10 +81,49 @@ export function ContextMenu() {
       { label: `Copy${n}`, shortcut: 'Ctrl+C', onSelect: () => copySelection(ctx) },
     )
   }
+  if (selFurniture.length >= 2) {
+    entries.push(
+      {
+        label: 'Align left',
+        separatorBefore: true,
+        onSelect: () => alignSelection(ctx, 'left'),
+      },
+      { label: 'Align right', onSelect: () => alignSelection(ctx, 'right') },
+      { label: 'Align top', onSelect: () => alignSelection(ctx, 'top') },
+      { label: 'Align bottom', onSelect: () => alignSelection(ctx, 'bottom') },
+    )
+    if (selFurniture.length >= 3) {
+      entries.push(
+        { label: 'Distribute horizontally', onSelect: () => distributeSelection(ctx, 'x') },
+        { label: 'Distribute vertically', onSelect: () => distributeSelection(ctx, 'y') },
+      )
+    }
+  }
   if (selWalls.length === 1 && selection.length === 1) {
     entries.push({
       label: 'Split wall here',
       onSelect: () => splitWallAt(ctx, selWalls[0]! as WallId, menu.world),
+    })
+  }
+  const selRoom =
+    selection.length === 1 && doc.rooms[selection[0]! as RoomId] ? selection[0]! : null
+  if (selRoom) {
+    entries.push({
+      label: 'Duplicate room',
+      onSelect: () => duplicateRoom(ctx, selRoom),
+    })
+    entries.push({
+      label: 'Copy room',
+      shortcut: 'Ctrl+C',
+      onSelect: () => copySelection(ctx),
+    })
+    // right-click auto-selects the room under the cursor, which used to
+    // hide the document-level fallback — paste-at-point must stay reachable
+    entries.push({
+      label: 'Paste here',
+      shortcut: 'Ctrl+V',
+      disabled: !hasClipboard(),
+      onSelect: () => pasteClipboard(ctx, menu.world),
     })
   }
   if (selection.length && !selRoomsOnly) {

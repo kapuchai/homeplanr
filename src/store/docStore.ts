@@ -11,6 +11,7 @@ import * as furniture from '../model/mutations/furniture'
 import * as rooms from '../model/mutations/rooms'
 import * as project from '../model/mutations/project'
 import * as annotations from '../model/mutations/annotations'
+import * as paste from '../model/mutations/paste'
 import type { MutationMode } from '../model/mutations/pipeline'
 
 /**
@@ -49,6 +50,10 @@ export interface DocState {
   resizeFurniture: (id: FurnitureId, size: Parameters<typeof furniture.resizeFurniture>[2]) => void
   renameFurniture: (id: FurnitureId, name: string) => void
   duplicateFurniture: (ids: readonly FurnitureId[]) => FurnitureId[]
+  alignFurniture: (ids: readonly FurnitureId[], edge: furniture.AlignEdge) => void
+  distributeFurniture: (ids: readonly FurnitureId[], axis: 'x' | 'y') => void
+  // paste (M9): one mutation ⇒ one undo entry; the commit pipeline welds
+  pasteSubgraph: (payload: paste.GraphPayload, target: Vec2) => WallId[]
   // annotations
   addDimension: (a: Vec2, b: Vec2, offset?: number) => AnnotationId | null
   addLabel: (pos: Vec2, text: string) => AnnotationId | null
@@ -98,6 +103,9 @@ export const useDocStore = create<DocState>()(
           resizeFurniture: (id, size) => mutate((d) => furniture.resizeFurniture(d, id, size)),
           renameFurniture: (id, name) => mutate((d) => furniture.renameFurniture(d, id, name)),
           duplicateFurniture: (ids) => mutate((d) => furniture.duplicateFurniture(d, ids)),
+          alignFurniture: (ids, edge) => mutate((d) => furniture.alignFurniture(d, ids, edge)),
+          distributeFurniture: (ids, axis) => mutate((d) => furniture.distributeFurniture(d, ids, axis)),
+          pasteSubgraph: (payload, target) => mutate((d) => paste.pasteSubgraph(d, payload, target)),
           addDimension: (a, b, offset) => mutate((d) => annotations.addDimension(d, a, b, offset)),
           addLabel: (pos, text) => mutate((d) => annotations.addLabel(d, pos, text)),
           updateAnnotation: (id, patch) => mutate((d) => annotations.updateAnnotation(d, id, patch)),

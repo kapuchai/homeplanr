@@ -849,3 +849,9 @@ button:disabled {
   font-size: 11px;
   white-space: nowrap;
 }
+
+/* menus can exceed short canvases (12-entry furniture menu) — scroll, never clip */
+.menu {
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+}

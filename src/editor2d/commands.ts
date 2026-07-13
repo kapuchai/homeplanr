@@ -1,7 +1,15 @@
 import type { ToolContext } from './tools/toolTypes'
 import type { Vec2 } from '../geometry/vec'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
-import { buildPasteParams, copyFurniture, hasClipboard, pasteTarget } from './clipboard'
+import {
+  buildPayload,
+  buildPasteParams,
+  clipboardGraph,
+  copyToClipboard,
+  hasClipboard,
+  materializeItems,
+  pasteTarget,
+} from './clipboard'
 import { closestPointOnSegment } from '../geometry/segment'
 import { getDerived } from '../store/derived'
 import { polygonBounds } from '../geometry/polygon'
@@ -55,15 +63,74 @@ export function flipSelection(ctx: ToolContext): boolean {
 
 export function copySelection(ctx: ToolContext): boolean {
   if (isTxActive()) return false
-  return copyFurniture(ctx.doc(), ctx.ui().selection)
+  return copyToClipboard(ctx.doc(), ctx.derived(), ctx.ui().selection)
 }
 
 /** Paste at `world` (context menu), or at the tracked cursor / view center. */
 export function pasteClipboard(ctx: ToolContext, world?: Vec2): boolean {
   if (isTxActive() || !hasClipboard()) return false
-  const target = world ?? pasteTarget(ctx.interaction().pointerWorld)
-  const ids = ctx.actions().addFurnitureBatch(buildPasteParams(target))
-  ctx.ui().setSelection(ids)
+  let target = world ?? pasteTarget(ctx.interaction().pointerWorld)
+  const g = clipboardGraph()
+  if (g && !world && !ctx.interaction().pointerWorld) {
+    // no cursor to aim at: the furniture-era +0.25m nudge would weld a graph
+    // payload onto its own source (X-split confetti) — land it DISJOINT
+    const dxs = g.nodes.map((n) => n.dx)
+    target = { x: target.x + (Math.max(...dxs) - Math.min(...dxs)) + 0.5, y: target.y }
+  }
+  // graph + furniture land as ONE undo entry
+  const tx = beginTx()
+  const wallIds = g ? ctx.actions().pasteSubgraph(g, target) : []
+  const itemIds = ctx.actions().addFurnitureBatch(buildPasteParams(target))
+  commitTx(tx)
+  ctx.ui().setSelection([...wallIds, ...itemIds])
+  return wallIds.length > 0 || itemIds.length > 0
+}
+
+/**
+ * Duplicate a room: its cycle walls, openings, contents, and meta pasted
+ * FULLY DISJOINT to the right (a small offset would X-split everything
+ * into confetti against the source).
+ */
+export function duplicateRoom(ctx: ToolContext, roomId: string): boolean {
+  if (isTxActive()) return false
+  const doc = ctx.doc()
+  const payload = buildPayload(doc, ctx.derived(), [roomId])
+  if (!payload?.graph) return false
+  const dxs = payload.graph.nodes.map((n) => n.dx)
+  // beyond EVERY existing wall (landing on a neighbor room would weld):
+  // clone minX = doc maxX + 0.5
+  const docMaxX = Math.max(
+    ...Object.values(doc.walls).flatMap((w) => {
+      const a = doc.nodes[w.a]
+      const b = doc.nodes[w.b]
+      return a && b ? [a.x, b.x] : []
+    }),
+  )
+  const target = { x: docMaxX + 0.5 - Math.min(...dxs), y: payload.anchor.y }
+  const tx = beginTx()
+  const wallIds = ctx.actions().pasteSubgraph(payload.graph, target)
+  const itemIds = ctx.actions().addFurnitureBatch(materializeItems(payload, target))
+  commitTx(tx)
+  ctx.ui().setSelection([...wallIds, ...itemIds])
+  return true
+}
+
+export function alignSelection(
+  ctx: ToolContext,
+  edge: 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY',
+): boolean {
+  if (isTxActive()) return false
+  const ids = selectedFurniture(ctx)
+  if (ids.length < 2) return false
+  ctx.actions().alignFurniture(ids, edge)
+  return true
+}
+
+export function distributeSelection(ctx: ToolContext, axis: 'x' | 'y'): boolean {
+  if (isTxActive()) return false
+  const ids = selectedFurniture(ctx)
+  if (ids.length < 3) return false
+  ctx.actions().distributeFurniture(ids, axis)
   return true
 }
 

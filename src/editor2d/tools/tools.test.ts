@@ -565,12 +565,16 @@ describe('clipboard copy/paste', () => {
     tool().onKeyDown?.('Escape', ctx)
   })
 
-  it('copying a wall-only selection leaves the clipboard empty', () => {
+  // 0.3.0 deliberate rewrite: walls are copyable now (M9 graph clipboard)
+  it('copying a wall-only selection fills the clipboard; paste recreates the wall', () => {
     const r = useDocStore.getState().addWallSegment(vec(0, 0), vec(4, 0))
     useUiStore.getState().setSelection([r.wallId!])
     copy()
-    expect(hasClipboard()).toBe(false)
-    paste() // silent no-op
+    expect(hasClipboard()).toBe(true)
+    const before = walls()
+    useInteractionStore.getState().set({ pointerWorld: vec(10, 10) })
+    paste()
+    expect(walls()).toBe(before + 1)
     expect(furnitureCount()).toBe(0)
   })
 
@@ -1393,5 +1397,80 @@ describe('M8 (0.3.0): snap/grid hotkeys, help overlay, shortcut sheet', () => {
     ]) {
       expect(tokens).toContain(k)
     }
+  })
+})
+
+describe('M9 (0.3.0): furniture resize handles + duplicate room', () => {
+  it('corner drag resizes with the opposite corner ANCHORED — one undo entry', () => {
+    const id = addSofa(2, 2) // 2.2×0.95 → corner (+,+) at (3.1, 2.475)
+    useUiStore.getState().setSelection([id])
+    const base = past()
+    tool().onPointerDown(pe(vec(3.1, 2.475)), ctx)
+    tool().onPointerMove(pe(vec(3.9, 3.525)), ctx) // stretch to 3×2
+    tool().onPointerUp(pe(vec(3.9, 3.525)), ctx)
+    const f = useDocStore.getState().doc.furniture[id]!
+    expect(f.size.w).toBeCloseTo(3, 6)
+    expect(f.size.d).toBeCloseTo(2, 6)
+    expect(f.x).toBeCloseTo(2.4, 6) // anchor (0.9,1.525) stayed put
+    expect(f.y).toBeCloseTo(2.53, 2) // (1.525+3.525)/2, 1cm quantized
+    expect(past()).toBe(base + 1)
+  })
+
+  it('resize respects rotation: a 90°-rotated item resizes in ITS frame', () => {
+    const id = useDocStore.getState().addFurniture({
+      catalogItemId: 'test-box',
+      x: 0,
+      y: 0,
+      rotation: Math.PI / 2,
+      size: { w: 2, d: 1, h: 1 },
+    })
+    useUiStore.getState().setSelection([id])
+    // corner local (+1,+0.5) rotated 90° → world (−0.5, 1); anchor (0.5, −1)
+    tool().onPointerDown(pe(vec(-0.5, 1)), ctx)
+    tool().onPointerMove(pe(vec(-1, 2)), ctx)
+    tool().onPointerUp(pe(vec(-1, 2)), ctx)
+    const f = useDocStore.getState().doc.furniture[id]!
+    expect(f.size.w).toBeCloseTo(3, 6)
+    expect(f.size.d).toBeCloseTo(1.5, 6)
+    expect(f.x).toBeCloseTo(-0.25, 6)
+    expect(f.y).toBeCloseTo(0.5, 6)
+  })
+
+  it('Esc aborts a resize; clamps hold at the floor', () => {
+    const id = addSofa(2, 2)
+    useUiStore.getState().setSelection([id])
+    const pristine = useDocStore.getState().doc
+    tool().onPointerDown(pe(vec(3.1, 2.475)), ctx)
+    tool().onPointerMove(pe(vec(5, 5)), ctx)
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(useDocStore.getState().doc).toBe(pristine)
+    // clamp: drag the corner nearly onto the anchor
+    tool().onPointerDown(pe(vec(3.1, 2.475)), ctx)
+    tool().onPointerMove(pe(vec(1.0, 1.6)), ctx)
+    tool().onPointerUp(pe(vec(1.0, 1.6)), ctx)
+    const f = useDocStore.getState().doc.furniture[id]!
+    expect(f.size.d).toBeGreaterThanOrEqual(0.1)
+    expect(f.size.w).toBeGreaterThanOrEqual(0.1)
+  })
+
+  it('Duplicate room clones walls, contents, and meta — fully disjoint', async () => {
+    const { duplicateRoom } = await import('../commands')
+    useDocStore
+      .getState()
+      .addWallChain([vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const room = Object.values(useDocStore.getState().doc.rooms)[0]!
+    useDocStore.getState().renameRoom(room.id, 'Bedroom')
+    addSofa(2, 1.5)
+    const base = past()
+    expect(duplicateRoom(ctx, room.id)).toBe(true)
+    expect(past()).toBe(base + 1) // ONE undo entry for the whole clone
+    const d = useDocStore.getState().doc
+    expect(walls()).toBe(8)
+    expect(rooms()).toBe(2)
+    expect(Object.keys(d.furniture)).toHaveLength(2)
+    const names = Object.values(d.rooms).map((r) => r.name)
+    expect(names.filter((n) => n === 'Bedroom')).toHaveLength(2)
+    // disjoint: no shared nodes between the two cycles
+    expect(Object.keys(d.nodes)).toHaveLength(8)
   })
 })

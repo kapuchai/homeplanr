@@ -2,7 +2,7 @@ import type { Tool, ToolContext } from './toolTypes'
 import type { EntityRef } from '../hit/hitTest'
 import { hitTestAll, hitTestRect } from '../hit/hitTest'
 import type { Vec2 } from '../../geometry/vec'
-import { add, dist, dot, normalize, perp, scale, sub } from '../../geometry/vec'
+import { add, dist, dot, normalize, perp, rotate, scale, sub } from '../../geometry/vec'
 import { closestPointOnSegment } from '../../geometry/segment'
 import { resolveSnap, type SnapResult } from '../../geometry/snapping'
 import {
@@ -14,8 +14,9 @@ import {
 } from '../snap/candidates'
 import { beginTx, commitTx, abortTx, type TxToken } from '../../store/transactions'
 import { useAppSettings } from '../../store/appSettings'
+import { formatLength } from '../../format/units'
 import { CATALOG } from '../../catalog'
-import { rotateHandlePos, HANDLE_RADIUS_PX } from './handles'
+import { resizeHandlePositions, rotateHandlePos, HANDLE_RADIUS_PX, RESIZE_CORNERS, RESIZE_HANDLE_RADIUS_PX } from './handles'
 import {
   furnitureDragPills,
   incidentWallIds,
@@ -84,6 +85,15 @@ type DragState =
       pillWallIds: WallId[]
     }
   | { kind: 'opening'; tx: TxToken; openingId: OpeningId; wallId: WallId }
+  | {
+      kind: 'resize'
+      tx: TxToken
+      id: FurnitureId
+      /** Local sign pair of the DRAGGED corner (informational). */
+      corner: Vec2
+      /** The opposite corner, FIXED in world space for the whole drag. */
+      anchorWorld: Vec2
+    }
   | { kind: 'annotation-label'; tx: TxToken; id: AnnotationId; grabOffset: Vec2 }
   | {
       kind: 'annotation-dim'
@@ -176,6 +186,38 @@ export function createSelectTool(): Tool {
           }
           ctx.interaction().set({ gestureActive: true })
           return
+        }
+      }
+
+      // 1b. corner resize handles — single selected furniture only (M9).
+      // Skip when the item is tiny on screen: at far zoom the corner radii
+      // cover the whole footprint and every move becomes an accidental
+      // stretch. Nearest corner wins when radii overlap.
+      if (selFurn.length === 1) {
+        const f = doc.furniture[selFurn[0]!]
+        if (f && Math.min(f.size.w, f.size.d) / px >= 28) {
+          const corners = resizeHandlePositions(f)
+          const tol = RESIZE_HANDLE_RADIUS_PX * px * 1.6
+          let ci = -1
+          let best = Infinity
+          corners.forEach((c, i) => {
+            const d0 = dist(e.world, c)
+            if (d0 <= tol && d0 < best) {
+              best = d0
+              ci = i
+            }
+          })
+          if (ci >= 0) {
+            state = {
+              kind: 'resize',
+              tx: beginTx(),
+              id: f.id,
+              corner: { ...RESIZE_CORNERS[ci]! },
+              anchorWorld: corners[(ci + 2) % 4]!,
+            }
+            ctx.interaction().set({ gestureActive: true })
+            return
+          }
         }
       }
 
@@ -473,6 +515,39 @@ export function createSelectTool(): Tool {
           return
         }
 
+        case 'resize': {
+          const f = doc.furniture[state.id]
+          if (!f) return
+          // pointer relative to the FIXED anchor corner, in the item frame:
+          // unrotate, then unmirror (mirror flips local x before rotation)
+          const v = rotate(sub(e.world, state.anchorWorld), -f.rotation)
+          if (f.mirrored) v.x = -v.x
+          const w = Math.min(5, Math.max(0.1, Math.abs(v.x)))
+          const d2 = Math.min(5, Math.max(0.1, Math.abs(v.y)))
+          const sx = v.x >= 0 ? 1 : -1
+          const sy = v.y >= 0 ? 1 : -1
+          // center = anchor + rotate(mirror(signed half-extents))
+          const local: Vec2 = { x: (sx * w) / 2, y: (sy * d2) / 2 }
+          if (f.mirrored) local.x = -local.x
+          const center = add(state.anchorWorld, rotate(local, f.rotation))
+          ctx.actions().resizeFurniture(state.id, { w, d: d2 })
+          ctx.actions().transformFurniture(
+            state.id,
+            { x: center.x, y: center.y },
+            { quantize: false },
+          )
+          ctx.interaction().set({
+            gestureActive: true,
+            pills: [
+              {
+                at: e.world,
+                text: `${formatLength(w, useAppSettings.getState().units)} × ${formatLength(d2, useAppSettings.getState().units)}`,
+              },
+            ],
+          })
+          return
+        }
+
         case 'annotation-label': {
           const p = add(e.world, state.grabOffset)
           ctx.actions().updateAnnotation(state.id, { x: p.x, y: p.y })
@@ -554,6 +629,17 @@ export function createSelectTool(): Tool {
         case 'opening': {
           const op = doc.openings[state.openingId]
           if (op) ctx.actions().updateOpening(state.openingId, { t: op.t }, { mode: 'commit' })
+          commitTx(state.tx)
+          reset(ctx)
+          return
+        }
+        case 'resize': {
+          const f = doc.furniture[state.id]
+          if (f) {
+            const cm = (v: number) => Math.round(v * 100) / 100
+            ctx.actions().resizeFurniture(state.id, { w: cm(f.size.w), d: cm(f.size.d) })
+            ctx.actions().transformFurniture(state.id, { x: f.x, y: f.y }) // quantize
+          }
           commitTx(state.tx)
           reset(ctx)
           return

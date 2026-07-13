@@ -1,14 +1,18 @@
-import type { ProjectDocument } from '../model/types'
-import type { FurnitureId } from '../model/ids'
+import type { ProjectDocument, Room } from '../model/types'
+import type { FurnitureId, RoomId, WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import type { AddFurnitureParams } from '../model/mutations/furniture'
+import type { GraphPayload } from '../model/mutations/paste'
+import type { DerivedGeometry } from '../store/derived'
+import { pointInPolygonWithHoles } from '../geometry/polygon'
 
 /**
- * Furniture clipboard — module-level BY DESIGN: no OS-clipboard plugin or
- * permissions needed, and the payload survives New/Open (it is neither doc
- * nor ui state). Items are stored as offsets from the copy anchor (the
- * centroid of the copied centers) so a paste lands the group centered on
- * the target point.
+ * Clipboard — module-level BY DESIGN: no OS-clipboard plugin or permissions
+ * needed, and the payload survives New/Open (it is neither doc nor ui
+ * state). Two halves around one shared anchor (the centroid of everything
+ * copied): furniture items, and (M9) a wall-graph payload — selected walls
+ * with their endpoint nodes and hosted openings, plus whole rooms (their
+ * cycles, contained furniture, and name/floor meta).
  */
 interface ClipboardItem {
   catalogItemId: string
@@ -21,19 +25,93 @@ interface ClipboardItem {
   mirrored?: boolean
 }
 
-let payload: { anchor: Vec2; items: ClipboardItem[] } | null = null
+export interface ClipboardPayload {
+  anchor: Vec2
+  items: ClipboardItem[]
+  graph: GraphPayload | null
+}
 
-/** Copy the furniture among `ids`. No furniture ⇒ false, payload untouched. */
-export function copyFurniture(doc: ProjectDocument, ids: readonly string[]): boolean {
-  const items = ids
-    .map((id) => doc.furniture[id as FurnitureId])
-    .filter((f): f is NonNullable<typeof f> => f !== undefined)
-  if (items.length === 0) return false
-  const anchor: Vec2 = {
-    x: items.reduce((s, f) => s + f.x, 0) / items.length,
-    y: items.reduce((s, f) => s + f.y, 0) / items.length,
+let payload: ClipboardPayload | null = null
+
+/** Build a payload for `ids` without touching the module clipboard. */
+export function buildPayload(
+  doc: ProjectDocument,
+  derived: DerivedGeometry,
+  ids: readonly string[],
+): ClipboardPayload | null {
+  const wallIds = new Set<WallId>()
+  const furnIds = new Set<FurnitureId>()
+  const rooms: Room[] = []
+
+  for (const id of ids) {
+    if (doc.walls[id as WallId]) wallIds.add(id as WallId)
+    if (doc.furniture[id as FurnitureId]) furnIds.add(id as FurnitureId)
+    const room = doc.rooms[id as RoomId]
+    if (room) {
+      rooms.push(room)
+      for (const w of [...room.wallCycle, ...room.holeCycles.flat()]) wallIds.add(w)
+    }
   }
-  payload = {
+  // room copies bring their contents along
+  for (const room of rooms) {
+    const dr = derived.rooms[room.id]
+    if (!dr) continue
+    for (const f of Object.values(doc.furniture)) {
+      if (pointInPolygonWithHoles({ x: f.x, y: f.y }, dr.polygon, dr.holePolygons)) {
+        furnIds.add(f.id)
+      }
+    }
+  }
+
+  const walls = [...wallIds].map((id) => doc.walls[id]!).filter(Boolean)
+  const items = [...furnIds].map((id) => doc.furniture[id]!).filter(Boolean)
+  if (!walls.length && !items.length) return null
+
+  const nodeIds = new Set(walls.flatMap((w) => [w.a, w.b]))
+  const nodes = [...nodeIds].map((id) => doc.nodes[id]!).filter(Boolean)
+
+  // shared anchor: centroid of all copied points
+  const pts: Vec2[] = [...nodes, ...items.map((f) => ({ x: f.x, y: f.y }))]
+  const anchor: Vec2 = {
+    x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
+    y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+  }
+
+  const graph: GraphPayload | null = walls.length
+    ? {
+        nodes: nodes.map((n) => ({ key: n.id, dx: n.x - anchor.x, dy: n.y - anchor.y })),
+        walls: walls.map((w) => ({
+          key: w.id,
+          aKey: w.a,
+          bKey: w.b,
+          thickness: w.thickness,
+          height: w.height,
+          ...(w.paintFront ? { paintFront: w.paintFront } : {}),
+          ...(w.paintBack ? { paintBack: w.paintBack } : {}),
+          ...(w.finish ? { finish: w.finish } : {}),
+        })),
+        openings: Object.values(doc.openings)
+          .filter((op) => wallIds.has(op.wallId))
+          .map((op) => ({
+            wallKey: op.wallId,
+            kind: op.kind,
+            t: op.t,
+            width: op.width,
+            height: op.height,
+            ...(op.kind === 'window' ? { sillHeight: op.sillHeight } : {}),
+            ...(op.kind === 'door' ? { hinge: op.hinge, swing: op.swing } : {}),
+          })),
+        roomMeta: rooms
+          .filter((r) => r.name || r.floorMaterialId)
+          .map((r) => ({
+            wallKeys: [...r.wallCycle, ...r.holeCycles.flat()],
+            ...(r.name ? { name: r.name } : {}),
+            ...(r.floorMaterialId ? { floorMaterialId: r.floorMaterialId } : {}),
+          })),
+      }
+    : null
+
+  return {
     anchor,
     items: items.map((f) => ({
       catalogItemId: f.catalogItemId,
@@ -45,11 +123,25 @@ export function copyFurniture(doc: ProjectDocument, ids: readonly string[]): boo
       elevation: f.elevation,
       ...(f.mirrored ? { mirrored: true } : {}),
     })),
+    graph,
   }
+}
+
+/** Copy `ids` (walls/rooms/furniture). Nothing copyable ⇒ false, untouched. */
+export function copyToClipboard(
+  doc: ProjectDocument,
+  derived: DerivedGeometry,
+  ids: readonly string[],
+): boolean {
+  const built = buildPayload(doc, derived, ids)
+  if (!built) return false
+  payload = built
   return true
 }
 
 export const hasClipboard = (): boolean => payload !== null
+
+export const clipboardGraph = (): GraphPayload | null => payload?.graph ?? null
 
 /** Where a paste lands: the cursor, else the copy anchor nudged by 0.25m. */
 export function pasteTarget(
@@ -59,10 +151,14 @@ export function pasteTarget(
   return pointerWorld ?? { x: fallbackAnchor.x + 0.25, y: fallbackAnchor.y + 0.25 }
 }
 
-/** Materialize the payload around `target` for addFurnitureBatch. */
+/** Materialize the furniture half around `target` for addFurnitureBatch. */
 export function buildPasteParams(target: Vec2): AddFurnitureParams[] {
-  if (!payload) return []
-  return payload.items.map((it) => ({
+  return payload ? materializeItems(payload, target) : []
+}
+
+/** Furniture params for an EXPLICIT payload (duplicate-room path). */
+export function materializeItems(p: ClipboardPayload, target: Vec2): AddFurnitureParams[] {
+  return p.items.map((it) => ({
     catalogItemId: it.catalogItemId,
     x: target.x + it.dx,
     y: target.y + it.dy,
