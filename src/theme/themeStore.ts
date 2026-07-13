@@ -48,6 +48,10 @@ export function initTheming(): () => void {
       '--accent-soft',
       resolved === 'dark' ? a.softDark : a.softLight,
     )
+    document.documentElement.style.setProperty(
+      '--accent-contrast',
+      resolved === 'dark' ? a.contrastDark : a.contrastLight,
+    )
     useThemeStore.setState({
       resolved,
       theme: getTheme2d(resolved, accent),

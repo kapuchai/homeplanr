@@ -1,6 +1,6 @@
 // App shell (M3b): toolbar w/ File menu + tools + undo/redo + 2D/3D toggle,
 // catalog + properties panels, confirm modal, and real file persistence.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { Editor2D } from './editor2d/Editor2D'
 import { PlannerCanvas } from './scene3d/PlannerCanvas'
@@ -23,8 +23,35 @@ import { CatalogPanel } from './app/CatalogPanel'
 import { PropertiesPanel } from './app/PropertiesPanel'
 import { ConfirmDialog } from './app/ConfirmDialog'
 import { OptionsDialog } from './app/OptionsDialog'
+import { MenuList, type MenuEntry } from './app/MenuList'
 
-// unicode ⚙ renders inconsistently on WebKitGTK/Windows — inline SVG instead
+// unicode glyphs render inconsistently on WebKitGTK/Windows — inline SVGs
+function UndoIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6.5 3.5 3 7l3.5 3.5" />
+      <path d="M3 7h6a4 4 0 0 1 0 8H7" />
+    </svg>
+  )
+}
+
+function RedoIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.5 3.5 13 7l-3.5 3.5" />
+      <path d="M13 7H7a4 4 0 0 0 0 8h2" />
+    </svg>
+  )
+}
+
+function CaretIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">
+      <path d="M2 3.5h6L5 7.5Z" />
+    </svg>
+  )
+}
+
 function GearIcon() {
   return (
     <svg
@@ -45,52 +72,48 @@ function GearIcon() {
 
 function FileMenu() {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const recents = usePersistStore((s) => s.recents)
   const canRecent = usePersistStore((s) => !!s.adapter?.readPath)
-  const run = (fn: () => void | Promise<unknown>) => () => {
+  const close = () => {
     setOpen(false)
+    triggerRef.current?.focus()
+  }
+  const run = (fn: () => void | Promise<unknown>) => () => {
     flushPendingNudge() // menu actions act on the post-nudge doc
     void fn()
   }
+  const entries: MenuEntry[] = [
+    { label: 'New', shortcut: 'Ctrl+N', onSelect: run(newProject) },
+    { label: 'Open…', shortcut: 'Ctrl+O', onSelect: run(openProject) },
+    { label: 'Save', shortcut: 'Ctrl+S', onSelect: run(saveProject) },
+    { label: 'Save As…', shortcut: 'Ctrl+Shift+S', onSelect: run(saveProjectAs) },
+    { label: 'Export PNG…', separatorBefore: true, onSelect: run(() => exportImage('png')) },
+    { label: 'Export SVG…', onSelect: run(() => exportImage('svg')) },
+    ...(canRecent && recents.length > 0
+      ? recents.map((r, i) => ({
+          label: r.name,
+          title: r.path,
+          separatorBefore: i === 0,
+          onSelect: run(() => openRecent(r.path)),
+        }))
+      : []),
+  ]
   return (
     <div className="file-menu">
-      <button type="button" onClick={() => setOpen((v) => !v)}>
-        File ▾
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        File <CaretIcon />
       </button>
       {open && (
         <>
           <div className="menu-backdrop" onClick={() => setOpen(false)} />
-          <div className="menu">
-            <button type="button" onClick={run(newProject)}>
-              New <kbd>Ctrl+N</kbd>
-            </button>
-            <button type="button" onClick={run(openProject)}>
-              Open… <kbd>Ctrl+O</kbd>
-            </button>
-            <button type="button" onClick={run(saveProject)}>
-              Save <kbd>Ctrl+S</kbd>
-            </button>
-            <button type="button" onClick={run(saveProjectAs)}>
-              Save As… <kbd>Ctrl+Shift+S</kbd>
-            </button>
-            <div className="menu-sep" />
-            <button type="button" onClick={run(() => exportImage('png'))}>
-              Export PNG…
-            </button>
-            <button type="button" onClick={run(() => exportImage('svg'))}>
-              Export SVG…
-            </button>
-            {canRecent && recents.length > 0 && (
-              <>
-                <div className="menu-sep" />
-                {recents.map((r) => (
-                  <button key={r.path} type="button" title={r.path} onClick={run(() => openRecent(r.path))}>
-                    {r.name}
-                  </button>
-                ))}
-              </>
-            )}
-          </div>
+          <MenuList entries={entries} onClose={close} />
         </>
       )}
     </div>
@@ -109,6 +132,8 @@ function ProjectName() {
     <span className="project-name">
       <input
         value={draft}
+        aria-label="Project name"
+        title="Project name — click to rename"
         onFocus={() => setFocused(true)}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
@@ -140,7 +165,14 @@ function Toolbar() {
     onClick: () => void,
     title: string,
   ) => (
-    <button type="button" className={active ? 'active' : ''} disabled={!is2d} onClick={onClick} title={title}>
+    <button
+      type="button"
+      className={active ? 'active' : ''}
+      aria-pressed={active}
+      disabled={!is2d}
+      onClick={onClick}
+      title={is2d ? title : 'Available in the 2D view'}
+    >
       {label}
     </button>
   )
@@ -186,8 +218,9 @@ function Toolbar() {
             safeUndo()
           }}
           title="Undo (Ctrl+Z)"
+          aria-label="Undo"
         >
-          ↩
+          <UndoIcon />
         </button>
         <button
           type="button"
@@ -197,8 +230,9 @@ function Toolbar() {
             safeRedo()
           }}
           title="Redo (Ctrl+Shift+Z)"
+          aria-label="Redo"
         >
-          ↪
+          <RedoIcon />
         </button>
       </div>
       <div className="spacer" />
@@ -212,10 +246,22 @@ function Toolbar() {
         <GearIcon />
       </button>
       <div className="segmented">
-        <button type="button" className={is2d ? 'active' : ''} onClick={() => setViewMode('2d')}>
+        <button
+          type="button"
+          className={is2d ? 'active' : ''}
+          aria-pressed={is2d}
+          title="2D plan view"
+          onClick={() => setViewMode('2d')}
+        >
           2D
         </button>
-        <button type="button" className={!is2d ? 'active' : ''} onClick={() => setViewMode('3d')}>
+        <button
+          type="button"
+          className={!is2d ? 'active' : ''}
+          aria-pressed={!is2d}
+          title="3D view"
+          onClick={() => setViewMode('3d')}
+        >
           3D
         </button>
       </div>

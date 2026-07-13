@@ -19,11 +19,12 @@ export function ZoomControls() {
   return (
     <div className="canvas-controls segmented small">
       <button
+        aria-label="Zoom out"
         title="Zoom out (−)"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => zoomAtCenter(1 / KEY_ZOOM_FACTOR)}
       >
-        −
+        -
       </button>
       <button
         className="zoom-level"
@@ -34,6 +35,7 @@ export function ZoomControls() {
         {Math.round((k / K_DEFAULT) * 100)}%
       </button>
       <button
+        aria-label="Zoom in"
         title="Zoom in (+)"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => zoomAtCenter(KEY_ZOOM_FACTOR)}
@@ -49,6 +51,7 @@ export function ZoomControls() {
       </button>
       <button
         className={showDimensions ? 'active' : ''}
+        aria-pressed={showDimensions}
         title="Wall dimensions (Shift+D)"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => useAppSettings.getState().setShowDimensions(!showDimensions)}

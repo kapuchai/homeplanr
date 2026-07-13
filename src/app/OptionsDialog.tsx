@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { useUiStore } from '../store/uiStore'
+import { Modal } from './Modal'
 import {
   ACCENT_IDS,
   THEME_PREFERENCES,
@@ -13,7 +13,7 @@ import type { UnitSystem } from '../format/units'
 /**
  * App options modal — every control applies instantly to useAppSettings.
  * While open, the editor keymap drops all shortcuts (guard in keymap.ts);
- * Escape is handled by this dialog's own listener.
+ * Escape / focus trapping / restore come from the shared Modal shell.
  */
 const THEME_LABELS: Record<ThemePreference, string> = {
   system: 'System',
@@ -34,28 +34,10 @@ export function OptionsDialog() {
   // swatches show the resolved-scheme variant (dark accents are lifted)
   const resolved = useThemeStore((s) => s.resolved)
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      // document fires before the keymap's window listener — without this the
-      // same Escape would fall through to the Esc ladder once the guard clears
-      e.stopPropagation()
-      useUiStore.getState().setOptionsOpen(false)
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
-
   if (!open) return null
   return (
-    <div
-      className="modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setOpen(false)
-      }}
-    >
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Options">
+    <Modal label="Options" onClose={() => setOpen(false)}>
+      <>
         <h3>Options</h3>
         <section className="options-section">
           <h4>Appearance</h4>
@@ -66,6 +48,7 @@ export function OptionsDialog() {
                 <button
                   key={t}
                   type="button"
+                  aria-pressed={settings.theme === t}
                   className={settings.theme === t ? 'active' : ''}
                   onClick={() => settings.setTheme(t)}
                 >
@@ -81,7 +64,9 @@ export function OptionsDialog() {
                 <button
                   key={a}
                   type="button"
-                  title={a}
+                  title={ACCENTS[a].name}
+                  aria-label={ACCENTS[a].name}
+                  aria-pressed={settings.accent === a}
                   className={`swatch${settings.accent === a ? ' active' : ''}`}
                   style={{ background: ACCENTS[a][resolved] }}
                   onClick={() => settings.setAccent(a)}
@@ -99,6 +84,7 @@ export function OptionsDialog() {
                 <button
                   key={u.value}
                   type="button"
+                  aria-pressed={settings.units === u.value}
                   className={settings.units === u.value ? 'active' : ''}
                   onClick={() => settings.setUnits(u.value)}
                 >
@@ -135,7 +121,7 @@ export function OptionsDialog() {
             Close
           </button>
         </div>
-      </div>
-    </div>
+      </>
+    </Modal>
   )
 }

@@ -15,6 +15,8 @@ export interface MenuEntry {
   separatorBefore?: boolean
   /** Display-only shortcut hint (e.g. 'Ctrl+D'). */
   shortcut?: string
+  /** Hover tooltip (e.g. a recent file's full path). */
+  title?: string
 }
 
 export function MenuList({ entries, onClose }: { entries: MenuEntry[]; onClose: () => void }) {
@@ -28,6 +30,11 @@ export function MenuList({ entries, onClose }: { entries: MenuEntry[]; onClose: 
   }, [])
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // a focused menu OWNS the keyboard: no key may fall through to the
+    // global keymap (Enter would also commit a measurement, Space would arm
+    // panning and cancel the button's own activation, Delete would delete
+    // the selection while browsing the menu)
+    e.stopPropagation()
     const list = buttons()
     if (!list.length) return
     const idx = list.findIndex((b) => b === document.activeElement)
@@ -49,10 +56,9 @@ export function MenuList({ entries, onClose }: { entries: MenuEntry[]; onClose: 
         }
       }
     } else {
-      return // let Enter/Space/Tab behave natively
+      return // Enter/Space: native button activation proceeds
     }
     e.preventDefault()
-    e.stopPropagation()
   }
 
   return (
@@ -64,6 +70,7 @@ export function MenuList({ entries, onClose }: { entries: MenuEntry[]; onClose: 
             type="button"
             role="menuitem"
             disabled={entry.disabled}
+            title={entry.title}
             className={entry.danger ? 'danger' : ''}
             onClick={() => {
               onClose()

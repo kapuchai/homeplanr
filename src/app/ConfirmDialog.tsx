@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useConfirmStore } from './confirmStore'
+import { Modal } from './Modal'
 
 export function ConfirmDialog() {
   const pending = useConfirmStore((s) => s.pending)
@@ -16,8 +17,13 @@ export function ConfirmDialog() {
   }, [pending])
   if (!pending) return null
   return (
-    <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-modal="true" aria-label={pending.title}>
+    <Modal
+      label={pending.title}
+      dismissOnBackdrop={false}
+      refocusKey={pending}
+      onClose={() => resolve(pending.escValue)}
+    >
+      <>
         <h3>{pending.title}</h3>
         <p>{pending.message}</p>
         <div className="modal-buttons">
@@ -35,7 +41,7 @@ export function ConfirmDialog() {
             </button>
           ))}
         </div>
-      </div>
-    </div>
+      </>
+    </Modal>
   )
 }

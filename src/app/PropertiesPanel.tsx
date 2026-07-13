@@ -185,6 +185,8 @@ function PaintSwatchRow({
         <button
           type="button"
           title="Default"
+          aria-label="Default"
+          aria-pressed={current === undefined}
           className={`swatch swatch-none${current === undefined ? ' active' : ''}`}
           onClick={() => onPick(undefined)}
         />
@@ -193,6 +195,8 @@ function PaintSwatchRow({
             key={p.id}
             type="button"
             title={p.name}
+            aria-label={p.name}
+            aria-pressed={current === p.id}
             className={`swatch${current === p.id ? ' active' : ''}`}
             style={{ background: p.color }}
             onClick={() => onPick(p.id)}
@@ -631,6 +635,8 @@ export function PropertiesPanel() {
                 key={f.id}
                 type="button"
                 title={f.name}
+                aria-label={f.name}
+                aria-pressed={(room.floorMaterialId ?? 'woodFloor') === f.id}
                 className={`swatch${(room.floorMaterialId ?? 'woodFloor') === f.id ? ' active' : ''}`}
                 style={{ background: f.color }}
                 onClick={() => a.setRoomFloorMaterial(room.id, f.id)}

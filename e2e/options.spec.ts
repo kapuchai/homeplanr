@@ -64,3 +64,32 @@ test('units switch updates the properties panel', async ({ page }) => {
   await closeOptions(page)
   await expect(gridUnit).toHaveText('m')
 })
+
+test('a11y baseline (M7): focus trap, Esc + focus restore, ARIA state', async ({ page }) => {
+  await page.goto('/')
+  const gear = page.getByRole('button', { name: 'Options' })
+  await gear.click()
+  await expect(dialog(page)).toBeVisible()
+  // focus moved INTO the dialog
+  const inDialog = await dialog(page).evaluate((d) => d.contains(document.activeElement))
+  expect(inDialog).toBe(true)
+  // active theme button exposes aria-pressed
+  await expect(
+    dialog(page).getByRole('button', { name: 'System', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  // Escape closes and focus RESTORES to the opener
+  await page.keyboard.press('Escape')
+  await expect(dialog(page)).toBeHidden()
+  await expect(gear).toBeFocused()
+
+  // File menu: ARIA menu semantics + Esc restores the trigger
+  const fileBtn = page.getByRole('button', { name: 'File' })
+  await expect(fileBtn).toHaveAttribute('aria-haspopup', 'menu')
+  await fileBtn.click()
+  await expect(page.getByRole('menuitem', { name: 'New' })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitem', { name: 'Open…' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toBeHidden()
+  await expect(fileBtn).toBeFocused()
+})

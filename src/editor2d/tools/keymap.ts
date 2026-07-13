@@ -117,7 +117,9 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     return
   }
   // modal guard: a pending confirm or the Options dialog swallows every key
-  // (Options handles its own Escape via a document listener)
+  // (the shared Modal handles Escape itself in the document CAPTURE phase —
+  // the resolve below is a belt-and-braces fallback that resolves the same
+  // escValue if a modal ever renders without the Modal shell)
   const confirm = useConfirmStore.getState()
   if (confirm.pending || ctx.ui().optionsOpen) {
     if (e.key === 'Escape' && confirm.pending) {
