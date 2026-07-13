@@ -14,6 +14,7 @@ import { symbolFor } from '../catalog/symbolFromParts'
 import { getTheme2d } from '../theme/theme2d'
 import { formatArea } from '../format/units'
 import { exportPixelSize, renderPlanSvg } from './exportPlanSvg'
+import { addDimension, addLabel } from '../model/mutations/annotations'
 
 /** The exporter is pinned to the LIGHT theme (accent-independent tokens). */
 const theme = getTheme2d('light', 'blue')
@@ -317,5 +318,30 @@ describe('exportPixelSize', () => {
     const size = exportPixelSize({ minX: 0, minY: 0, maxX: 1, maxY: 1 }, 0)
     expect(Math.max(size.w, size.h)).toBe(512)
     expect(size.k).toBeGreaterThan(100)
+  })
+})
+
+describe('annotations in the export (v3 — always rendered, they are document content)', () => {
+  it('renders dimension lines with derived length text and labels with their text', () => {
+    const doc = emptyDocument('p_ann', 'Ann', '2026-07-13T00:00:00.000Z')
+    addWallChain(doc, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const dim = addDimension(doc, { x: 0, y: -1 }, { x: 4, y: -1 }, 0.3)!
+    addLabel(doc, { x: 2, y: 2 }, 'Reading nook <3')
+    resetDerivedForTests()
+    const svg = renderPlanSvg(doc, getDerived(doc))!
+    expect(svg).toContain('4.00 m') // derived from dist(a,b) + current units
+    expect(svg).toContain('Reading nook &lt;3') // escaped label text
+    void dim
+  })
+
+  it('annotation extents stretch the export framing (content bounds)', () => {
+    const doc = emptyDocument('p_ann2', 'Ann2', '2026-07-13T00:00:00.000Z')
+    addWallChain(doc, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const bare = renderPlanSvg(doc, getDerived(doc))!
+    addLabel(doc, { x: 30, y: 30 }, 'Far away note')
+    resetDerivedForTests()
+    const withAnn = renderPlanSvg(doc, getDerived(doc))!
+    const vb = (s: string) => s.match(/viewBox="([^"]+)"/)![1]!
+    expect(vb(withAnn)).not.toBe(vb(bare))
   })
 })

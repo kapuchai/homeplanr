@@ -4,6 +4,7 @@ import { createDrawWallTool } from './drawWallTool'
 import { createPlaceOpeningTool } from './placeOpeningTool'
 import { createPlaceFurnitureTool } from './placeFurnitureTool'
 import { createMeasureTool } from './measureTool'
+import { createAnnotateTextTool } from './annotateTextTool'
 import { useDocStore } from '../../store/docStore'
 import { useUiStore } from '../../store/uiStore'
 import { useInteractionStore } from '../session/interactionStore'
@@ -18,6 +19,7 @@ export function createToolRegistry() {
   tools.set('place-opening', createPlaceOpeningTool())
   tools.set('place-furniture', createPlaceFurnitureTool())
   tools.set('measure', createMeasureTool())
+  tools.set('annotate-text', createAnnotateTextTool())
 
   return {
     get(id: ToolId): Tool {

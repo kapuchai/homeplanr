@@ -7,7 +7,13 @@ import { useDocStore } from './docStore'
  * Per-frame tool ephemera (ghost previews, snap indicators) live in the
  * editor's interactionStore (M3), not here.
  */
-export type ToolId = 'select' | 'draw-wall' | 'place-opening' | 'place-furniture' | 'measure'
+export type ToolId =
+  | 'select'
+  | 'draw-wall'
+  | 'place-opening'
+  | 'place-furniture'
+  | 'measure'
+  | 'annotate-text'
 export type ViewMode = '2d' | '3d'
 
 export interface ToolParams {
@@ -99,7 +105,8 @@ export function initSelectionPruning(): () => void {
         id in doc.nodes ||
         id in doc.openings ||
         id in doc.furniture ||
-        id in doc.rooms
+        id in doc.rooms ||
+        id in doc.annotations
       const ui = useUiStore.getState()
       const kept = ui.selection.filter(exists)
       if (kept.length !== ui.selection.length) ui.setSelection(kept)

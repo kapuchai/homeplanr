@@ -18,7 +18,9 @@ export function StatusHint() {
   } else if (tool === 'place-furniture') {
     text = 'Click to place · R rotates the ghost · Esc to finish'
   } else if (tool === 'measure') {
-    text = 'Click two points to measure · Esc clears'
+    text = 'Click two points to measure · Enter keeps it as a dimension · Esc clears'
+  } else if (tool === 'annotate-text') {
+    text = 'Click to place a text label · type its text in the panel · Esc exits'
   } else if (selection.length > 1) {
     text = `${selection.length} selected · drag moves all · R rotates · Ctrl+D duplicates · Del deletes`
   } else if (selection.length === 1) {
@@ -27,7 +29,7 @@ export function StatusHint() {
     text = 'Press W and click to draw your first wall'
   } else {
     text =
-      'V select · W wall · D door · N window · M measure · drag selects · right-drag pans · Shift+1 fit'
+      'V select · W wall · D door · N window · M measure · T text · drag selects · right-drag pans · Shift+1 fit'
   }
 
   return <div className="status-hint">{text}</div>

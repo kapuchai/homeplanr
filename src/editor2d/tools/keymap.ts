@@ -244,6 +244,10 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
       switchTool('measure')
       return
     }
+    if (key.toLowerCase() === 't') {
+      switchTool('annotate-text')
+      return
+    }
   }
 
   // R/F reach the ACTIVE TOOL first — the place-furniture ghost consumes

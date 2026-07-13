@@ -173,6 +173,7 @@ function Toolbar() {
           'Place window (N)',
         )}
         {toolBtn('Measure', activeTool === 'measure', () => switchTool('measure'), 'Measure (M)')}
+        {toolBtn('Text', activeTool === 'annotate-text', () => switchTool('annotate-text'), 'Text label (T)')}
       </div>
       <div className="segmented">
         <button

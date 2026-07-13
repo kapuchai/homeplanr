@@ -1,7 +1,7 @@
-import type { ProjectDocument } from '../../model/types'
+import { DEFAULTS, type ProjectDocument } from '../../model/types'
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
-import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
+import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
 
 /** Point sets covering everything visible — input to zoom-to-fit. */
 export function docContentBounds(doc: ProjectDocument, derived: DerivedGeometry): Vec2[][] {
@@ -12,7 +12,32 @@ export function docContentBounds(doc: ProjectDocument, derived: DerivedGeometry)
   for (const f of Object.values(doc.furniture)) {
     polys.push(furnitureBounds(f))
   }
+  for (const ann of Object.values(doc.annotations)) {
+    polys.push(annotationBounds(ann))
+  }
   return polys
+}
+
+const annotationBounds = (ann: ProjectDocument['annotations'][AnnotationId] & object): Vec2[] => {
+  if (ann.kind === 'dimension') {
+    const dx = ann.b.x - ann.a.x
+    const dy = ann.b.y - ann.a.y
+    const len = Math.hypot(dx, dy) || 1
+    const nx = (-dy / len) * ann.offset
+    const ny = (dx / len) * ann.offset
+    return [
+      { x: ann.a.x, y: ann.a.y },
+      { x: ann.b.x, y: ann.b.y },
+      { x: ann.a.x + nx, y: ann.a.y + ny },
+      { x: ann.b.x + nx, y: ann.b.y + ny },
+    ]
+  }
+  const size = ann.fontSize ?? DEFAULTS.labelFontSize
+  const r = Math.max(size, (ann.text.length * size * 0.62) / 2)
+  return [
+    { x: ann.x - r, y: ann.y - r },
+    { x: ann.x + r, y: ann.y + r },
+  ]
 }
 
 const furnitureBounds = (f: ProjectDocument['furniture'][FurnitureId] & object): Vec2[] => {
@@ -59,7 +84,12 @@ export function selectionContentBounds(
       continue
     }
     const n = doc.nodes[id as NodeId]
-    if (n) polys.push([{ x: n.x, y: n.y }])
+    if (n) {
+      polys.push([{ x: n.x, y: n.y }])
+      continue
+    }
+    const ann = doc.annotations[id as AnnotationId]
+    if (ann) polys.push(annotationBounds(ann))
   }
   return polys
 }

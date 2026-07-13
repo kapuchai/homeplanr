@@ -1,5 +1,5 @@
-import type { ProjectDocument } from '../../model/types'
-import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
+import { DEFAULTS, type ProjectDocument } from '../../model/types'
+import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
 import { dist, sub } from '../../geometry/vec'
@@ -8,12 +8,14 @@ import { pointInOBB, pointInPolygon, pointInPolygonWithHoles } from '../../geome
 
 /**
  * Geometric hit-testing (never DOM-based). Priority order (plan-pinned):
- * openings > furniture (smallest footprint wins among overlaps) > nodes
- * (only those offered by the caller — selection context) > walls > rooms.
- * Manipulation handles are tested by the select tool itself (M3) before
- * calling this. Tolerances are screen px, converted via pxToWorld.
+ * annotations (topmost render layer) > openings > furniture (smallest
+ * footprint wins among overlaps) > nodes (only those offered by the caller
+ * — selection context) > walls > rooms. Manipulation handles are tested by
+ * the select tool itself (M3) before calling this. Tolerances are screen
+ * px, converted via pxToWorld.
  */
 export type EntityRef =
+  | { kind: 'annotation'; id: AnnotationId }
   | { kind: 'opening'; id: OpeningId }
   | { kind: 'furniture'; id: FurnitureId }
   | { kind: 'node'; id: NodeId }
@@ -25,10 +27,38 @@ export interface HitOptions {
   nodeCandidates?: ReadonlySet<NodeId>
 }
 
+const ANNOTATION_TOLERANCE_PX = 5
+/** Visibility floors, shared with AnnotationsLayer: what the layer culls at
+ * the current zoom must not be hittable either — an invisible annotation
+ * stealing clicks from the wall under it reads as a broken click. */
+export const DIMENSION_MIN_PX = 24
+export const LABEL_MIN_PX = 6
 const OPENING_INFLATE_PX = 4
 const FURNITURE_INFLATE_PX = 3
 const NODE_RADIUS_PX = 8
 const WALL_TOLERANCE_PX = 4
+
+
+/** Dimension line moved to its offset position. */
+export function dimensionSpan(ann: {
+  a: { x: number; y: number }
+  b: { x: number; y: number }
+  offset: number
+}): { p: Vec2; q: Vec2 } {
+  const d = sub(ann.b, ann.a)
+  const len = Math.hypot(d.x, d.y) || 1
+  const n = { x: -d.y / len, y: d.x / len }
+  return {
+    p: { x: ann.a.x + n.x * ann.offset, y: ann.a.y + n.y * ann.offset },
+    q: { x: ann.b.x + n.x * ann.offset, y: ann.b.y + n.y * ann.offset },
+  }
+}
+
+/** Approximate box of a label's rendered text (world units). */
+export function labelBox(ann: { text: string; fontSize?: number }): { w: number; d: number } {
+  const size = ann.fontSize ?? DEFAULTS.labelFontSize
+  return { w: Math.max(size, ann.text.length * size * 0.62), d: size * 1.3 }
+}
 
 export function hitTestAll(
   doc: ProjectDocument,
@@ -38,6 +68,24 @@ export function hitTestAll(
   opts: HitOptions = {},
 ): EntityRef[] {
   const hits: EntityRef[] = []
+
+  // --- annotations (topmost render layer; invisible-at-zoom ones excluded) ---
+  const annTol = ANNOTATION_TOLERANCE_PX * pxToWorld
+  for (const ann of Object.values(doc.annotations)) {
+    if (ann.kind === 'dimension') {
+      const { p, q } = dimensionSpan(ann)
+      if (dist(p, q) < DIMENSION_MIN_PX * pxToWorld) continue // layer culls it
+      if (distToSegment(world, p, q) <= annTol) {
+        hits.push({ kind: 'annotation', id: ann.id })
+      }
+    } else {
+      const size = ann.fontSize ?? DEFAULTS.labelFontSize
+      if (size < LABEL_MIN_PX * pxToWorld) continue // layer culls it
+      if (pointInOBB(world, { x: ann.x, y: ann.y }, labelBox(ann), ann.rotation ?? 0)) {
+        hits.push({ kind: 'annotation', id: ann.id })
+      }
+    }
+  }
 
   // --- openings (they sit on top of walls) ---
   for (const solid of Object.values(derived.wallSolids)) {
@@ -157,19 +205,47 @@ function bandQuad(p: Vec2, q: Vec2, halfT: number): Vec2[] | null {
 /**
  * Marquee selection: INTERSECTION semantics — anything whose RENDERED shape
  * touches the rect selects (walls/openings count their thickness band, not
- * just the centerline — matching click hit-testing). Walls, openings, and
- * furniture only: bare nodes are manipulation targets (not bulk-selectable)
- * and rooms are derived, so sweeping a plan must not grab them.
+ * just the centerline — matching click hit-testing). Walls, openings,
+ * furniture, and annotations; bare nodes are manipulation targets (not
+ * bulk-selectable) and rooms are derived, so sweeping a plan must not grab
+ * them. Pass pxToWorld to exclude annotations the layer culls at this zoom.
  */
 export function hitTestRect(
   doc: ProjectDocument,
   derived: DerivedGeometry,
   a: Vec2,
   b: Vec2,
+  pxToWorld?: number,
 ): EntityRef[] {
   const min = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) }
   const max = { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) }
   const hits: EntityRef[] = []
+
+  for (const ann of Object.values(doc.annotations)) {
+    if (ann.kind === 'dimension') {
+      const { p, q } = dimensionSpan(ann)
+      if (pxToWorld !== undefined && dist(p, q) < DIMENSION_MIN_PX * pxToWorld) continue
+      if (segIntersectsRect(p, q, min, max)) hits.push({ kind: 'annotation', id: ann.id })
+    } else {
+      if (
+        pxToWorld !== undefined &&
+        (ann.fontSize ?? DEFAULTS.labelFontSize) < LABEL_MIN_PX * pxToWorld
+      ) {
+        continue
+      }
+      const box = labelBox(ann)
+      const rot = ann.rotation ?? 0
+      const cos = Math.cos(rot)
+      const sin = Math.sin(rot)
+      const corners = [
+        { x: -box.w / 2, y: -box.d / 2 },
+        { x: box.w / 2, y: -box.d / 2 },
+        { x: box.w / 2, y: box.d / 2 },
+        { x: -box.w / 2, y: box.d / 2 },
+      ].map((c) => ({ x: ann.x + c.x * cos - c.y * sin, y: ann.y + c.x * sin + c.y * cos }))
+      if (polyIntersectsRect(corners, min, max)) hits.push({ kind: 'annotation', id: ann.id })
+    }
+  }
 
   for (const solid of Object.values(derived.wallSolids)) {
     if (!solid.openings.length) continue

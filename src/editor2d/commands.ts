@@ -7,7 +7,7 @@ import { getDerived } from '../store/derived'
 import { polygonBounds } from '../geometry/polygon'
 import { docContentBounds, selectionContentBounds } from './render/bounds'
 import { useViewportStore } from './viewport/viewportStore'
-import type { FurnitureId, NodeId, OpeningId, WallId } from '../model/ids'
+import type { AnnotationId, FurnitureId, NodeId, OpeningId, WallId } from '../model/ids'
 
 /**
  * Selection commands — ONE implementation shared by the keymap and the
@@ -74,6 +74,7 @@ export function deleteSelection(ctx: ToolContext): boolean {
     | NodeId
     | OpeningId
     | FurnitureId
+    | AnnotationId
   )[]
   if (!ids.length) return false
   ctx.actions().deleteEntities(ids)
@@ -101,6 +102,7 @@ export function selectAll(ctx: ToolContext): void {
       ...Object.keys(d.walls),
       ...Object.keys(d.openings),
       ...Object.keys(d.furniture),
+      ...Object.keys(d.annotations),
     ])
 }
 

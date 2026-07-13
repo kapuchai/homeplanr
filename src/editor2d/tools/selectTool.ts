@@ -23,7 +23,7 @@ import {
   wallLengthPills,
   type MeasureInput,
 } from '../measure/liveMeasurements'
-import type { FurnitureId, NodeId, OpeningId, WallId } from '../../model/ids'
+import type { AnnotationId, FurnitureId, NodeId, OpeningId, WallId } from '../../model/ids'
 
 /**
  * Select/move tool — drag branches per hit kind (plan-pinned):
@@ -84,6 +84,17 @@ type DragState =
       pillWallIds: WallId[]
     }
   | { kind: 'opening'; tx: TxToken; openingId: OpeningId; wallId: WallId }
+  | { kind: 'annotation-label'; tx: TxToken; id: AnnotationId; grabOffset: Vec2 }
+  | {
+      kind: 'annotation-dim'
+      tx: TxToken
+      id: AnnotationId
+      /** +perp(a→b) at drag start — offset = dot(world − a, n) + off0. */
+      n: Vec2
+      a: Vec2
+      /** Grab compensation: where in the tolerance band the press landed. */
+      off0: number
+    }
 
 export function createSelectTool(): Tool {
   let state: DragState = { kind: 'idle' }
@@ -271,6 +282,30 @@ export function createSelectTool(): Tool {
             if (!op) return
             state = { kind: 'opening', tx: beginTx(), openingId: hit.id, wallId: op.wallId }
             ctx.interaction().set({ gestureActive: true })
+          } else if (hit.kind === 'annotation') {
+            const ann = doc.annotations[hit.id]
+            if (!ann) return
+            if (ann.kind === 'label') {
+              state = {
+                kind: 'annotation-label',
+                tx: beginTx(),
+                id: hit.id,
+                grabOffset: sub({ x: ann.x, y: ann.y }, state.world),
+              }
+            } else {
+              // dimensions slide along their normal ONLY — a rigid translate
+              // would silently falsify what the dimension measures
+              const n = perp(normalize(sub(ann.b, ann.a)))
+              state = {
+                kind: 'annotation-dim',
+                tx: beginTx(),
+                id: hit.id,
+                n,
+                a: { ...ann.a },
+                off0: ann.offset - dot(sub(state.world, ann.a), n),
+              }
+            }
+            ctx.interaction().set({ gestureActive: true })
           } else {
             // rooms don't drag — a drag STARTING on a room floor is the
             // marquee (boxing furniture inside a room must work; a sub-slop
@@ -282,7 +317,7 @@ export function createSelectTool(): Tool {
 
         case 'marquee': {
           // live-updating selection: what you see boxed is what you get
-          const hits = hitTestRect(doc, ctx.derived(), state.origin, e.world)
+          const hits = hitTestRect(doc, ctx.derived(), state.origin, e.world, px)
           const ids = new Set(state.base)
           for (const h of hits) ids.add(h.id)
           const next = [...ids]
@@ -428,6 +463,19 @@ export function createSelectTool(): Tool {
           })
           return
         }
+
+        case 'annotation-label': {
+          const p = add(e.world, state.grabOffset)
+          ctx.actions().updateAnnotation(state.id, { x: p.x, y: p.y })
+          return
+        }
+
+        case 'annotation-dim': {
+          ctx.actions().updateAnnotation(state.id, {
+            offset: dot(sub(e.world, state.a), state.n) + state.off0,
+          })
+          return
+        }
       }
     },
 
@@ -498,6 +546,12 @@ export function createSelectTool(): Tool {
           const op = doc.openings[state.openingId]
           if (op) ctx.actions().updateOpening(state.openingId, { t: op.t }, { mode: 'commit' })
           commitTx(state.tx)
+          reset(ctx)
+          return
+        }
+        case 'annotation-label':
+        case 'annotation-dim': {
+          commitTx(state.tx) // annotations skip the pipeline — nothing to re-run
           reset(ctx)
           return
         }

@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { useAppSettings } from '../store/appSettings'
-import { formatArea, fromDisplayLength, lengthUnitLabel, toDisplayLength } from '../format/units'
+import { formatArea, formatLength, fromDisplayLength, lengthUnitLabel, toDisplayLength } from '../format/units'
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { FLOOR_MATERIALS, WALL_PAINTS } from '../catalog/palette'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
+import { LABEL_PLACEHOLDER } from '../editor2d/tools/annotateTextTool'
+import { DEFAULTS } from '../model/types'
 import type { WallFinishId } from '../model/types'
-import type { FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
+import type { AnnotationId, FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
 
 /**
  * Right properties panel. Inputs are DRAFT-BUFFERED (plan-pinned): typing
@@ -100,11 +102,14 @@ function TextField({
   value,
   placeholder,
   onCommit,
+  autoFocus,
 }: {
   label: string
   value: string
   placeholder?: string
   onCommit: (v: string) => void
+  /** Focus + select on mount (fresh text labels: click → type). */
+  autoFocus?: boolean
 }) {
   const [draft, setDraft] = useState(value)
   const [focused, setFocused] = useState(false)
@@ -118,7 +123,11 @@ function TextField({
         type="text"
         value={draft}
         placeholder={placeholder}
-        onFocus={() => setFocused(true)}
+        autoFocus={autoFocus}
+        onFocus={(e) => {
+          setFocused(true)
+          if (autoFocus) e.target.select()
+        }}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           setFocused(false)
@@ -364,6 +373,58 @@ export function PropertiesPanel() {
   const opening = id ? doc.openings[id as OpeningId] : undefined
   const furniture = id ? doc.furniture[id as FurnitureId] : undefined
   const room = id ? doc.rooms[id as RoomId] : undefined
+  const annotation = id ? doc.annotations[id as AnnotationId] : undefined
+
+  if (annotation) {
+    if (annotation.kind === 'dimension') {
+      const len = dist(annotation.a, annotation.b)
+      return (
+        <aside className="props-panel" key={annotation.id}>
+          <h3>Dimension</h3>
+          <Row>
+            <span>Length</span>
+            <span className="readonly">{formatLength(len, units)}</span>
+          </Row>
+          <LengthField
+            label="Offset"
+            value={annotation.offset}
+            onCommit={(v) => a.updateAnnotation(annotation.id, { offset: v })}
+          />
+          <p className="hint">
+            Drag slides the line · endpoints are fixed — delete and re-measure to change them
+          </p>
+        </aside>
+      )
+    }
+    return (
+      // key: label→label selection changes REMOUNT the panel — autoFocus
+      // only fires on mount, and the click→type flow depends on it
+      <aside className="props-panel" key={annotation.id}>
+        <h3>Text</h3>
+        <TextField
+          label="Text"
+          value={annotation.text}
+          autoFocus={annotation.text === LABEL_PLACEHOLDER}
+          onCommit={(v) => a.updateAnnotation(annotation.id, { text: v })}
+        />
+        <NumField
+          label="Rotation"
+          value={annotation.rotation ?? 0}
+          unit="°"
+          step={15}
+          toDisplay={(v) => (v * 180) / Math.PI}
+          fromDisplay={(v) => (v * Math.PI) / 180}
+          onCommit={(v) => a.updateAnnotation(annotation.id, { rotation: v })}
+        />
+        <LengthField
+          label="Size"
+          value={annotation.fontSize ?? DEFAULTS.labelFontSize}
+          onCommit={(v) => a.updateAnnotation(annotation.id, { fontSize: v })}
+        />
+        <p className="hint">Clearing the text deletes the label</p>
+      </aside>
+    )
+  }
 
   if (wall) {
     const na = doc.nodes[wall.a]!

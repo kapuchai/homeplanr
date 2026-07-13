@@ -6,6 +6,7 @@ import { add, dist, normalize, perp, scale, sub } from '../../geometry/vec'
 import type { ProjectDocument } from '../../model/types'
 import { DEFAULTS } from '../../model/types'
 import { Pill } from './Pill'
+import { DIMENSION_MIN_PX, LABEL_MIN_PX } from '../hit/hitTest'
 
 /**
  * User annotations (v3): persistent dimensions + free text labels.
@@ -25,7 +26,7 @@ export function AnnotationsLayer({ doc }: { doc: ProjectDocument }) {
   for (const ann of Object.values(doc.annotations)) {
     if (ann.kind === 'dimension') {
       const len = dist(ann.a, ann.b)
-      if (len * k < 24) continue // unreadably small at this zoom
+      if (len * k < DIMENSION_MIN_PX) continue // hitTest culls the same set
       const n = scale(perp(normalize(sub(ann.b, ann.a))), 1)
       const off = scale(n, ann.offset)
       const a2 = add(ann.a, off)
@@ -52,7 +53,7 @@ export function AnnotationsLayer({ doc }: { doc: ProjectDocument }) {
       )
     } else {
       const size = ann.fontSize ?? DEFAULTS.labelFontSize
-      if (size * k < 6) continue
+      if (size * k < LABEL_MIN_PX) continue // hitTest culls the same set
       els.push(
         // rotate(+deg): stored θ = world angle +θ — the furniture sign
         // convention, frozen HERE before any saved file can carry a nonzero
@@ -62,7 +63,13 @@ export function AnnotationsLayer({ doc }: { doc: ProjectDocument }) {
           transform={`translate(${ann.x} ${ann.y}) rotate(${((ann.rotation ?? 0) * 180) / Math.PI}) scale(1 -1)`}
           style={{ pointerEvents: 'none' }}
         >
-          <text textAnchor="middle" fontSize={size} fill={theme.text} fontWeight={500}>
+          <text
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={size}
+            fill={theme.text}
+            fontWeight={500}
+          >
             {ann.text}
           </text>
         </g>,

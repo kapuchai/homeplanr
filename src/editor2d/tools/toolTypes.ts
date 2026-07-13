@@ -32,7 +32,13 @@ export interface ToolContext {
   pxToWorld: () => number
 }
 
-export type ToolId = 'select' | 'draw-wall' | 'place-opening' | 'place-furniture' | 'measure'
+export type ToolId =
+  | 'select'
+  | 'draw-wall'
+  | 'place-opening'
+  | 'place-furniture'
+  | 'measure'
+  | 'annotate-text'
 
 export interface Tool {
   id: ToolId

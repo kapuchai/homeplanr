@@ -100,6 +100,18 @@ export function createMeasureTool(): Tool {
     onPointerUp() {},
 
     onKeyDown(key, ctx) {
+      if (key === 'Enter') {
+        // freeze → persist: the measurement becomes a dimension annotation
+        // (offset 0 — the line stays where the tape was), selected for
+        // immediate offset-drag or delete
+        if (state.a && state.b) {
+          const id = ctx.actions().addDimension(state.a, state.b, 0)
+          if (id) ctx.ui().setSelection([id])
+          reset(ctx) // even a sub-cm (rejected) freeze is consumed
+          return true
+        }
+        return false
+      }
       if (key === 'Escape') {
         if (state.a) {
           // pending point or frozen measurement — either way, wipe it

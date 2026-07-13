@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../model/types'
+import { DEFAULTS as MODEL_DEFAULTS, type ProjectDocument } from '../model/types'
 import type { DerivedGeometry } from '../store/derived'
 import type { Bounds } from '../geometry/polygon'
 import { polygonBounds } from '../geometry/polygon'
@@ -9,7 +9,7 @@ import { CATALOG } from '../catalog'
 import { symbolFor } from '../catalog/symbolFromParts'
 import type { SymbolPrim } from '../catalog/types'
 import { getTheme2d, type Theme2D } from '../theme/theme2d'
-import { formatArea } from '../format/units'
+import { formatArea, formatLength } from '../format/units'
 import { useAppSettings } from '../store/appSettings'
 
 /**
@@ -206,6 +206,50 @@ export function renderPlanSvg(
         `</g>`,
     )
   }
+  // user annotations — document content: ALWAYS exported (unlike the
+  // showDimensions wall-label toggle below)
+  for (const ann of Object.values(doc.annotations)) {
+    if (ann.kind === 'dimension') {
+      const dx = ann.b.x - ann.a.x
+      const dy = ann.b.y - ann.a.y
+      const len = Math.hypot(dx, dy)
+      if (len < 1e-9) continue
+      const nx = (-dy / len) * ann.offset
+      const ny = (dx / len) * ann.offset
+      const p = { x: ann.a.x + nx, y: ann.a.y + ny }
+      const q = { x: ann.b.x + nx, y: ann.b.y + ny }
+      const tx2 = (-dy / len) * 0.04
+      const ty2 = (dx / len) * 0.04
+      const dim: string[] = []
+      if (ann.offset !== 0) {
+        dim.push(
+          `<line x1="${ann.a.x}" y1="${ann.a.y}" x2="${p.x}" y2="${p.y}" stroke="${theme.textMuted}" stroke-width="${DETAIL}" stroke-dasharray="0.02 0.03"/>`,
+          `<line x1="${ann.b.x}" y1="${ann.b.y}" x2="${q.x}" y2="${q.y}" stroke="${theme.textMuted}" stroke-width="${DETAIL}" stroke-dasharray="0.02 0.03"/>`,
+        )
+      }
+      dim.push(
+        `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="${theme.textMuted}" stroke-width="${HAIRLINE}"/>`,
+        `<line x1="${p.x - tx2}" y1="${p.y - ty2}" x2="${p.x + tx2}" y2="${p.y + ty2}" stroke="${theme.textMuted}" stroke-width="${HAIRLINE}"/>`,
+        `<line x1="${q.x - tx2}" y1="${q.y - ty2}" x2="${q.x + tx2}" y2="${q.y + ty2}" stroke="${theme.textMuted}" stroke-width="${HAIRLINE}"/>`,
+      )
+      const mid = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }
+      dim.push(
+        `<g transform="translate(${mid.x} ${mid.y}) scale(1 -1)">` +
+          `<text text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${DIM_SIZE}" fill="${theme.text}" stroke="${theme.paper}" stroke-width="0.03" paint-order="stroke">${esc(formatLength(len, units))}</text>` +
+          `</g>`,
+      )
+      parts.push(...dim)
+    } else {
+      const size = ann.fontSize ?? MODEL_DEFAULTS.labelFontSize
+      const deg = ((ann.rotation ?? 0) * 180) / Math.PI
+      parts.push(
+        `<g transform="translate(${ann.x} ${ann.y}) rotate(${deg}) scale(1 -1)">` +
+          `<text text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${size}" font-weight="500" fill="${theme.text}">${esc(ann.text)}</text>` +
+          `</g>`,
+      )
+    }
+  }
+
   if (showDimensions) {
     for (const l of dimensionLabels(doc, derived, units, 1 / NOMINAL_PX_PER_M)) {
       parts.push(

@@ -1262,3 +1262,89 @@ describe('M4 (0.3.0): commands, batch editing, context-menu guard', () => {
     expect(useDocStore.getState().doc.furniture[pasted]!.y).toBeCloseTo(9, 6)
   })
 })
+
+describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
+  it('Enter on a frozen measurement persists it as a selected dimension (one entry)', () => {
+    registry.switchTo(ctx, 'measure')
+    const base = past()
+    click(vec(0, 6))
+    click(vec(4, 6))
+    expect(tool().onKeyDown?.('Enter', ctx)).toBe(true)
+    expect(past()).toBe(base + 1)
+    const anns = Object.values(useDocStore.getState().doc.annotations)
+    expect(anns).toHaveLength(1)
+    expect(anns[0]!.kind).toBe('dimension')
+    expect(useUiStore.getState().selection).toEqual([anns[0]!.id])
+    // Enter with nothing frozen bubbles
+    expect(tool().onKeyDown?.('Enter', ctx)).toBe(false)
+  })
+
+  it('the T tool drops a placeholder label and selects it; stays armed', () => {
+    switchTool('annotate-text')
+    tool().onPointerDown(pe(vec(2, 2)), ctx)
+    tool().onPointerDown(pe(vec(5, 5)), ctx)
+    const anns = Object.values(useDocStore.getState().doc.annotations)
+    expect(anns).toHaveLength(2)
+    expect(anns.every((a) => a.kind === 'label' && a.text === 'Text')).toBe(true)
+    expect(useUiStore.getState().selection).toHaveLength(1) // the latest
+    expect(useUiStore.getState().activeTool).toBe('annotate-text')
+  })
+
+  it('label drag translates it — one undo entry', () => {
+    const id = useDocStore.getState().addLabel(vec(2, 2), 'Hello')!
+    const base = past()
+    useUiStore.getState().setSelection([id])
+    drag(vec(2, 2), vec(4, 3))
+    const ann = useDocStore.getState().doc.annotations[id]!
+    expect(ann.kind === 'label' && ann.x).toBeCloseTo(4, 6)
+    expect(ann.kind === 'label' && ann.y).toBeCloseTo(3, 6)
+    expect(past()).toBe(base + 1)
+  })
+
+  it('dimension drag slides the OFFSET only; endpoints never move', () => {
+    const id = useDocStore.getState().addDimension(vec(0, 4), vec(4, 4), 0)!
+    const base = past()
+    drag(vec(2, 4), vec(2.2, 5)) // grab the line, pull perpendicular
+    const ann = useDocStore.getState().doc.annotations[id]!
+    expect(ann.kind).toBe('dimension')
+    if (ann.kind === 'dimension') {
+      expect(ann.offset).toBeCloseTo(1, 6) // world +1 along +perp(a→b)
+      expect(ann.a).toEqual({ x: 0, y: 4 })
+      expect(ann.b).toEqual({ x: 4, y: 4 })
+    }
+    expect(past()).toBe(base + 1)
+    // Esc mid-drag aborts the slide
+    tool().onPointerDown(pe(vec(2, 5)), ctx)
+    tool().onPointerMove(pe(vec(2, 8)), ctx)
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    const after = useDocStore.getState().doc.annotations[id]!
+    expect(after.kind === 'dimension' && after.offset).toBeCloseTo(1, 6)
+  })
+
+  it('annotations hit TOPMOST (a label over furniture wins the click)', () => {
+    const sofa = addSofa(2, 2)
+    const label = useDocStore.getState().addLabel(vec(2, 2), 'On top')!
+    click(vec(2, 2))
+    expect(useUiStore.getState().selection).toEqual([label])
+    void sofa
+  })
+
+  it('Ctrl+A and the marquee include annotations', () => {
+    const dim = useDocStore.getState().addDimension(vec(0, 5), vec(4, 5), 0)!
+    const sofa = addSofa(2, 2)
+    handleKey(key('a', { ctrlKey: true }), ctx, registry)
+    expect(new Set(useUiStore.getState().selection)).toEqual(new Set([dim, sofa]))
+    useUiStore.getState().clearSelection()
+    tool().onPointerDown(pe(vec(-1, 4.5)), ctx)
+    tool().onPointerMove(pe(vec(5, 5.5)), ctx) // box sweeps the dimension line
+    expect(useUiStore.getState().selection).toEqual([dim])
+    tool().onPointerUp(pe(vec(5, 5.5)), ctx)
+  })
+
+  it('Delete removes a selected annotation', () => {
+    const id = useDocStore.getState().addLabel(vec(1, 1), 'Bye')!
+    useUiStore.getState().setSelection([id])
+    handleKey(key('Delete'), ctx, registry)
+    expect(useDocStore.getState().doc.annotations[id]).toBeUndefined()
+  })
+})

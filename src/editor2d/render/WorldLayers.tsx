@@ -15,6 +15,7 @@ import { DimensionsLayer } from './DimensionsLayer'
 import { AnnotationsLayer } from './AnnotationsLayer'
 import { openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
 import { rotateHandlePos } from '../tools/handles'
+import { dimensionSpan, labelBox } from '../hit/hitTest'
 import { useThemeStore } from '../../theme/themeStore'
 
 /**
@@ -329,6 +330,42 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
           strokeDasharray="6 4"
           vectorEffect="non-scaling-stroke"
         />
+      )
+    }
+    const ann = doc.annotations[id as never]
+    if (ann) {
+      if (ann.kind === 'dimension') {
+        const { p, q } = dimensionSpan(ann)
+        return (
+          <line
+            key={`${id}-${color}`}
+            x1={p.x}
+            y1={p.y}
+            x2={q.x}
+            y2={q.y}
+            stroke={color}
+            strokeWidth={width + 2}
+            strokeOpacity={0.7}
+            vectorEffect="non-scaling-stroke"
+          />
+        )
+      }
+      const box = labelBox(ann)
+      const deg = ((ann.rotation ?? 0) * 180) / Math.PI
+      return (
+        <g key={`${id}-${color}`} transform={`translate(${ann.x} ${ann.y}) rotate(${deg})`}>
+          <rect
+            x={-box.w / 2}
+            y={-box.d / 2}
+            width={box.w}
+            height={box.d}
+            fill="none"
+            stroke={color}
+            strokeWidth={width}
+            strokeDasharray="4 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        </g>
       )
     }
     const op = doc.openings[id as never]
