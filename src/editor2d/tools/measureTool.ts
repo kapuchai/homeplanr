@@ -41,7 +41,7 @@ export function createMeasureTool(): Tool {
     ]
     const result = resolveSnap(e.world, candidates, {
       pxToWorld: ctx.pxToWorld(),
-      enabled: doc.settings.snapEnabled && !e.mods.ctrl,
+      enabled: useAppSettings.getState().snapEnabled && !e.mods.ctrl,
       ...(state.lastSnap ? { prev: state.lastSnap } : {}),
     })
     state.lastSnap = result

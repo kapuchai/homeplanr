@@ -11,6 +11,7 @@ const DEFAULTS: AppSettings = {
   accent: 'blue',
   units: 'm',
   showDimensions: false,
+  snapEnabled: true,
 }
 
 describe('parseAppSettings', () => {
@@ -24,16 +25,29 @@ describe('parseAppSettings', () => {
   })
 
   it('roundtrips a full v1 envelope', () => {
-    const s: AppSettings = { theme: 'dark', accent: 'teal', units: 'ftin', showDimensions: true }
+    const s: AppSettings = { theme: 'dark', accent: 'teal', units: 'ftin', showDimensions: true, snapEnabled: false }
     expect(parseAppSettings(JSON.stringify({ v: 1, ...s }))).toEqual(s)
   })
 
   it('invalid fields fall back per-field, valid ones survive', () => {
     expect(
       parseAppSettings(
-        JSON.stringify({ v: 1, theme: 'light', accent: 'hotpink', units: 'cm', showDimensions: 1 }),
+        JSON.stringify({
+          v: 1,
+          theme: 'light',
+          accent: 'hotpink',
+          units: 'cm',
+          showDimensions: 1,
+          snapEnabled: 'off',
+        }),
       ),
-    ).toEqual({ theme: 'light', accent: 'blue', units: 'cm', showDimensions: false })
+    ).toEqual({
+      theme: 'light',
+      accent: 'blue',
+      units: 'cm',
+      showDimensions: false,
+      snapEnabled: true,
+    })
     expect(parseAppSettings(JSON.stringify({ v: 1, units: 'inches' }))).toEqual(DEFAULTS)
   })
 })
@@ -69,6 +83,7 @@ describe('useAppSettings persistence', () => {
       accent: s.accent,
       units: s.units,
       showDimensions: s.showDimensions,
+      snapEnabled: s.snapEnabled,
     }).toEqual(DEFAULTS)
   })
 
@@ -78,14 +93,17 @@ describe('useAppSettings persistence', () => {
     s.setAccent('rose')
     s.setUnits('cm')
     s.setShowDimensions(true)
+    s.setSnapEnabled(false)
     expect(useAppSettings.getState().theme).toBe('dark')
     expect(useAppSettings.getState().units).toBe('cm')
+    expect(useAppSettings.getState().snapEnabled).toBe(false)
     expect(JSON.parse(storage.get(APP_SETTINGS_KEY)!)).toEqual({
       v: 1,
       theme: 'dark',
       accent: 'rose',
       units: 'cm',
       showDimensions: true,
+      snapEnabled: false,
     })
   })
 

@@ -13,6 +13,7 @@ export type WallId = Id<'wall'>
 export type OpeningId = Id<'opening'>
 export type RoomId = Id<'room'>
 export type FurnitureId = Id<'furniture'>
+export type AnnotationId = Id<'annotation'>
 
 const id = (prefix: string) => `${prefix}_${nanoid(10)}`
 
@@ -21,6 +22,7 @@ export const newWallId = (): WallId => id('w') as WallId
 export const newOpeningId = (): OpeningId => id('o') as OpeningId
 export const newRoomId = (): RoomId => id('r') as RoomId
 export const newFurnitureId = (): FurnitureId => id('f') as FurnitureId
+export const newAnnotationId = (): AnnotationId => id('a') as AnnotationId
 export const newProjectId = (): string => id('p')
 
 /** Cast helpers for validated/parsed input (validator's responsibility). */
@@ -29,3 +31,4 @@ export const asWallId = (s: string): WallId => s as WallId
 export const asOpeningId = (s: string): OpeningId => s as OpeningId
 export const asRoomId = (s: string): RoomId => s as RoomId
 export const asFurnitureId = (s: string): FurnitureId => s as FurnitureId
+export const asAnnotationId = (s: string): AnnotationId => s as AnnotationId

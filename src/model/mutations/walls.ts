@@ -1,7 +1,7 @@
 import type { ProjectDocument, Wall, WallFinishId, WallNode } from '../types'
 import { DEFAULTS } from '../types'
 import { WALL_PAINT_IDS } from '../../catalog/palette'
-import { newNodeId, newWallId, type FurnitureId, type NodeId, type OpeningId, type WallId } from '../ids'
+import { newNodeId, newWallId, type AnnotationId, type FurnitureId, type NodeId, type OpeningId, type WallId } from '../ids'
 import type { Vec2 } from '../../geometry/vec'
 import { dist } from '../../geometry/vec'
 import { closestPointOnSegment, segSegIntersection } from '../../geometry/segment'
@@ -270,7 +270,7 @@ export function splitWall(
  */
 export function deleteEntities(
   doc: ProjectDocument,
-  ids: readonly (WallId | NodeId | OpeningId | FurnitureId)[],
+  ids: readonly (WallId | NodeId | OpeningId | FurnitureId | AnnotationId)[],
   opts: { mode?: MutationMode } = {},
 ): void {
   const idSet = new Set<string>(ids)
@@ -293,6 +293,9 @@ export function deleteEntities(
   }
   for (const key of Object.keys(doc.furniture)) {
     if (idSet.has(key)) delete doc.furniture[key as FurnitureId]
+  }
+  for (const key of Object.keys(doc.annotations)) {
+    if (idSet.has(key)) delete doc.annotations[key as AnnotationId]
   }
   for (const key of Object.keys(doc.nodes)) {
     if (idSet.has(key)) delete doc.nodes[key as NodeId]

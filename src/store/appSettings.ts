@@ -16,6 +16,9 @@ export interface AppSettings {
   accent: AccentId
   units: UnitSystem
   showDimensions: boolean
+  /** Snap master switch — device preference since schema v3 (doc-level snap
+   * made every toggle an undo entry and dirtied the file). */
+  snapEnabled: boolean
 }
 
 export const APP_SETTINGS_KEY = 'homeplanr:v1:app-settings'
@@ -29,6 +32,7 @@ const DEFAULTS: AppSettings = {
   accent: 'blue',
   units: 'm',
   showDimensions: false,
+  snapEnabled: true,
 }
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -49,6 +53,7 @@ export function parseAppSettings(json: string | null): AppSettings {
       units: pick(r.units, UNIT_SYSTEMS, DEFAULTS.units),
       showDimensions:
         typeof r.showDimensions === 'boolean' ? r.showDimensions : DEFAULTS.showDimensions,
+      snapEnabled: typeof r.snapEnabled === 'boolean' ? r.snapEnabled : DEFAULTS.snapEnabled,
     }
   } catch {
     return { ...DEFAULTS }
@@ -74,6 +79,7 @@ const persist = (s: AppSettings): void => {
         accent: s.accent,
         units: s.units,
         showDimensions: s.showDimensions,
+        snapEnabled: s.snapEnabled,
       }),
     )
   } catch {
@@ -86,6 +92,7 @@ interface AppSettingsState extends AppSettings {
   setAccent: (accent: AccentId) => void
   setUnits: (units: UnitSystem) => void
   setShowDimensions: (show: boolean) => void
+  setSnapEnabled: (enabled: boolean) => void
 }
 
 export const useAppSettings = create<AppSettingsState>()(
@@ -100,6 +107,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setAccent: (accent) => apply({ accent }),
       setUnits: (units) => apply({ units }),
       setShowDimensions: (showDimensions) => apply({ showDimensions }),
+      setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),
     }
   }),
 )

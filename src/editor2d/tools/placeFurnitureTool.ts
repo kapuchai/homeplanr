@@ -3,6 +3,7 @@ import type { Vec2 } from '../../geometry/vec'
 import { add, rotate } from '../../geometry/vec'
 import { resolveSnap, type SnapResult } from '../../geometry/snapping'
 import { alignmentGuideCandidates, wallBackCandidate } from '../snap/candidates'
+import { useAppSettings } from '../../store/appSettings'
 import { CATALOG } from '../../catalog'
 
 /**
@@ -55,7 +56,7 @@ export function createPlaceFurnitureTool(): Tool {
     ]
     const snap = resolveSnap(world, candidates, {
       pxToWorld: ctx.pxToWorld(),
-      enabled: doc.settings.snapEnabled,
+      enabled: useAppSettings.getState().snapEnabled,
       ...(lastSnap ? { prev: lastSnap } : {}),
     })
     lastSnap = snap

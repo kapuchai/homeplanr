@@ -13,6 +13,7 @@ import {
 } from './walls'
 import { addOpening, updateOpening } from './openings'
 import { paintRoomWalls, renameRoom } from './rooms'
+import { addDimension, addLabel, updateAnnotation } from './annotations'
 import {
   addFurniture,
   addFurnitureBatch,
@@ -526,5 +527,33 @@ describe('live-mode opening survival (S4, 0.3.0)', () => {
     updateOpening(d, a, { t: 0.25 }, { mode: 'commit' })
     expect(d.openings[a]).toBeDefined()
     expect(d.openings[b]).toBeDefined()
+  })
+})
+
+describe('annotations (v3)', () => {
+  it('addDimension/addLabel validate; updates clamp; clearing label text deletes it', () => {
+    const d = doc()
+    expect(addDimension(d, vec(0, 0), vec(0.001, 0))).toBeNull() // degenerate
+    expect(addLabel(d, vec(1, 1), '   ')).toBeNull() // blank
+    const dim = addDimension(d, vec(0, 0), vec(4, 0), 0.5)!
+    const lab = addLabel(d, vec(2, 1), 'Pantry')!
+    expect(d.annotations[dim]!.kind).toBe('dimension')
+    updateAnnotation(d, dim, { offset: 999 })
+    expect((d.annotations[dim] as { offset: number }).offset).toBe(20) // clamped
+    updateAnnotation(d, lab, { fontSize: 3, rotation: Math.PI / 2 })
+    const l = d.annotations[lab] as { fontSize?: number; rotation?: number }
+    expect(l.fontSize).toBe(1) // clamped
+    expect(l.rotation).toBeCloseTo(Math.PI / 2, 9)
+    updateAnnotation(d, lab, { text: '  ' })
+    expect(d.annotations[lab]).toBeUndefined() // cleared text deletes
+  })
+
+  it('deleteEntities removes annotations alongside other entities', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(4, 0))
+    const dim = addDimension(d, vec(0, 1), vec(4, 1))!
+    deleteEntities(d, [r.wallId!, dim])
+    expect(d.annotations[dim]).toBeUndefined()
+    expect(d.walls[r.wallId!]).toBeUndefined()
   })
 })

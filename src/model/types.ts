@@ -1,4 +1,4 @@
-import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from './ids'
+import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from './ids'
 
 /**
  * The document model — the single source of truth both renderers derive from.
@@ -91,16 +91,45 @@ export interface FurnitureInstance {
   mirrored?: boolean
 }
 
+/**
+ * Free world-anchored dimension (v3): deliberately NOT wall-attached — it
+ * survives any wall edit, and its text is DERIVED at render from dist(a,b)
+ * plus the current unit preference (never stored, so unit switches and
+ * endpoint edits can't go stale).
+ */
+export interface DimensionAnnotation {
+  id: AnnotationId
+  kind: 'dimension'
+  a: { x: number; y: number }
+  b: { x: number; y: number }
+  /** Signed offset (m) of the dimension line along +perp(a→b). */
+  offset: number
+}
+
+/** Free text label (v3), world-sized so it scales with the plan. */
+export interface LabelAnnotation {
+  id: AnnotationId
+  kind: 'label'
+  x: number
+  y: number
+  text: string
+  /** Radians; absent = 0. */
+  rotation?: number
+  /** Text height in meters; absent = DEFAULTS.labelFontSize. */
+  fontSize?: number
+}
+
+export type Annotation = DimensionAnnotation | LabelAnnotation
+
 export interface ProjectSettings {
   /** m — base grid unit; display tiers and snap derive from it. */
   gridSize: number
-  snapEnabled: boolean
   defaultWallThickness: number
   defaultWallHeight: number
 }
 
 export interface ProjectDocument {
-  schemaVersion: 2
+  schemaVersion: 3
   id: string
   name: string
   /** ISO strings. Mutations never touch updatedAt — serialize() stamps it. */
@@ -112,9 +141,10 @@ export interface ProjectDocument {
   openings: Record<OpeningId, Opening>
   rooms: Record<RoomId, Room>
   furniture: Record<FurnitureId, FurnitureInstance>
+  annotations: Record<AnnotationId, Annotation>
 }
 
-export const SCHEMA_VERSION = 2 as const
+export const SCHEMA_VERSION = 3 as const
 
 /** Pinned defaults (plan: "DEFAULTS"). All meters. */
 export const DEFAULTS = {
@@ -131,12 +161,15 @@ export const DEFAULTS = {
   minWindowHeight: 0.3,
   /** Walls shorter than this are rejected/merged away. */
   minWallLength: 0.01,
+  /** Default world height (m) of a label annotation's text. */
+  labelFontSize: 0.15,
+  /** Dimension-line offset clamp (m) — validator bound, ± this. */
+  maxDimensionOffset: 20,
 } as const
 
 export function defaultSettings(): ProjectSettings {
   return {
     gridSize: DEFAULTS.gridSize,
-    snapEnabled: true,
     defaultWallThickness: DEFAULTS.wallThickness,
     defaultWallHeight: DEFAULTS.wallHeight,
   }
@@ -155,5 +188,6 @@ export function emptyDocument(id: string, name: string, nowIso: string): Project
     openings: {},
     rooms: {},
     furniture: {},
+    annotations: {},
   }
 }

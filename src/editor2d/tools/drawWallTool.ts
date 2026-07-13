@@ -49,7 +49,7 @@ export function createDrawWallTool(): Tool {
     ]
     const result = resolveSnap(e.world, candidates, {
       pxToWorld: ctx.pxToWorld(),
-      enabled: doc.settings.snapEnabled && !e.mods.ctrl,
+      enabled: useAppSettings.getState().snapEnabled && !e.mods.ctrl,
       ...(chain.lastSnap ? { prev: chain.lastSnap } : {}),
     })
     chain.lastSnap = result

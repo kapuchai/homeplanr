@@ -12,6 +12,7 @@ import { CATALOG } from '../../catalog'
 import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { DimensionsLayer } from './DimensionsLayer'
+import { AnnotationsLayer } from './AnnotationsLayer'
 import { openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
 import { rotateHandlePos } from '../tools/handles'
 import { useThemeStore } from '../../theme/themeStore'
@@ -36,6 +37,7 @@ export function WorldLayers() {
       <FurnitureLayer doc={doc} />
       <RoomLabels derived={derived} />
       <DimensionsLayer />
+      <AnnotationsLayer doc={doc} />
       <SelectionLayer doc={doc} derived={derived} />
     </>
   )

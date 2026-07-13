@@ -6,6 +6,7 @@ import {
   type ProjectDocument,
 } from '../../model/types'
 import {
+  asAnnotationId,
   asFurnitureId,
   asNodeId,
   asOpeningId,
@@ -70,6 +71,15 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
     if (isObj(settings)) delete settings.unitDisplay
     return { ...raw, settings, schemaVersion: 2 }
   },
+  // v2 → v3: snapEnabled leaves the document (app-level preference — the
+  // exact unitDisplay precedent; doc-level snap made every toggle an undo
+  // entry and dirtied the file); annotations arrive (the validator defaults
+  // the missing record — a migration must not invent entities).
+  2: (raw) => {
+    const settings = isObj(raw.settings) ? { ...raw.settings } : raw.settings
+    if (isObj(settings)) delete settings.snapEnabled
+    return { ...raw, settings, schemaVersion: 3 }
+  },
 }
 
 export function parseDocument(json: string): ParseResult {
@@ -114,13 +124,13 @@ export function validateParsedObject(raw: unknown): ParseResult {
     openings: {},
     rooms: {},
     furniture: {},
+    annotations: {},
   }
 
   // settings: merge known keys with bounds
   if (isObj(obj.settings)) {
     const s = obj.settings
     if (isFiniteNum(s.gridSize)) doc.settings.gridSize = Math.min(1, Math.max(0.01, s.gridSize))
-    if (typeof s.snapEnabled === 'boolean') doc.settings.snapEnabled = s.snapEnabled
     if (isFiniteNum(s.defaultWallThickness)) {
       doc.settings.defaultWallThickness = Math.min(0.6, Math.max(0.03, s.defaultWallThickness))
     }
@@ -289,6 +299,58 @@ export function validateParsedObject(raw: unknown): ParseResult {
         elevation: isFiniteNum(v.elevation) ? Math.min(3, Math.max(0, v.elevation)) : 0,
         ...(isStr(v.name) && v.name ? { name: v.name } : {}),
         ...(v.mirrored === true ? { mirrored: true } : {}),
+      }
+    }
+  }
+
+  // annotations (v3) — free plan artifacts: never graph-healed (excluded
+  // from the self-heal hash below, like furniture), whole-entity invalid →
+  // prune with a warning, invalid optional FIELDS → silently absent
+  if (isObj(obj.annotations)) {
+    for (const [key, v] of Object.entries(obj.annotations)) {
+      if (isObj(v) && v.kind === 'dimension') {
+        const a = v.a
+        const b = v.b
+        const ok =
+          isObj(a) &&
+          isObj(b) &&
+          isFiniteNum(a.x) &&
+          isFiniteNum(a.y) &&
+          isFiniteNum(b.x) &&
+          isFiniteNum(b.y) &&
+          Math.hypot(b.x - a.x, b.y - a.y) >= DEFAULTS.minWallLength
+        if (!ok) {
+          warnings.push(`Removed invalid annotation ${key}`)
+          continue
+        }
+        const id = asAnnotationId(key)
+        const m = DEFAULTS.maxDimensionOffset
+        doc.annotations[id] = {
+          id,
+          kind: 'dimension',
+          a: { x: a.x as number, y: a.y as number },
+          b: { x: b.x as number, y: b.y as number },
+          offset: isFiniteNum(v.offset) ? Math.min(m, Math.max(-m, v.offset)) : 0,
+        }
+      } else if (isObj(v) && v.kind === 'label') {
+        if (!(isFiniteNum(v.x) && isFiniteNum(v.y) && isStr(v.text) && v.text.trim())) {
+          warnings.push(`Removed invalid annotation ${key}`)
+          continue
+        }
+        const id = asAnnotationId(key)
+        doc.annotations[id] = {
+          id,
+          kind: 'label',
+          x: v.x,
+          y: v.y,
+          text: v.text,
+          ...(isFiniteNum(v.rotation) ? { rotation: v.rotation } : {}),
+          ...(isFiniteNum(v.fontSize)
+            ? { fontSize: Math.min(1, Math.max(0.05, v.fontSize)) }
+            : {}),
+        }
+      } else {
+        warnings.push(`Removed invalid annotation ${key}`)
       }
     }
   }

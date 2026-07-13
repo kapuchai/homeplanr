@@ -323,7 +323,7 @@ export function createSelectTool(): Tool {
           ]
           const snap = resolveSnap(rawCenter, candidates, {
             pxToWorld: px,
-            enabled: doc.settings.snapEnabled && !e.mods.ctrl,
+            enabled: useAppSettings.getState().snapEnabled && !e.mods.ctrl,
             ...(state.lastSnap ? { prev: state.lastSnap } : {}),
           })
           state.lastSnap = snap
@@ -387,7 +387,7 @@ export function createSelectTool(): Tool {
             ],
             {
               pxToWorld: px,
-              enabled: doc.settings.snapEnabled && !e.mods.ctrl,
+              enabled: useAppSettings.getState().snapEnabled && !e.mods.ctrl,
               ...(state.lastSnap ? { prev: state.lastSnap } : {}),
             },
           )

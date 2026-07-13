@@ -3,13 +3,14 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { temporal } from 'zundo'
 import { emptyDocument, type ProjectDocument, type ProjectSettings } from '../model/types'
-import { newProjectId, type FurnitureId, type NodeId, type OpeningId, type RoomId, type WallId } from '../model/ids'
+import { newProjectId, type AnnotationId, type FurnitureId, type NodeId, type OpeningId, type RoomId, type WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import * as walls from '../model/mutations/walls'
 import * as openings from '../model/mutations/openings'
 import * as furniture from '../model/mutations/furniture'
 import * as rooms from '../model/mutations/rooms'
 import * as project from '../model/mutations/project'
+import * as annotations from '../model/mutations/annotations'
 import type { MutationMode } from '../model/mutations/pipeline'
 
 /**
@@ -37,7 +38,7 @@ export interface DocState {
   setWallLength: (id: WallId, length: number, opts?: { mode?: MutationMode }) => void
   splitWall: (id: WallId, s: number, opts?: { mode?: MutationMode }) => NodeId | null
   mergeNodes: (survivor: NodeId, loser: NodeId, opts?: { mode?: MutationMode }) => void
-  deleteEntities: (ids: readonly (WallId | NodeId | OpeningId | FurnitureId)[], opts?: { mode?: MutationMode }) => void
+  deleteEntities: (ids: readonly (WallId | NodeId | OpeningId | FurnitureId | AnnotationId)[], opts?: { mode?: MutationMode }) => void
   // openings
   addOpening: (params: openings.AddOpeningParams, opts?: { mode?: MutationMode }) => OpeningId | null
   updateOpening: (id: OpeningId, patch: Parameters<typeof openings.updateOpening>[2], opts?: { mode?: MutationMode }) => void
@@ -48,6 +49,10 @@ export interface DocState {
   resizeFurniture: (id: FurnitureId, size: Parameters<typeof furniture.resizeFurniture>[2]) => void
   renameFurniture: (id: FurnitureId, name: string) => void
   duplicateFurniture: (ids: readonly FurnitureId[]) => FurnitureId[]
+  // annotations
+  addDimension: (a: Vec2, b: Vec2, offset?: number) => AnnotationId | null
+  addLabel: (pos: Vec2, text: string) => AnnotationId | null
+  updateAnnotation: (id: AnnotationId, patch: annotations.AnnotationPatch) => void
   // rooms / project
   renameRoom: (id: RoomId, name: string) => void
   setRoomFloorMaterial: (id: RoomId, materialId: string | undefined) => void
@@ -93,6 +98,9 @@ export const useDocStore = create<DocState>()(
           resizeFurniture: (id, size) => mutate((d) => furniture.resizeFurniture(d, id, size)),
           renameFurniture: (id, name) => mutate((d) => furniture.renameFurniture(d, id, name)),
           duplicateFurniture: (ids) => mutate((d) => furniture.duplicateFurniture(d, ids)),
+          addDimension: (a, b, offset) => mutate((d) => annotations.addDimension(d, a, b, offset)),
+          addLabel: (pos, text) => mutate((d) => annotations.addLabel(d, pos, text)),
+          updateAnnotation: (id, patch) => mutate((d) => annotations.updateAnnotation(d, id, patch)),
           renameRoom: (id, name) => mutate((d) => rooms.renameRoom(d, id, name)),
           setRoomFloorMaterial: (id, mat) => mutate((d) => rooms.setRoomFloorMaterial(d, id, mat)),
           paintRoomWalls: (id, paintId) => mutate((d) => rooms.paintRoomWalls(d, id, paintId)),

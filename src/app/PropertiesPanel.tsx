@@ -351,6 +351,8 @@ export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection)
   const doc = useDocStore((s) => s.doc)
   const units = useAppSettings((s) => s.units)
+  const snapEnabled = useAppSettings((s) => s.snapEnabled)
+  const setSnapEnabled = useAppSettings((s) => s.setSnapEnabled)
   const a = useDocStore.getState()
 
   if (selection.length > 1) {
@@ -598,18 +600,19 @@ export function PropertiesPanel() {
       <LengthField label="Grid size" value={s.gridSize} onCommit={(v) => a.updateSettings({ gridSize: v })} />
       <Row>
         <span>Snapping</span>
+        {/* device preference since v3 — toggling never dirties the file */}
         <div className="segmented small">
           <button
             type="button"
-            className={s.snapEnabled ? 'active' : ''}
-            onClick={() => a.updateSettings({ snapEnabled: true })}
+            className={snapEnabled ? 'active' : ''}
+            onClick={() => setSnapEnabled(true)}
           >
             On
           </button>
           <button
             type="button"
-            className={!s.snapEnabled ? 'active' : ''}
-            onClick={() => a.updateSettings({ snapEnabled: false })}
+            className={!snapEnabled ? 'active' : ''}
+            onClick={() => setSnapEnabled(false)}
           >
             Off
           </button>
