@@ -14,8 +14,9 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SCHEMA_VERSION, emptyDocument, type ProjectDocument } from '../src/model/types'
-import { addWallChain } from '../src/model/mutations/walls'
+import { addWallChain, updateWall } from '../src/model/mutations/walls'
 import { setRoomFloorMaterial } from '../src/model/mutations/rooms'
+import { transformFurniture } from '../src/model/mutations/furniture'
 import { renameProject, updateSettings } from '../src/model/mutations/project'
 import { serializeDocument } from '../src/store/persistence/serialize'
 import { buildFixtureDoc } from '../src/test/fixtureDoc'
@@ -42,7 +43,13 @@ function buildBasic(): ProjectDocument {
   return doc
 }
 
-/** The fixture apartment plus a floor material and cm display units. */
+/**
+ * The fixture apartment plus the v2 surface worth freezing: floor material,
+ * per-side wall paint + a finish, a mirrored furniture item, snap off.
+ * (The v1-era builder exercised `unitDisplay`, which the v1→v2 migration
+ * removes — each schema bump edits this builder to freeze the OUTGOING
+ * version's real feature set.)
+ */
 function buildFull(): ProjectDocument {
   const doc = buildFixtureDoc()
   doc.id = 'p_golden_full'
@@ -50,7 +57,13 @@ function buildFull(): ProjectDocument {
   const living = Object.values(doc.rooms).find((r) => r.name === 'Living room')
   assert(living, 'full: fixture doc has no room named "Living room"')
   setRoomFloorMaterial(doc, living.id, 'darkFloor')
-  updateSettings(doc, { unitDisplay: 'cm' })
+  updateSettings(doc, { snapEnabled: false })
+  const paintedWall = Object.values(doc.walls)[0]
+  assert(paintedWall, 'full: fixture doc has no walls')
+  updateWall(doc, paintedWall.id, { paintFront: 'sage', paintBack: 'terracotta', finish: 'brick' })
+  const mirroredItem = Object.values(doc.furniture)[0]
+  assert(mirroredItem, 'full: fixture doc has no furniture')
+  transformFurniture(doc, mirroredItem.id, { mirrored: true })
 
   const openings = Object.values(doc.openings)
   assert(openings.some((o) => o.kind === 'door'), 'full: expected a door')
@@ -61,7 +74,10 @@ function buildFull(): ProjectDocument {
     'full: catalog ids present',
   )
   assert(living.floorMaterialId === 'darkFloor', 'full: floor material not set')
-  assert(doc.settings.unitDisplay === 'cm', 'full: unitDisplay not cm')
+  assert(doc.settings.snapEnabled === false, 'full: snapEnabled not frozen off')
+  assert(doc.walls[paintedWall.id]!.paintFront === 'sage', 'full: paintFront not set')
+  assert(doc.walls[paintedWall.id]!.finish === 'brick', 'full: finish not set')
+  assert(doc.furniture[mirroredItem.id]!.mirrored === true, 'full: mirrored not set')
   return doc
 }
 
