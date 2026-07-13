@@ -4,15 +4,26 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.2.0, 2026-07-12)
+## State (as of v0.3.0, 2026-07-13)
 
-Shipped: 2D editor (walls/doors/windows/furniture, snapping, undo), 3D view,
-35-item procedural catalog with iso thumbnails, native `.homeplanr`
-persistence with crash recovery + silent forward migrations (schema v2),
-theming (dark mode, 6 accents), units (m/cm/ft-in), measure/dimension tools,
-per-side wall paint + finishes, 11 floors, first-person walk with collision,
-plan PNG/SVG export + 3D screenshot, file association + single instance,
-Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
+Shipped on top of 0.2.0: schema v3 (persistent dimension/label annotations;
+snapEnabled → device pref), marquee multi-select (+Ctrl+A/Shift+2; pan moved
+to right-drag/Space/middle), right-click context menu + batch property
+editing + Split wall, wall/room copy-paste + Duplicate room, align/
+distribute, furniture corner-resize handles, opt-in autosave over a
+serialized write chain, save feedback, S/G toggles + '?' shortcut sheet +
+catalog search, UI token system + WCAG accent contrast (test-pinned) +
+focus-trapped modals + ARIA. Underneath: transaction ownership tokens and
+eleven 0.2.0-era bugs fixed (save race, live-mode opening deletion, nudge
+races, prompt force-resolution, chorded-button ghosts).
+
+0.2.0 baseline: 2D editor (walls/doors/windows/furniture, snapping, undo),
+3D view, 35-item procedural catalog with iso thumbnails, native `.homeplanr`
+persistence with crash recovery + silent forward migrations, theming (dark
+mode, 6 accents), units (m/cm/ft-in), measure/dimension tools, per-side wall
+paint + finishes, 11 floors, first-person walk with collision, plan PNG/SVG
+export + 3D screenshot, file association + single instance, Linux
+(.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
 
 ## Commands
 
@@ -20,7 +31,7 @@ Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
 |---|---|
 | Dev (native window, HMR) | `npm run tauri dev` |
 | Dev (browser only) | `npm run dev` |
-| Unit tests (512) | `npm test` |
+| Unit tests (599) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Typecheck / lint | `npm run typecheck` / `npm run lint` |
 | Color-token lint | `npm run lint:colors` (raw colors outside the allowed dirs fail CI) |
@@ -74,6 +85,25 @@ Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
 - **Migrations are silent**: a schema-version upgrade never pushes warnings
   and never marks the doc dirty — old files open clean and upgrade only on
   the next explicit save.
+- **Transaction OWNERSHIP (0.3.0)**: `beginTx` returns a token;
+  `commitTx/abortTx(token)` act only for the owner (a stale nudge timer or
+  an outgoing tool can never close a later gesture's tx). The arrow-nudge
+  tx opens with `preempt:'commit'` — preemption COMMITS it. Only the keymap
+  Esc safety net force-closes token-less. `flushPendingNudge()` runs at
+  every non-arrow key AND every pointer entry point.
+- **Annotations (v3)**: free world-anchored, NEVER graph-healed (outside
+  the self-heal hash), dimension text derived at render (`dist(a,b)` +
+  units — never stored), label `rotate(+θ)` = the furniture sign
+  convention, world-sized labels, visibility-parity culling (what
+  AnnotationsLayer hides at a zoom is not hittable/marquee-selectable —
+  constants shared via hitTest).
+- **File writes serialize** through `serializedWrite` (controller.ts) —
+  explicit saves AND autosaves; every input is (re)read INSIDE the lock.
+  Doc-replacing ops serialize through `serialized()` and cancel pending
+  autosaves after their guard resolves.
+- **Confirm prompts QUEUE (FIFO)** and each declares a non-destructive
+  `escValue` (the recovery prompt's Esc means dismiss-keep-blob, never
+  Discard). The shared `Modal` owns Esc/focus-trap/restore.
 
 ## Schema change checklist (bumping schema N → N+1)
 
@@ -166,6 +196,16 @@ Linux (.deb/.rpm/AppImage) + Windows (NSIS) packaging via CI.
   (same storage as recovery/recents; see gate 4).
 - pkill sweeps of `vite`/`tauri dev` return exit 143/144 in this harness —
   harmless.
+- **walk.spec e2e flakes under FULL-SUITE load** (headless-chromium WebGL
+  first frame starves when specs run in parallel) — it passes in isolation
+  (`npx playwright test --project=chromium e2e/walk.spec.ts`). Re-run
+  isolated before blaming a change.
+- **argv multi-file opens are first-wins BY DESIGN** (single-document app;
+  lib.rs `find_map` takes the first `.homeplanr`) — wontfix.
+- **makeGoldens' `buildFull` is intentionally version-rotted between bumps**
+  (it still calls the outgoing version's API and asserts on it, so an
+  accidental run at the NEW version throws before writing) — rewrite it to
+  freeze the outgoing feature set as step 1 of every schema bump.
 
 ## Session workflow that worked
 
@@ -174,15 +214,33 @@ in the running app → commit with a detailed message → push → `gh run watch
 User visual checks caught what tests couldn't (mirror chirality, arc sweep,
 pinch behavior, selector collisions) — always do the human pass for UX.
 
-## Backlog (user-acknowledged, post-v0.1.0)
+## Deferred to 0.4.0 (user-approved cut when 0.3.0 shipped)
 
-- **Furniture symbol quality**: derived symbols are correct but busy for
-  some items; consider per-part `symbolWeight`/outline-merging or curated
-  overrides via the (deprecated, still-typed) `symbol2d` field.
-- Verify pinch-zoom fix across DEs (GNOME X11/Wayland, KDE); wry follow-up
-  if `zoomHotkeysEnabled` proves insufficient.
-- Strip legacy `symbol2d` data from item files; make the field optional.
-- Drag-from-catalog ghost could show the real symbol (currently plain rect).
-- Icon polish + proper AUR/Flatpak packaging for Arch users.
-- Plan's v2 seams: GLTF furniture (`gltfUrl` + realize cache), walkthrough
-  camera, multi-floor (`floors[0]` wrap), opening re-hosting, marquee select.
+Planned-and-designed in the 0.3.0 plan (`~/.claude/plans/let-s-plan-the-
+next-enchanted-dragon.md`) but cut for scope — pick up here:
+
+- **M10 — 3D**: Top/Front/Iso/Reset camera presets (pose+target only; never
+  touch the one `rotation-x={-π/2}` mapping point), one-time orbit hint,
+  walk-mode furniture collision (additive body-band RectObstacles, 0.3–1.2m;
+  the doors-only passability oracle governs WALLS and is not violated).
+- **M11 — Output**: export options dialog (wire the dead `includeGrid`/
+  `marginM` params + scale presets), PDF via jsPDF+svg2pdf (design reviewed,
+  on the shelf), bundled template plans via Vite `?raw` + a
+  `scripts/makeTemplates.ts` (regenerate per schema version).
+- **M12 — Catalog hygiene**: per-part `symbol?: 'omit'|'outline'` authoring
+  hints + near-dup prim dedup + 35-item visual pass; DELETE the legacy
+  `symbol2d` field; drag-from-catalog ghost renders the real symbol.
+- **M13 — i18n seam**: `src/i18n/en.ts` + `t()` (chrome strings only, no
+  library) — must be the LAST string-touching milestone of its release.
+- Smaller carried items: panel drag-resize/collapse; opening swing-arc
+  pre-click preview; overlay-paste weld determinism (designate pasted ids
+  as weld/dedupe LOSERS in normalizeGraph so exact-overlay paste preserves
+  room identity — see paste.ts + M9 commit notes); pasted openings bypass
+  `findOpeningSlot` (can displace an existing door on a dedup — bends the
+  never-evict invariant on this one path); PropertiesPanel one-click edits
+  inside the 300ms nudge window fold into the nudge entry (accepted,
+  physically negligible); App.tsx subscribes `docTemporal` directly
+  (violates the transactions-own-zundo rule — route via canUndo/canRedo);
+  AUR + Flatpak packaging; furniture symbol quality polish.
+- **Ask the user for THEIR 0.4.0 feature list first** — they deferred it
+  when 0.3.0 was cut and it has never been collected.

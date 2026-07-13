@@ -5,6 +5,77 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-13
+
+### Added
+
+- **Marquee selection** — left-drag on empty canvas *or a room floor*
+  rubber-band-selects with live highlighting; `Shift` adds to the selection,
+  `Esc` cancels back to the previous one; `Ctrl+A` selects all; `Shift+2`
+  zooms to the selection
+- **Right-click context menu** — entity-aware and fully keyboard-navigable:
+  duplicate/rotate/flip/copy furniture, **Split wall here**, align &
+  distribute, **Duplicate room**, copy room, paste here, zoom commands
+- **Batch property editing** — select several walls (or items, or openings)
+  and edit thickness/height/finish/per-side paint (rotation/elevation/
+  mirror; width/height) for all of them as ONE undo step
+- **Persistent annotations** (schema v3) — `Enter` keeps a tape measurement
+  as a dimension line (text always derived from its endpoints and your unit
+  preference); a new **Text tool (T)** places world-sized labels; both
+  select, drag (dimensions slide along their offset), edit in the panel,
+  and always appear in PNG/SVG exports
+- **Wall & room copy/paste + Duplicate room** — copying captures walls with
+  their doors/windows, and whole rooms with contents and name/floor; pastes
+  weld cleanly into existing geometry as a single undo step
+- **Furniture power editing** — corner resize handles (the opposite corner
+  stays anchored, rotation-aware), align left/right/top/bottom, distribute
+  with equal gaps
+- **Autosave** (opt-in, Options → Files) — debounced background saves to
+  the current file that never conflict with explicit saves; "Saved · HH:MM"
+  status flash, last-saved time in the File menu, non-modal failure notice
+- **Keyboard shortcut sheet** (`?`), snap (`S`) and grid (`G`) toggles in
+  the on-canvas cluster, a catalog search box, and a live angle readout
+  while rotating furniture
+- **Accessibility baseline** — dialogs trap and restore focus, every
+  control has a visible accent focus ring, menus/toggles/swatches expose
+  ARIA state and names, and every accent color meets WCAG AA contrast in
+  both themes (enforced by a unit test)
+
+### Changed
+
+- Left-drag on empty canvas now **selects** (marquee) instead of panning —
+  panning moved to right-drag, middle-drag, `Space`+drag, wheel and arrows
+- Snapping is a **device preference** now (`S`), not a per-file setting —
+  toggling it no longer dirties the file or creates undo entries. One-time
+  effect: files saved with snapping off re-enable it once after upgrading
+- Schema v3 (annotations; `settings.snapEnabled` removed) — older files
+  open silently and upgrade on the next explicit save, as always
+- UI polish: one radius/type scale, hover and disabled states everywhere,
+  SVG icons instead of font glyphs, themed dark-mode scrollbars, long
+  names clamp instead of overflowing
+
+### Fixed
+
+- **Silent save race** — edits made while a save was writing (worst under a
+  Save-As dialog, which keeps the editor interactive) were marked saved but
+  never reached the file; saves are now snapshot-consistent, serialized,
+  and re-prompt for work that landed mid-save
+- **Doors/windows were permanently deleted** when their wall was transiently
+  dragged too short mid-gesture; live drags now never delete openings — the
+  release decides
+- Arrow-nudge cleanup: a drag, toolbar click, or `Ctrl+Z` right after
+  nudging no longer loses the nudge or floods the undo history; `AltGr` no
+  longer splits a nudge run (EU keyboard layouts)
+- `R`/`F` rotate/flip the **placement ghost** even after the first
+  placement; ghost state resets when switching catalog cards
+- `Esc` on the crash-recovery prompt no longer discards the recovery data;
+  overlapping dialogs queue instead of silently answering themselves
+- Opening a file from the file manager mid-drag no longer silently does
+  nothing, and concurrent open requests run in order
+- Chorded mouse buttons (release left while right is held) no longer leave
+  drags or pans tracking a lifted button; a second pointer (pen/touch) can
+  no longer hijack or freeze a mouse drag
+
 ## [0.2.0] - 2026-07-12
 
 ### Added
@@ -84,5 +155,6 @@ dialogs, recents, crash recovery, and an unsaved-changes guard; Linux
 (.deb/.rpm/AppImage) and Windows (NSIS) packaging via CI with e2e smoke
 tests and perf budgets.
 
+[0.3.0]: https://github.com/kapuchai/homeplanr/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kapuchai/homeplanr/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kapuchai/homeplanr/releases/tag/v0.1.0
