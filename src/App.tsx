@@ -23,6 +23,7 @@ import { CatalogPanel } from './app/CatalogPanel'
 import { PropertiesPanel } from './app/PropertiesPanel'
 import { ConfirmDialog } from './app/ConfirmDialog'
 import { OptionsDialog } from './app/OptionsDialog'
+import { ShortcutHelp } from './app/ShortcutHelp'
 import { MenuList, type MenuEntry } from './app/MenuList'
 
 // unicode glyphs render inconsistently on WebKitGTK/Windows — inline SVGs
@@ -75,6 +76,7 @@ function FileMenu() {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const recents = usePersistStore((s) => s.recents)
   const canRecent = usePersistStore((s) => !!s.adapter?.readPath)
+  const lastSavedAt = usePersistStore((s) => s.lastSavedAt)
   const close = () => {
     setOpen(false)
     triggerRef.current?.focus()
@@ -97,6 +99,16 @@ function FileMenu() {
           separatorBefore: i === 0,
           onSelect: run(() => openRecent(r.path)),
         }))
+      : []),
+    ...(lastSavedAt !== null
+      ? [
+          {
+            label: `Last saved ${new Date(lastSavedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`,
+            disabled: true,
+            separatorBefore: true,
+            onSelect: () => {},
+          },
+        ]
       : []),
   ]
   return (
@@ -239,6 +251,15 @@ function Toolbar() {
       <button
         type="button"
         className="icon-btn"
+        title="Keyboard shortcuts (?)"
+        aria-label="Keyboard shortcuts"
+        onClick={() => useUiStore.getState().setHelpOpen(true)}
+      >
+        ?
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
         title="Options"
         aria-label="Options"
         onClick={() => useUiStore.getState().setOptionsOpen(true)}
@@ -308,6 +329,7 @@ export default function App() {
         )}
       </main>
       <OptionsDialog />
+      <ShortcutHelp />
       <ConfirmDialog />
     </div>
   )

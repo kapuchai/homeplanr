@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDocStore } from '../docStore'
 import { useConfirmStore } from '../../app/confirmStore'
 import { beginTx, clearHistory, commitTx, isTxActive } from '../transactions'
 import { emptyDocument } from '../../model/types'
 import { newProjectId } from '../../model/ids'
 import type { StorageAdapter } from './adapter'
-import { guardDirty, offerRecovery, openPath, openRecent, saveProject, usePersistStore } from './controller'
+import { guardDirty, offerRecovery, openPath, openRecent, saveProject, scheduleFileAutosave, usePersistStore } from './controller'
 import { decideLaunchIntent, RECOVERY_KEY } from './recovery'
 import { serializeDocument } from './serialize'
 
@@ -176,9 +176,14 @@ describe('save race (S1, 0.3.0): edits during an in-flight save', () => {
     const gate = new Promise<void>((r) => {
       release = r
     })
+    let reachedWrite!: () => void
+    const atWrite = new Promise<void>((r) => {
+      reachedWrite = r
+    })
     usePersistStore.setState({
       adapter: madeAdapter(async (path, json) => {
         written = json
+        reachedWrite() // the snapshot is taken by now
         await gate
         return path
       }),
@@ -189,7 +194,7 @@ describe('save race (S1, 0.3.0): edits during an in-flight save', () => {
     })
     const snapshot = useDocStore.getState().doc
     const saving = saveProject()
-    await Promise.resolve() // let saveProject reach the awaited write
+    await atWrite // saveProject snapshotted and is inside the write
     // an edit lands while the file write is in flight
     useDocStore.getState().addFurniture({
       catalogItemId: 'test-box',
@@ -416,5 +421,110 @@ describe('recovery prompt Esc = dismiss (R1b, 0.3.0)', () => {
     useConfirmStore.getState().resolve('discard')
     expect(await second).toBe('declined')
     expect(localStorage.getItem(RECOVERY_KEY)).toBeNull()
+  })
+})
+
+describe('autosave-to-file (M8)', () => {
+  const writes: string[] = []
+  let failNext = false
+  const autosaveAdapter = (): StorageAdapter => ({
+    kind: 'tauri',
+    async openDialog() {
+      return null
+    },
+    savePath: async (path: string) => {
+      if (failNext) {
+        failNext = false
+        throw new Error('disk full')
+      }
+      writes.push(path)
+      return path
+    },
+    async saveAsDialog() {
+      return null
+    },
+    async saveBinaryDialog() {
+      return null
+    },
+    setTitle() {},
+    installCloseGuard() {},
+    async message() {
+      throw new Error('autosave must NEVER open a dialog')
+    },
+  })
+
+  beforeEach(async () => {
+    const { useAppSettings } = await import('../appSettings')
+    useAppSettings.setState({ autosaveEnabled: true })
+    writes.length = 0
+    failNext = false
+    backing.clear()
+    useDocStore.setState({
+      doc: emptyDocument(newProjectId(), 'test', '2026-07-11T00:00:00.000Z'),
+    })
+    clearHistory()
+    usePersistStore.setState({
+      adapter: autosaveAdapter(),
+      currentFilePath: '/auto.homeplanr',
+      lastSavedDoc: null, // dirty
+      dirty: true,
+      recents: [],
+      lastSavedAt: null,
+      autosaveError: false,
+    })
+  })
+
+  afterEach(async () => {
+    const { useAppSettings } = await import('../appSettings')
+    useAppSettings.setState({ autosaveEnabled: false })
+    vi.useRealTimers()
+  })
+
+  it('writes the current path after the debounce and clears dirty', async () => {
+    vi.useFakeTimers()
+    scheduleFileAutosave()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(writes).toEqual(['/auto.homeplanr'])
+    expect(usePersistStore.getState().dirty).toBe(false)
+    expect(usePersistStore.getState().lastSavedAt).not.toBeNull()
+  })
+
+  it('disabled ⇒ zero writes; no path ⇒ silent skip', async () => {
+    vi.useFakeTimers()
+    const { useAppSettings } = await import('../appSettings')
+    useAppSettings.setState({ autosaveEnabled: false })
+    scheduleFileAutosave()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(writes).toEqual([])
+    useAppSettings.setState({ autosaveEnabled: true })
+    usePersistStore.setState({ currentFilePath: null })
+    scheduleFileAutosave()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(writes).toEqual([])
+    expect(usePersistStore.getState().autosaveError).toBe(false)
+  })
+
+  it('a live transaction defers the write until after the gesture', async () => {
+    vi.useFakeTimers()
+    const tx = beginTx()
+    scheduleFileAutosave()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(writes).toEqual([]) // rescheduled, not written mid-gesture
+    commitTx(tx)
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(writes).toEqual(['/auto.homeplanr'])
+  })
+
+  it('failure sets the flag with NO dialog; the next success clears it', async () => {
+    vi.useFakeTimers()
+    failNext = true
+    scheduleFileAutosave()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(usePersistStore.getState().autosaveError).toBe(true)
+    expect(usePersistStore.getState().dirty).toBe(true) // nothing lied
+    scheduleFileAutosave()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(writes).toEqual(['/auto.homeplanr'])
+    expect(usePersistStore.getState().autosaveError).toBe(false)
   })
 })

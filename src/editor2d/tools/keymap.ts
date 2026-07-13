@@ -121,7 +121,7 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   // the resolve below is a belt-and-braces fallback that resolves the same
   // escValue if a modal ever renders without the Modal shell)
   const confirm = useConfirmStore.getState()
-  if (confirm.pending || ctx.ui().optionsOpen) {
+  if (confirm.pending || ctx.ui().optionsOpen || ctx.ui().helpOpen) {
     if (e.key === 'Escape' && confirm.pending) {
       // per-prompt escValue: non-destructive by contract (the recovery
       // prompt's Esc must never mean Discard)
@@ -168,6 +168,12 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
       )
       return
     }
+  }
+
+  // shortcut sheet — universal (works in 3D too; the toolbar button does)
+  if (key === '?' && !isTxActive()) {
+    ui.setHelpOpen(true)
+    return
   }
 
   // 3D view: only the file accelerators above stay live — every editing/
@@ -248,6 +254,17 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     }
     if (key.toLowerCase() === 't') {
       switchTool('annotate-text')
+      return
+    }
+    if (key.toLowerCase() === 's') {
+      // snap toggle — device pref since v3, so this never dirties the file
+      const settings = useAppSettings.getState()
+      settings.setSnapEnabled(!settings.snapEnabled)
+      return
+    }
+    if (key.toLowerCase() === 'g') {
+      const settings = useAppSettings.getState()
+      settings.setShowGrid(!settings.showGrid)
       return
     }
   }

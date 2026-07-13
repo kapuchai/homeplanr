@@ -1,5 +1,6 @@
 import { forwardRef } from 'react'
 import { useThemeStore } from '../../theme/themeStore'
+import { useAppSettings } from '../../store/appSettings'
 
 /**
  * Adaptive grid: a GPU-composited div behind the SVG. Two line weights ×
@@ -13,6 +14,7 @@ export const GridLayer = forwardRef<HTMLDivElement>(function GridLayer(_, ref) {
   // theme flips re-render backgroundImage only; useViewportTransform keeps
   // writing backgroundSize/backgroundPosition imperatively (untouched by React)
   const theme = useThemeStore((s) => s.theme)
+  const showGrid = useAppSettings((s) => s.showGrid)
   return (
     <div
       ref={ref}
@@ -21,6 +23,9 @@ export const GridLayer = forwardRef<HTMLDivElement>(function GridLayer(_, ref) {
         position: 'absolute',
         inset: 0,
         pointerEvents: 'none',
+        // visibility (not unmount): the ref must survive the toggle —
+        // useViewportTransform keeps writing to it imperatively
+        display: showGrid ? undefined : 'none',
         backgroundImage: [
           line(theme.gridMajor, 90),
           line(theme.gridMajor, 180),

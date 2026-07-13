@@ -22,6 +22,7 @@ import {
   type RecoveryBlob,
 } from './recovery'
 import { useConfirmStore } from '../../app/confirmStore'
+import { useAppSettings } from '../appSettings'
 
 /**
  * Persistence controller — owns currentFilePath/lastSavedDoc and applies
@@ -54,6 +55,12 @@ interface PersistState {
   lastSavedDoc: ProjectDocument | null
   dirty: boolean
   recents: RecentEntry[]
+  /** Epoch ms of the last successful write (explicit or autosave). */
+  lastSavedAt: number | null
+  /** True when that write was an autosave (the status flash stays quiet). */
+  lastSaveWasAuto: boolean
+  /** Last autosave attempt failed — surfaced in the status line, no modal. */
+  autosaveError: boolean
 }
 
 export const usePersistStore = create<PersistState>()(() => ({
@@ -62,6 +69,9 @@ export const usePersistStore = create<PersistState>()(() => ({
   lastSavedDoc: null,
   dirty: false,
   recents: [],
+  lastSavedAt: null,
+  lastSaveWasAuto: false,
+  autosaveError: false,
 }))
 
 const state = () => usePersistStore.getState()
@@ -130,6 +140,69 @@ function scheduleRecoveryAutosave(): void {
 
 const clearRecovery = () => localStorage.removeItem(RECOVERY_KEY)
 
+// ---------- autosave-to-file (opt-in; crash recovery above is separate) ----------
+let fileAutosaveTimer: ReturnType<typeof setTimeout> | null = null
+/** Doc-replacing ops call this after their guard resolves: an autosave that
+ * fires mid-open would write the DISCARDED doc back to its old path. */
+function cancelFileAutosave(): void {
+  if (fileAutosaveTimer) {
+    clearTimeout(fileAutosaveTimer)
+    fileAutosaveTimer = null
+  }
+}
+export function scheduleFileAutosave(): void {
+  if (fileAutosaveTimer) clearTimeout(fileAutosaveTimer)
+  fileAutosaveTimer = setTimeout(() => {
+    fileAutosaveTimer = null
+    void runFileAutosave()
+  }, 3000)
+}
+
+async function runFileAutosave(): Promise<void> {
+  if (!useAppSettings.getState().autosaveEnabled) {
+    // turning autosave off must not leave a stale error eating the hint line
+    if (state().autosaveError) usePersistStore.setState({ autosaveError: false })
+    return
+  }
+  const { adapter, currentFilePath, dirty } = state()
+  // no path ⇒ SILENT skip (never a dialog; the crash blob is the net)
+  if (!dirty || !currentFilePath || !adapter?.savePath) return
+  if (isTxActive() || useConfirmStore.getState().pending) {
+    // mid-gesture, or the user is DECIDING (a guardDirty 'Discard?' prompt):
+    // writing now would falsify the prompt's premise — retry later
+    scheduleFileAutosave()
+    return
+  }
+  await serializedWrite(async () => {
+    // re-check under the lock — an explicit save may have just run, a drag
+    // may have started while we were queued
+    const { currentFilePath: path, dirty: stillDirty, adapter: a } = state()
+    if (!stillDirty || !path || !a.savePath) return
+    if (isTxActive()) {
+      scheduleFileAutosave()
+      return
+    }
+    const snapshot = doc()
+    const json = serializeDocument(snapshot)
+    try {
+      await a.savePath(path, json)
+      usePersistStore.setState({
+        lastSavedDoc: snapshot,
+        lastSavedAt: Date.now(),
+        lastSaveWasAuto: true,
+        autosaveError: false,
+      })
+      clearRecovery()
+      recomputeDirty()
+      if (state().dirty) scheduleRecoveryAutosave()
+    } catch {
+      // NO modal mid-flow: flag it for the status line; the next doc change
+      // reschedules a retry, and explicit saves keep their error dialog
+      usePersistStore.setState({ autosaveError: true })
+    }
+  })
+}
+
 // ---------- op serialization ----------
 // Doc-replacing operations run ONE at a time: a second request (second
 // window relay, menu click while a guard prompt is up) queues behind the
@@ -140,6 +213,20 @@ let opChain: Promise<unknown> = Promise.resolve()
 function serialized<T>(fn: () => Promise<T>): Promise<T> {
   const run = opChain.then(fn, fn)
   opChain = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
+// ---------- write serialization ----------
+// ALL file writes (explicit saves AND autosaves) run one at a time through
+// this chain — an autosave firing during a Save-As dialog must never
+// interleave its write with the explicit one.
+let writeChain: Promise<unknown> = Promise.resolve()
+function serializedWrite<T>(fn: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(fn, fn)
+  writeChain = run.then(
     () => undefined,
     () => undefined,
   )
@@ -195,12 +282,14 @@ export function newProject(): Promise<void> {
   return serialized(async () => {
     if (!(await whenTxIdle())) return reportBusy()
     if ((await guardDirty()) === 'cancel') return
+    cancelFileAutosave() // a late autosave must not resurrect discarded work
     const fresh = emptyDocument(newProjectId(), 'Untitled', new Date().toISOString())
     useDocStore.getState().replaceDocument(fresh)
     clearHistory()
     usePersistStore.setState({
       currentFilePath: null,
       lastSavedDoc: useDocStore.getState().doc, // pristine, not dirty
+      autosaveError: false,
     })
     clearRecovery()
     recomputeDirty()
@@ -223,6 +312,7 @@ async function applyOpened(
       currentFilePath: path,
       // self-healed docs no longer match the file — mark dirty
       lastSavedDoc: healed ? NEVER_SAVED : useDocStore.getState().doc,
+      autosaveError: false,
     })
     // preserveRecovery: only the Esc-DISMISSED launch prompt sets this —
     // the user deferred the decision, so the blob stays offerable on a
@@ -253,6 +343,7 @@ export function openProject(): Promise<void> {
   return serialized(async () => {
     if (!(await whenTxIdle())) return reportBusy()
     if ((await guardDirty()) === 'cancel') return
+    cancelFileAutosave() // see newProject
     const { adapter } = state()
     try {
       const result = await adapter.openDialog()
@@ -290,6 +381,7 @@ export function openRecent(path: string): Promise<void> {
     if (!state().adapter.readPath) return
     if (!(await whenTxIdle())) return reportBusy()
     if ((await guardDirty()) === 'cancel') return
+    cancelFileAutosave() // see newProject
     await openPath(path)
   })
 }
@@ -305,31 +397,38 @@ export async function saveProject(): Promise<boolean> {
   // mid-save must stay dirty — so the file's content and lastSavedDoc MUST
   // be the same doc reference. Re-reading doc() after the await used to mark
   // mid-save edits as saved without ever writing them.
-  const snapshot = doc()
-  const json = serializeDocument(snapshot)
-  try {
-    let path: string | null
-    if (currentFilePath && adapter.savePath) {
-      path = await adapter.savePath(currentFilePath, json)
-    } else {
-      path = await adapter.saveAsDialog(json, snapshot.name)
-      if (!path) return false // cancelled
+  return serializedWrite(async () => {
+    // Snapshot INSIDE the lock: a queued explicit save must persist the doc
+    // as of ITS turn, not a stale pre-autosave reference.
+    const snapshot = doc()
+    const json = serializeDocument(snapshot)
+    try {
+      let path: string | null
+      if (currentFilePath && adapter.savePath) {
+        path = await adapter.savePath(currentFilePath, json)
+      } else {
+        path = await adapter.saveAsDialog(json, snapshot.name)
+        if (!path) return false // cancelled
+      }
+      usePersistStore.setState({
+        currentFilePath: adapter.kind === 'tauri' ? path : null,
+        lastSavedDoc: snapshot,
+        lastSavedAt: Date.now(),
+        lastSaveWasAuto: false,
+        autosaveError: false,
+      })
+      if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
+      clearRecovery()
+      recomputeDirty()
+      // mid-save edits: still dirty, and the clearRecovery above wiped their
+      // crash blob — re-arm it
+      if (state().dirty) scheduleRecoveryAutosave()
+      return true
+    } catch (err) {
+      await adapter.message('Save failed', String(err))
+      return false // dirty/title/recovery untouched
     }
-    usePersistStore.setState({
-      currentFilePath: adapter.kind === 'tauri' ? path : null,
-      lastSavedDoc: snapshot,
-    })
-    if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
-    clearRecovery()
-    recomputeDirty()
-    // mid-save edits: still dirty, and the clearRecovery above wiped their
-    // crash blob — re-arm it
-    if (state().dirty) scheduleRecoveryAutosave()
-    return true
-  } catch (err) {
-    await adapter.message('Save failed', String(err))
-    return false // dirty/title/recovery untouched
-  }
+  })
 }
 
 export async function saveProjectAs(): Promise<boolean> {
@@ -337,25 +436,31 @@ export async function saveProjectAs(): Promise<boolean> {
     await reportBusy()
     return false
   }
-  const { adapter } = state()
-  const snapshot = doc() // see saveProject: one snapshot for file AND state
-  const json = serializeDocument(snapshot)
-  try {
-    const path = await adapter.saveAsDialog(json, snapshot.name)
-    if (!path) return false
-    usePersistStore.setState({
-      currentFilePath: adapter.kind === 'tauri' ? path : null,
-      lastSavedDoc: snapshot,
-    })
-    if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
-    clearRecovery()
-    recomputeDirty()
-    if (state().dirty) scheduleRecoveryAutosave()
-    return true
-  } catch (err) {
-    await adapter.message('Save failed', String(err))
-    return false
-  }
+  return serializedWrite(async () => {
+    if (!(await whenTxIdle())) return false // a drag started while queued
+    const { adapter } = state()
+    const snapshot = doc() // see saveProject: one snapshot for file AND state
+    const json = serializeDocument(snapshot)
+    try {
+      const path = await adapter.saveAsDialog(json, snapshot.name)
+      if (!path) return false
+      usePersistStore.setState({
+        currentFilePath: adapter.kind === 'tauri' ? path : null,
+        lastSavedDoc: snapshot,
+        lastSavedAt: Date.now(),
+        lastSaveWasAuto: false,
+        autosaveError: false,
+      })
+      if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
+      clearRecovery()
+      recomputeDirty()
+      if (state().dirty) scheduleRecoveryAutosave()
+      return true
+    } catch (err) {
+      await adapter.message('Save failed', String(err))
+      return false
+    }
+  })
 }
 
 export type RecoveryOutcome = 'restored' | 'declined' | 'dismissed'
@@ -499,6 +604,7 @@ export async function launchPersistence(): Promise<void> {
     () => {
       recomputeDirty()
       scheduleRecoveryAutosave()
+      scheduleFileAutosave() // no-ops unless enabled + dirty + a path exists
     },
   )
 }
@@ -526,6 +632,7 @@ function installOpenFileListener(): void {
         // that reads as a broken double-click)
         if (!(await whenTxIdle())) return reportBusy()
         if ((await guardDirty()) === 'cancel') return
+        cancelFileAutosave() // see newProject
         // normal clearRecovery inside the open is correct here: guardDirty
         // just resolved this session's unsaved work
         await openPath(payload)

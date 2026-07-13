@@ -816,3 +816,36 @@ button:disabled {
 .editor-viewport {
   min-width: 280px;
 }
+
+/* ---- M8: catalog search + shortcut sheet ---- */
+.catalog-search {
+  margin: 10px 10px 4px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.catalog-empty {
+  margin: 12px;
+  color: var(--muted);
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.shortcut-row kbd {
+  background: var(--kbd-bg);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}

@@ -19,6 +19,10 @@ export interface AppSettings {
   /** Snap master switch — device preference since schema v3 (doc-level snap
    * made every toggle an undo entry and dirtied the file). */
   snapEnabled: boolean
+  /** 2D grid visibility (grid SIZE stays in the document). */
+  showGrid: boolean
+  /** Autosave to the current file path (crash recovery is separate). */
+  autosaveEnabled: boolean
 }
 
 export const APP_SETTINGS_KEY = 'homeplanr:v1:app-settings'
@@ -33,6 +37,8 @@ const DEFAULTS: AppSettings = {
   units: 'm',
   showDimensions: false,
   snapEnabled: true,
+  showGrid: true,
+  autosaveEnabled: false,
 }
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -54,6 +60,9 @@ export function parseAppSettings(json: string | null): AppSettings {
       showDimensions:
         typeof r.showDimensions === 'boolean' ? r.showDimensions : DEFAULTS.showDimensions,
       snapEnabled: typeof r.snapEnabled === 'boolean' ? r.snapEnabled : DEFAULTS.snapEnabled,
+      showGrid: typeof r.showGrid === 'boolean' ? r.showGrid : DEFAULTS.showGrid,
+      autosaveEnabled:
+        typeof r.autosaveEnabled === 'boolean' ? r.autosaveEnabled : DEFAULTS.autosaveEnabled,
     }
   } catch {
     return { ...DEFAULTS }
@@ -80,6 +89,8 @@ const persist = (s: AppSettings): void => {
         units: s.units,
         showDimensions: s.showDimensions,
         snapEnabled: s.snapEnabled,
+        showGrid: s.showGrid,
+        autosaveEnabled: s.autosaveEnabled,
       }),
     )
   } catch {
@@ -93,6 +104,8 @@ interface AppSettingsState extends AppSettings {
   setUnits: (units: UnitSystem) => void
   setShowDimensions: (show: boolean) => void
   setSnapEnabled: (enabled: boolean) => void
+  setShowGrid: (show: boolean) => void
+  setAutosaveEnabled: (enabled: boolean) => void
 }
 
 export const useAppSettings = create<AppSettingsState>()(
@@ -108,6 +121,8 @@ export const useAppSettings = create<AppSettingsState>()(
       setUnits: (units) => apply({ units }),
       setShowDimensions: (showDimensions) => apply({ showDimensions }),
       setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),
+      setShowGrid: (showGrid) => apply({ showGrid }),
+      setAutosaveEnabled: (autosaveEnabled) => apply({ autosaveEnabled }),
     }
   }),
 )

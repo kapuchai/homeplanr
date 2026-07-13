@@ -12,6 +12,8 @@ const DEFAULTS: AppSettings = {
   units: 'm',
   showDimensions: false,
   snapEnabled: true,
+  showGrid: true,
+  autosaveEnabled: false,
 }
 
 describe('parseAppSettings', () => {
@@ -25,7 +27,15 @@ describe('parseAppSettings', () => {
   })
 
   it('roundtrips a full v1 envelope', () => {
-    const s: AppSettings = { theme: 'dark', accent: 'teal', units: 'ftin', showDimensions: true, snapEnabled: false }
+    const s: AppSettings = {
+      theme: 'dark',
+      accent: 'teal',
+      units: 'ftin',
+      showDimensions: true,
+      snapEnabled: false,
+      showGrid: false,
+      autosaveEnabled: true,
+    }
     expect(parseAppSettings(JSON.stringify({ v: 1, ...s }))).toEqual(s)
   })
 
@@ -47,6 +57,8 @@ describe('parseAppSettings', () => {
       units: 'cm',
       showDimensions: false,
       snapEnabled: true,
+      showGrid: true,
+      autosaveEnabled: false,
     })
     expect(parseAppSettings(JSON.stringify({ v: 1, units: 'inches' }))).toEqual(DEFAULTS)
   })
@@ -84,6 +96,8 @@ describe('useAppSettings persistence', () => {
       units: s.units,
       showDimensions: s.showDimensions,
       snapEnabled: s.snapEnabled,
+      showGrid: s.showGrid,
+      autosaveEnabled: s.autosaveEnabled,
     }).toEqual(DEFAULTS)
   })
 
@@ -94,6 +108,8 @@ describe('useAppSettings persistence', () => {
     s.setUnits('cm')
     s.setShowDimensions(true)
     s.setSnapEnabled(false)
+    s.setShowGrid(false)
+    s.setAutosaveEnabled(true)
     expect(useAppSettings.getState().theme).toBe('dark')
     expect(useAppSettings.getState().units).toBe('cm')
     expect(useAppSettings.getState().snapEnabled).toBe(false)
@@ -104,6 +120,8 @@ describe('useAppSettings persistence', () => {
       units: 'cm',
       showDimensions: true,
       snapEnabled: false,
+      showGrid: false,
+      autosaveEnabled: true,
     })
   })
 

@@ -686,12 +686,12 @@ export function PropertiesPanel() {
         </div>
       </Row>
       <LengthField
-        label="Wall thickness"
+        label="New wall thickness"
         value={s.defaultWallThickness}
         onCommit={(v) => a.updateSettings({ defaultWallThickness: v })}
       />
       <LengthField
-        label="Wall height"
+        label="New wall height"
         value={s.defaultWallHeight}
         onCommit={(v) => a.updateSettings({ defaultWallHeight: v })}
       />

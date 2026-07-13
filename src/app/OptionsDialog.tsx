@@ -95,6 +95,30 @@ export function OptionsDialog() {
           </div>
         </section>
         <section className="options-section">
+          <h4>Files</h4>
+          <div className="options-row">
+            <span>Autosave</span>
+            <div className="segmented small">
+              <button
+                type="button"
+                aria-pressed={settings.autosaveEnabled}
+                className={settings.autosaveEnabled ? 'active' : ''}
+                onClick={() => settings.setAutosaveEnabled(true)}
+              >
+                On
+              </button>
+              <button
+                type="button"
+                aria-pressed={!settings.autosaveEnabled}
+                className={!settings.autosaveEnabled ? 'active' : ''}
+                onClick={() => settings.setAutosaveEnabled(false)}
+              >
+                Off
+              </button>
+            </div>
+          </div>
+        </section>
+        <section className="options-section">
           <h4>View</h4>
           <div className="options-row">
             <span>Show dimensions</span>

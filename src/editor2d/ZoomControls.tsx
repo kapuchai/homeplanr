@@ -12,6 +12,8 @@ import { zoomToFitContent } from './tools/keymap'
 export function ZoomControls() {
   const k = useViewportStore((s) => s.k)
   const showDimensions = useAppSettings((s) => s.showDimensions)
+  const snapEnabled = useAppSettings((s) => s.snapEnabled)
+  const showGrid = useAppSettings((s) => s.showGrid)
   const zoomAtCenter = (factor: number) => {
     const vp = useViewportStore.getState()
     vp.zoomAtPoint({ x: vp.width / 2, y: vp.height / 2 }, factor)
@@ -57,6 +59,24 @@ export function ZoomControls() {
         onClick={() => useAppSettings.getState().setShowDimensions(!showDimensions)}
       >
         Dim
+      </button>
+      <button
+        className={snapEnabled ? 'active' : ''}
+        aria-pressed={snapEnabled}
+        title="Snapping (S · hold Ctrl to suspend)"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => useAppSettings.getState().setSnapEnabled(!snapEnabled)}
+      >
+        Snap
+      </button>
+      <button
+        className={showGrid ? 'active' : ''}
+        aria-pressed={showGrid}
+        title="Grid (G)"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => useAppSettings.getState().setShowGrid(!showGrid)}
+      >
+        Grid
       </button>
     </div>
   )

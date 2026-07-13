@@ -1348,3 +1348,50 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     expect(useDocStore.getState().doc.annotations[id]).toBeUndefined()
   })
 })
+
+describe('M8 (0.3.0): snap/grid hotkeys, help overlay, shortcut sheet', () => {
+  it('S toggles snapping and G toggles the grid — device prefs, no undo entries', async () => {
+    const { useAppSettings } = await import('../../store/appSettings')
+    const base = past()
+    const snapBefore = useAppSettings.getState().snapEnabled
+    handleKey(key('s'), ctx, registry)
+    expect(useAppSettings.getState().snapEnabled).toBe(!snapBefore)
+    const gridBefore = useAppSettings.getState().showGrid
+    handleKey(key('g'), ctx, registry)
+    expect(useAppSettings.getState().showGrid).toBe(!gridBefore)
+    expect(past()).toBe(base) // never undoable
+    expect(usePersistStore.getState().dirty).toBe(false) // never dirties
+    // restore
+    useAppSettings.getState().setSnapEnabled(true)
+    useAppSettings.getState().setShowGrid(true)
+  })
+
+  it("'?' opens the shortcut sheet; the modal guard then swallows canvas keys", () => {
+    handleKey(key('?', { shiftKey: true }), ctx, registry)
+    expect(useUiStore.getState().helpOpen).toBe(true)
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    handleKey(key('Delete'), ctx, registry)
+    expect(useDocStore.getState().doc.furniture[id]).toBeDefined() // swallowed
+    useUiStore.getState().setHelpOpen(false)
+  })
+
+  it('the shortcut sheet covers the live binding set (drift pin)', async () => {
+    const { SHORTCUT_SECTIONS } = await import('../../app/shortcuts')
+    // EXACT tokens (substring matching let 'S' pass via 'Shift+1')
+    const tokens = new Set(
+      SHORTCUT_SECTIONS.flatMap((s) =>
+        s.rows.flatMap((r) => r.keys.split(' / ').map((t) => t.trim())),
+      ),
+    )
+    for (const k of [
+      'V', 'W', 'D', 'N', 'M', 'T', 'S', 'G',
+      'Ctrl+A', 'Ctrl+D', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Z', 'Ctrl+Y',
+      'Ctrl+N', 'Ctrl+O', 'Ctrl+S',
+      'Shift+1', 'Shift+2', 'Shift+D', 'Shift+R',
+      'Del', 'Enter', 'Backspace', 'R', 'F', '?', 'Esc', 'Arrows',
+    ]) {
+      expect(tokens).toContain(k)
+    }
+  })
+})

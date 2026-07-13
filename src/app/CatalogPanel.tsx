@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { CATALOG, CATALOG_BY_CATEGORY, CATEGORY_ORDER, type CatalogItem } from '../catalog'
 import { symbolFor } from '../catalog/symbolFromParts'
 import { ensureThumbnails, getThumbnail } from '../catalog/thumbnails'
@@ -140,28 +140,62 @@ export function CatalogPanel() {
   // isometric thumbnails warm up in idle slices; each progress tick
   // re-renders the cards so they swap from SVG symbols to renders
   const [, bump] = useReducer((n: number) => n + 1, 0)
+  const [query, setQuery] = useState('')
   useEffect(() => {
     void ensureThumbnails(Object.values(CATALOG), () => bump())
   }, [])
 
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? Object.values(CATALOG).filter(
+        (item) => item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q),
+      )
+    : null
+
   return (
     <aside className="catalog-panel">
-      {CATEGORY_ORDER.map((cat) => {
-        const items = CATALOG_BY_CATEGORY[cat]
-        if (!items.length) return null
-        return (
-          <details key={cat} open className="catalog-section">
-            <summary>
-              {cat} <span className="count">{items.length}</span>
-            </summary>
-            <div className="catalog-grid">
-              {items.map((item) => (
-                <ItemCard key={item.id} item={item} />
-              ))}
-            </div>
-          </details>
+      <input
+        type="search"
+        className="catalog-search"
+        placeholder="Search catalog…"
+        aria-label="Search catalog"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            setQuery('')
+            ;(e.target as HTMLInputElement).blur()
+          }
+        }}
+      />
+      {matches ? (
+        matches.length ? (
+          <div className="catalog-grid">
+            {matches.map((item) => (
+              <ItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        ) : (
+          <p className="hint catalog-empty">Nothing matches “{query.trim()}”</p>
         )
-      })}
+      ) : (
+        CATEGORY_ORDER.map((cat) => {
+          const items = CATALOG_BY_CATEGORY[cat]
+          if (!items.length) return null
+          return (
+            <details key={cat} open className="catalog-section">
+              <summary>
+                {cat} <span className="count">{items.length}</span>
+              </summary>
+              <div className="catalog-grid">
+                {items.map((item) => (
+                  <ItemCard key={item.id} item={item} />
+                ))}
+              </div>
+            </details>
+          )
+        })
+      )}
     </aside>
   )
 }

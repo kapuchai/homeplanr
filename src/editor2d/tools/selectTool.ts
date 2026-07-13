@@ -406,6 +406,15 @@ export function createSelectTool(): Tool {
               { quantize: false },
             )
           }
+          // live angle readout — the 15° detents were invisible without it
+          const grabbed = ctx.doc().furniture[state.grabbedId]
+          if (grabbed) {
+            const deg =
+              Math.round((((grabbed.rotation * 180) / Math.PI) % 360) + 360) % 360
+            ctx.interaction().set({
+              pills: [{ at: rotateHandlePos(grabbed, px), text: `${deg}°` }],
+            })
+          }
           return
         }
 
