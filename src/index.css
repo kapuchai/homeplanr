@@ -531,6 +531,12 @@ textarea,
   width: 380px;
 }
 
+/* wide variant (B8): the shortcut sheet's 2-column grid needs the room —
+   the 380px shell forced horizontal scrolling in every direction */
+.modal-wide {
+  width: min(680px, calc(100vw - 32px));
+}
+
 .modal h3 {
   margin: 0 0 8px;
 }
@@ -900,7 +906,10 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
   gap: 4px 24px;
   max-height: 60vh;
+  /* vertical scroll only — the wide modal gives the columns their room;
+     never let overflow-y force a horizontal scrollbar in (B8) */
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .shortcut-row kbd {

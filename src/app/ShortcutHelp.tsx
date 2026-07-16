@@ -9,7 +9,7 @@ export function ShortcutHelp() {
   const setOpen = useUiStore((s) => s.setHelpOpen)
   if (!open) return null
   return (
-    <Modal label={t('shortcuts.title')} onClose={() => setOpen(false)}>
+    <Modal label={t('shortcuts.title')} onClose={() => setOpen(false)} wide>
       <>
         <h3>{t('shortcuts.title')}</h3>
         <div className="shortcut-grid">

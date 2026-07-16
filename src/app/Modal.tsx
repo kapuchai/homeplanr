@@ -23,6 +23,7 @@ export function Modal({
   onClose,
   dismissOnBackdrop = true,
   refocusKey,
+  wide = false,
   children,
 }: {
   label: string
@@ -32,6 +33,9 @@ export function Modal({
    * so a QUEUE PROMOTION (same mounted Modal, new buttons) doesn't strand
    * focus on <body> and leave the promoted prompt keyboard-dead. */
   refocusKey?: unknown
+  /** Wide variant (B8) for content the 380 px shell can't hold — the
+   * shortcut sheet's two-column grid clipped and scrolled sideways. */
+  wide?: boolean
   children: React.ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -104,7 +108,14 @@ export function Modal({
         if (dismissOnBackdrop && e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-label={label} ref={ref} tabIndex={-1}>
+      <div
+        className={wide ? 'modal modal-wide' : 'modal'}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        ref={ref}
+        tabIndex={-1}
+      >
         {children}
       </div>
     </div>

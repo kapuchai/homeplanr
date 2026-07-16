@@ -1,10 +1,15 @@
 import { nanoid } from 'nanoid'
 import type { StorageAdapter } from './adapter'
+import { defaultDialogDir, defaultDialogPath, rememberDialogDir } from './defaultDirs'
 
 /**
  * Native storage: plugin-dialog + plugin-fs. Dialog-granted paths persist
  * across restarts via tauri-plugin-persisted-scope (registered in lib.rs) —
  * launch auto-reopen and Recents depend on that.
+ *
+ * Dialogs open in a sensible directory (B7): exports → Downloads, saves
+ * and opens → Documents, with the user's last-picked directory remembered
+ * per dialog kind (defaultDirs.ts).
  *
  * Atomic save: write `${path}.tmp-<id>` then rename() over the target;
  * scope/rename failures fall back to a direct write (the localStorage
@@ -19,9 +24,11 @@ export function createTauriStorage(): StorageAdapter {
       const picked = await open({
         multiple: false,
         directory: false,
+        defaultPath: await defaultDialogDir('open'),
         filters: [{ name: 'homeplanr project', extensions: ['homeplanr'] }],
       })
       if (!picked || typeof picked !== 'string') return null
+      void rememberDialogDir('open', picked)
       const { readTextFile } = await import('@tauri-apps/plugin-fs')
       return { json: await readTextFile(picked), path: picked }
     },
@@ -51,23 +58,26 @@ export function createTauriStorage(): StorageAdapter {
 
     async saveAsDialog(json, suggestedName) {
       const { save } = await import('@tauri-apps/plugin-dialog')
+      const name = suggestedName.endsWith('.homeplanr')
+        ? suggestedName
+        : `${suggestedName}.homeplanr`
       const picked = await save({
-        defaultPath: suggestedName.endsWith('.homeplanr')
-          ? suggestedName
-          : `${suggestedName}.homeplanr`,
+        defaultPath: await defaultDialogPath('save', name),
         filters: [{ name: 'homeplanr project', extensions: ['homeplanr'] }],
       })
       if (!picked) return null
+      void rememberDialogDir('save', picked)
       return this.savePath!(picked, json)
     },
 
     async saveBinaryDialog(bytes, suggestedName, filter) {
       const { save } = await import('@tauri-apps/plugin-dialog')
       const picked = await save({
-        defaultPath: suggestedName,
+        defaultPath: await defaultDialogPath('export', suggestedName),
         filters: [filter],
       })
       if (!picked) return null
+      void rememberDialogDir('export', picked)
       const { writeFile } = await import('@tauri-apps/plugin-fs')
       await writeFile(picked, bytes)
       return picked

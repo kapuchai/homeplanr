@@ -20,6 +20,9 @@ const DEFAULTS: AppSettings = {
   propsPanelWidth: 260,
   catalogPanelCollapsed: false,
   propsPanelCollapsed: false,
+  lastDirSave: null,
+  lastDirExport: null,
+  lastDirOpen: null,
 }
 
 describe('parseAppSettings', () => {
@@ -47,6 +50,9 @@ describe('parseAppSettings', () => {
       propsPanelWidth: 320,
       catalogPanelCollapsed: true,
       propsPanelCollapsed: true,
+      lastDirSave: '/home/u/Documents/plans',
+      lastDirExport: '/home/u/Downloads',
+      lastDirOpen: '/mnt/shared',
     }
     expect(parseAppSettings(JSON.stringify({ v: 1, ...s }))).toEqual(s)
   })
@@ -62,6 +68,8 @@ describe('parseAppSettings', () => {
           wheelMode: 'scroll',
           showDimensions: 1,
           snapEnabled: 'off',
+          lastDirSave: '',
+          lastDirExport: 5,
         }),
       ),
     ).toEqual({
@@ -78,6 +86,9 @@ describe('parseAppSettings', () => {
       propsPanelWidth: 260,
       catalogPanelCollapsed: false,
       propsPanelCollapsed: false,
+      lastDirSave: null, // '' → unset
+      lastDirExport: null, // non-string → unset
+      lastDirOpen: null,
     })
     expect(parseAppSettings(JSON.stringify({ v: 1, units: 'inches' }))).toEqual(DEFAULTS)
   })
@@ -134,6 +145,9 @@ describe('useAppSettings persistence', () => {
       propsPanelWidth: s.propsPanelWidth,
       catalogPanelCollapsed: s.catalogPanelCollapsed,
       propsPanelCollapsed: s.propsPanelCollapsed,
+      lastDirSave: s.lastDirSave,
+      lastDirExport: s.lastDirExport,
+      lastDirOpen: s.lastDirOpen,
     }).toEqual(DEFAULTS)
   })
 
@@ -151,6 +165,7 @@ describe('useAppSettings persistence', () => {
     s.setPanelWidth('catalog', 999) // clamps to 360
     s.setPanelWidth('props', 300)
     s.setPanelCollapsed('catalog', true)
+    s.setLastDir('export', '/mnt/plans')
     expect(useAppSettings.getState().theme).toBe('dark')
     expect(useAppSettings.getState().units).toBe('cm')
     expect(useAppSettings.getState().snapEnabled).toBe(false)
@@ -171,6 +186,9 @@ describe('useAppSettings persistence', () => {
       propsPanelWidth: 300,
       catalogPanelCollapsed: true,
       propsPanelCollapsed: false,
+      lastDirSave: null,
+      lastDirExport: '/mnt/plans',
+      lastDirOpen: null,
     })
   })
 

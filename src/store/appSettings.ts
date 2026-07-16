@@ -34,7 +34,16 @@ export interface AppSettings {
   propsPanelWidth: number
   catalogPanelCollapsed: boolean
   propsPanelCollapsed: boolean
+  /** Last-used native-dialog directories per dialog kind (B7) — null until
+   * the user picks somewhere; defaults come from defaultDirs.ts
+   * (exports → Downloads, saves/opens → Documents). Tauri-only. */
+  lastDirSave: string | null
+  lastDirExport: string | null
+  lastDirOpen: string | null
 }
+
+/** Native-dialog kinds with independent remembered directories (B7). */
+export type DialogDirKind = 'save' | 'export' | 'open'
 
 /** Panel width clamps + defaults — shared with the PanelHandle splitter. */
 export const PANEL_LIMITS = {
@@ -63,7 +72,13 @@ const DEFAULTS: AppSettings = {
   propsPanelWidth: PANEL_LIMITS.props.def,
   catalogPanelCollapsed: false,
   propsPanelCollapsed: false,
+  lastDirSave: null,
+  lastDirExport: null,
+  lastDirOpen: null,
 }
+
+const dirOrNull = (value: unknown): string | null =>
+  typeof value === 'string' && value.length > 0 ? value : null
 
 const clampWidth = (value: unknown, lim: { min: number; max: number; def: number }): number =>
   typeof value === 'number' && Number.isFinite(value)
@@ -105,6 +120,9 @@ export function parseAppSettings(json: string | null): AppSettings {
         typeof r.propsPanelCollapsed === 'boolean'
           ? r.propsPanelCollapsed
           : DEFAULTS.propsPanelCollapsed,
+      lastDirSave: dirOrNull(r.lastDirSave),
+      lastDirExport: dirOrNull(r.lastDirExport),
+      lastDirOpen: dirOrNull(r.lastDirOpen),
     }
   } catch {
     return { ...DEFAULTS }
@@ -139,6 +157,9 @@ const persist = (s: AppSettings): void => {
         propsPanelWidth: s.propsPanelWidth,
         catalogPanelCollapsed: s.catalogPanelCollapsed,
         propsPanelCollapsed: s.propsPanelCollapsed,
+        lastDirSave: s.lastDirSave,
+        lastDirExport: s.lastDirExport,
+        lastDirOpen: s.lastDirOpen,
       }),
     )
   } catch {
@@ -160,6 +181,7 @@ interface AppSettingsState extends AppSettings {
    * (no localStorage churn per pointermove) and call this on pointer-up. */
   setPanelWidth: (panel: 'catalog' | 'props', width: number) => void
   setPanelCollapsed: (panel: 'catalog' | 'props', collapsed: boolean) => void
+  setLastDir: (kind: DialogDirKind, dir: string) => void
 }
 
 export const useAppSettings = create<AppSettingsState>()(
@@ -190,6 +212,14 @@ export const useAppSettings = create<AppSettingsState>()(
           panel === 'catalog'
             ? { catalogPanelCollapsed: collapsed }
             : { propsPanelCollapsed: collapsed },
+        ),
+      setLastDir: (kind, dir) =>
+        apply(
+          kind === 'save'
+            ? { lastDirSave: dir }
+            : kind === 'export'
+              ? { lastDirExport: dir }
+              : { lastDirOpen: dir },
         ),
     }
   }),
