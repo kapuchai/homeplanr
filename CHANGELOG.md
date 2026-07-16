@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-17
+
+### Added
+
+- **Area tool** (`A`, toolbar button) — click corners to trace a polygon
+  that shows its area; close it by clicking the first point, double-click,
+  or Enter (Backspace steps back, Esc clears). Traced areas persist with
+  the plan, can be dragged as a whole, export with the drawing, and show
+  area/perimeter in the properties panel
+- **Dimension label levels** — *Show dimensions* grew from on/off into a
+  ladder: Off / Walls / + Openings (door & window widths) / All (adds the
+  selected item's width × depth). `Shift+D` cycles the levels; SVG/PNG/PDF
+  exports follow the walls and openings levels
+- **Measurements & labels visibility** (`Shift+A`, Options → View) — hide
+  or show all kept measurements, traced areas, and text labels at once.
+  Hidden annotations can't be clicked or box-selected; creating a new one
+  turns the layer back on
+- **Interface scale** (Options → Appearance) — 90% / 100% / 110% / 125% /
+  150% presets scale the whole interface typography, including the
+  in-canvas measurement pills and room labels (plan geometry and exports
+  are unaffected)
+
+### Changed
+
+- **Furniture symbols now show their real shape** — the 2D plan no longer
+  masks every item with a bounding rectangle: a corner sofa reads as an L,
+  round tables / plants / lamps / stools as circles, the toilet as
+  tank + bowl, the washbasin as its oval — in the editor, the catalog,
+  the placement ghost, and every export
+
+### Fixed
+
+- Wall-length labels no longer double up with the live measurement pills
+  while dragging furniture at any dimension level
+- Per-item price/notes/material data (arriving in future releases) now
+  survives copy/paste and duplication
+
+### File format
+
+- Documents save as schema **v4** (adds traced areas plus room-type and
+  per-item metadata fields for upcoming releases). Older files open
+  seamlessly and upgrade on the next save
+
 ## [0.6.0] - 2026-07-16
 
 ### Added

@@ -4,14 +4,29 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.6.0, 2026-07-16)
+## State (as of v0.7.0, 2026-07-17)
 
-0.6.0 "Distribution & Polish" (no schema change — still v3): **AUR +
-Flatpak packaging** shipped and verified locally (`packaging/aur/` with
-homeplanr-bin PKGBUILD; `packaging/flatpak/` with com.kapuchai.homeplanr
-manifest + AppStream metainfo — see "Distribution channels"; AUR publish
-+ Flathub submission live in the ROADMAP deferred queue), **new blueprint
-app icon** (two-variant SVG sources at src-tauri/icons/src/, regen via
+0.7.0 "2D Editor Quality" (schema v3 → **v4**): **per-part symbol
+footprints** (the bbox body mask is gone — silhouette+body prim pairs per
+unique part footprint, flattened-opacity group, two styling twins:
+SymbolRenderer + exportPlanSvg primEl), **dimension ladder**
+(`dimensionLevel`: off/walls/openings/all replaces the showDimensions
+boolean; Shift+D cycles; legacy envelopes map true→'walls'), **annotations
+visibility toggle** (`showAnnotations`, Shift+A — parity-gated in hitTest
+click/marquee AND selectAll; creating an annotation re-enables), **area
+tool** ('A', kind:'area' annotations — trace in tool state, ONE addArea on
+close), **interface scale** (`uiScale` 0.9–1.5 → --ui-scale CSS token +
+scaled pill/room-label chrome; exports pinned at 1×). Schema v4 batched
+the settled 0.8.0/0.9.0 fields: Room.roomType?,
+FurnitureInstance.price?/notes?/materialOverrides? (schema-only, no UI;
+clipboard/duplicate whitelists carry them).
+
+0.6.0 recap (no schema change): **AUR + Flatpak packaging** shipped and
+verified locally (`packaging/aur/` with homeplanr-bin PKGBUILD;
+`packaging/flatpak/` with com.kapuchai.homeplanr manifest + AppStream
+metainfo — see "Distribution channels"; AUR publish + Flathub submission
+live in the ROADMAP deferred queue), **new blueprint app icon**
+(two-variant SVG sources at src-tauri/icons/src/, regen via
 `scripts/makeIcons.sh`, bundle.icon gained 256/512), **filled-cog gear
 icon** + toolbar right cluster reordered to [2D 3D] | ? | gear.
 **Locale/Russian translation DROPPED from the roadmap entirely** (user
@@ -55,7 +70,7 @@ export + 3D screenshot, file association + single instance, Linux
 |---|---|
 | Dev (native window, HMR) | `npm run tauri dev` |
 | Dev (browser only) | `npm run dev` |
-| Unit tests (599) | `npm test` |
+| Unit tests (677) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Visual baselines (local rig) | `npx playwright test --project=chromium e2e/visual.spec.ts` — add `--update-snapshots` to rebaseline, then EYEBALL the new PNGs |
 | Native smoke (Tier 1) | `npm run smoke:native` — needs a FRESH release binary (`npm run tauri build -- --no-bundle`), `~/.cargo/bin/tauri-driver`, and no running homeplanr instance |
@@ -141,12 +156,32 @@ export + 3D screenshot, file association + single instance, Linux
   tx opens with `preempt:'commit'` — preemption COMMITS it. Only the keymap
   Esc safety net force-closes token-less. `flushPendingNudge()` runs at
   every non-arrow key AND every pointer entry point.
-- **Annotations (v3)**: free world-anchored, NEVER graph-healed (outside
+- **Annotations (v3/v4)**: free world-anchored, NEVER graph-healed (outside
   the self-heal hash), dimension text derived at render (`dist(a,b)` +
-  units — never stored), label `rotate(+θ)` = the furniture sign
-  convention, world-sized labels, visibility-parity culling (what
-  AnnotationsLayer hides at a zoom is not hittable/marquee-selectable —
-  constants shared via hitTest).
+  units — never stored; area text likewise from the shoelace of points),
+  label `rotate(+θ)` = the furniture sign convention, world-sized labels,
+  visibility-parity culling (what AnnotationsLayer hides at a zoom is not
+  hittable/marquee-selectable — constants shared via hitTest). The 0.7.0
+  `showAnnotations` toggle extends the SAME parity rule: hidden ⇒ not
+  hittable (HitOptions.annotationsVisible at every hit call site), not in
+  selectAll, pruned from selection on hide; creating an annotation while
+  hidden re-enables visibility (a persist must never look like a no-op).
+  Area drags are RIGID translates (a drag must never change the readout);
+  the trace lives in tool state and lands as ONE addArea on close.
+- **Symbol footprint layer (0.7.0)**: per unique part footprint the symbol
+  emits a 'silhouette' stroke + 'body' fill pair, rendered inside ONE
+  opacity-0.92 group with hairlines on top — fills cover interior stroke
+  segments, so the strong border survives only on the part-union boundary.
+  TWO styling twins must stay in agreement: SymbolRenderer.buildStyles and
+  exportPlanSvg.primEl (silhouette = 2× the outline width in both). Hit
+  test/selection/collision stay OBB-based — never symbol-derived.
+- **--ui-scale (0.7.0)**: chrome typography + the counter-scaled canvas
+  chrome (pills, room labels) multiply by `appSettings.uiScale`; the
+  clearance math must receive the SAME scale as the Pill renderer
+  (pillMetrics `scale` param) or side labels land on their walls.
+  World-sized text (label annotations, meters) and EXPORT paper metrics
+  never scale — the default-1 params are load-bearing. Never couple
+  --ui-scale to the viewport zoom k or native webview zoom.
 - **File writes serialize** through `serializedWrite` (controller.ts) —
   explicit saves AND autosaves; every input is (re)read INSIDE the lock.
   Doc-replacing ops serialize through `serialized()` and cancel pending
