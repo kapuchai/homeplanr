@@ -237,6 +237,24 @@ describe('dimensionLabels', () => {
   })
 })
 
+describe('uiScale clearance (0.7.0)', () => {
+  it('vertical-wall labels clear farther when the chrome scale grows', () => {
+    const d = doc()
+    addWallSegment(d, vec(0, 0), vec(0, 2)) // vertical orphan wall
+    const pxToWorld = 1 / 60
+    const [base] = dimensionLabels(d, getDerived(d), 'm', pxToWorld)
+    const [scaled] = dimensionLabels(d, getDerived(d), 'm', pxToWorld, 1.5)
+    // the pill box is 1.5× wider — the anchor must sit farther off the wall
+    expect(Math.abs(scaled!.at.x)).toBeGreaterThan(Math.abs(base!.at.x))
+    const halfW = (pillWidthPx(scaled!.text, 1.5) / 2) * pxToWorld
+    expect(Math.abs(scaled!.at.x) - halfW).toBeGreaterThanOrEqual(
+      d.settings.defaultWallThickness / 2,
+    )
+    // default stays the unscaled geometry (the export pin)
+    expect(dimensionLabels(d, getDerived(d), 'm', pxToWorld)[0]!.at).toEqual(base!.at)
+  })
+})
+
 describe('openingWidthLabels (0.7.0 ladder)', () => {
   it('one width label per opening, on the OPPOSITE side of the wall label', () => {
     const d = doc()

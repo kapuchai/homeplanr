@@ -38,10 +38,13 @@ export function initTheming(): () => void {
   const media = window.matchMedia('(prefers-color-scheme: dark)')
 
   const apply = (): void => {
-    const { theme, accent } = useAppSettings.getState()
+    const { theme, accent, uiScale } = useAppSettings.getState()
     const resolved: ResolvedTheme =
       theme === 'system' ? (media.matches ? 'dark' : 'light') : theme
     document.documentElement.dataset.theme = resolved
+    // interface scale (0.7.0): the CSS default is 1, so the pre-JS frame is
+    // only wrong for non-100% users — the accepted theme-flash tradeoff
+    document.documentElement.style.setProperty('--ui-scale', String(uiScale))
     const a = ACCENTS[accent]
     document.documentElement.style.setProperty('--accent', a[resolved])
     document.documentElement.style.setProperty(
@@ -62,7 +65,7 @@ export function initTheming(): () => void {
   apply()
 
   const unsubSettings = useAppSettings.subscribe(
-    (s) => [s.theme, s.accent] as const,
+    (s) => [s.theme, s.accent, s.uiScale] as const,
     apply,
     { equalityFn: shallow },
   )

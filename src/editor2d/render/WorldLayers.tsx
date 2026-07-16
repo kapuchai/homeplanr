@@ -65,6 +65,9 @@ function RoomsLayer({ derived }: { derived: DerivedGeometry }) {
 function RoomLabels({ derived }: { derived: DerivedGeometry }) {
   const k = useViewportStore((s) => s.k)
   const units = useAppSettings((s) => s.units)
+  // uiScale (0.7.0): room labels are screen-sized chrome like the pills —
+  // the counter-scale group multiplies by it (world-sized text never does)
+  const uiScale = useAppSettings((s) => s.uiScale)
   const theme = useThemeStore((s) => s.theme)
   return (
     <g>
@@ -75,7 +78,7 @@ function RoomLabels({ derived }: { derived: DerivedGeometry }) {
         return (
           <g
             key={r.roomId}
-            transform={`translate(${r.labelAnchor.x} ${r.labelAnchor.y}) scale(${1 / k} ${-1 / k})`}
+            transform={`translate(${r.labelAnchor.x} ${r.labelAnchor.y}) scale(${uiScale / k} ${-uiScale / k})`}
             style={{ pointerEvents: 'none' }}
           >
             <text textAnchor="middle" fontSize={11} fill={theme.text} fontWeight={500}>

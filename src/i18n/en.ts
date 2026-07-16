@@ -112,6 +112,7 @@ export const en = {
   'options.dimsOpenings': '+ Openings',
   'options.dimsAll': 'All',
   'options.showAnnotations': 'Measurements & labels',
+  'options.uiScale': 'Interface scale',
 
   // ---- export dialog + flow ----
   'export.title': 'Export plan',

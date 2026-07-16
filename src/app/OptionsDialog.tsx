@@ -4,6 +4,7 @@ import {
   ACCENT_IDS,
   DIMENSION_LEVELS,
   THEME_PREFERENCES,
+  UI_SCALES,
   useAppSettings,
   type DimensionLevel,
   type ThemePreference,
@@ -81,6 +82,22 @@ export function OptionsDialog() {
                   style={{ background: ACCENTS[a][resolved] }}
                   onClick={() => settings.setAccent(a)}
                 />
+              ))}
+            </div>
+          </div>
+          <div className="options-row">
+            <span>{t('options.uiScale')}</span>
+            <div className="segmented small">
+              {UI_SCALES.map((scale) => (
+                <button
+                  key={scale}
+                  type="button"
+                  aria-pressed={settings.uiScale === scale}
+                  className={settings.uiScale === scale ? 'active' : ''}
+                  onClick={() => settings.setUiScale(scale)}
+                >
+                  {Math.round(scale * 100)}%
+                </button>
               ))}
             </div>
           </div>

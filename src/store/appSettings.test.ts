@@ -11,6 +11,7 @@ const DEFAULTS: AppSettings = {
   accent: 'blue',
   units: 'm',
   wheelMode: 'zoom',
+  uiScale: 1,
   dimensionLevel: 'off',
   showAnnotations: true,
   snapEnabled: true,
@@ -42,6 +43,7 @@ describe('parseAppSettings', () => {
       accent: 'teal',
       units: 'ftin',
       wheelMode: 'pan',
+      uiScale: 1.25,
       dimensionLevel: 'openings',
       showAnnotations: false,
       snapEnabled: false,
@@ -68,6 +70,7 @@ describe('parseAppSettings', () => {
           accent: 'hotpink',
           units: 'cm',
           wheelMode: 'scroll',
+          uiScale: 2.75,
           dimensionLevel: 'everything',
           snapEnabled: 'off',
           lastDirSave: '',
@@ -79,6 +82,7 @@ describe('parseAppSettings', () => {
       accent: 'blue',
       units: 'cm',
       wheelMode: 'zoom',
+      uiScale: 1,
       dimensionLevel: 'off',
       showAnnotations: true,
       snapEnabled: true,
@@ -153,6 +157,7 @@ describe('useAppSettings persistence', () => {
       accent: s.accent,
       units: s.units,
       wheelMode: s.wheelMode,
+      uiScale: s.uiScale,
       dimensionLevel: s.dimensionLevel,
       showAnnotations: s.showAnnotations,
       snapEnabled: s.snapEnabled,
@@ -175,6 +180,7 @@ describe('useAppSettings persistence', () => {
     s.setAccent('rose')
     s.setUnits('cm')
     s.setWheelMode('pan')
+    s.setUiScale(1.5)
     s.setDimensionLevel('walls')
     s.setShowAnnotations(false)
     s.setSnapEnabled(false)
@@ -196,6 +202,7 @@ describe('useAppSettings persistence', () => {
       accent: 'rose',
       units: 'cm',
       wheelMode: 'pan',
+      uiScale: 1.5,
       dimensionLevel: 'walls',
       showAnnotations: false,
       snapEnabled: false,

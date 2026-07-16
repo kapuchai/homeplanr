@@ -20,12 +20,19 @@ export type WheelMode = 'zoom' | 'pan'
  * Room areas are NOT part of the ladder — they live in the room labels.
  */
 export type DimensionLevel = 'off' | 'walls' | 'openings' | 'all'
+/** Interface-scale presets (Options → Appearance). */
+export type UiScale = 0.9 | 1 | 1.1 | 1.25 | 1.5
 
 export interface AppSettings {
   theme: ThemePreference
   accent: AccentId
   units: UnitSystem
   wheelMode: WheelMode
+  /** Chrome typography multiplier (accessibility) — drives the --ui-scale
+   * CSS token (initTheming) and the counter-scaled canvas pill/label
+   * chrome. World-sized text (label annotations, meters) never scales.
+   * Orthogonal to the viewport zoom k. */
+  uiScale: UiScale
   dimensionLevel: DimensionLevel
   /** Visibility of user annotations (persisted measures + text labels) —
    * view-only: annotations stay document content and always export.
@@ -70,12 +77,14 @@ const UNIT_SYSTEMS: readonly UnitSystem[] = ['m', 'cm', 'ftin']
 export const WHEEL_MODES: readonly WheelMode[] = ['zoom', 'pan']
 /** Ladder order — Shift+D cycles through this array. */
 export const DIMENSION_LEVELS: readonly DimensionLevel[] = ['off', 'walls', 'openings', 'all']
+export const UI_SCALES: readonly UiScale[] = [0.9, 1, 1.1, 1.25, 1.5]
 
 const DEFAULTS: AppSettings = {
   theme: 'system',
   accent: 'blue',
   units: 'm',
   wheelMode: 'zoom',
+  uiScale: 1,
   dimensionLevel: 'off',
   showAnnotations: true,
   snapEnabled: true,
@@ -116,6 +125,7 @@ export function parseAppSettings(json: string | null): AppSettings {
       accent: pick(r.accent, ACCENT_IDS, DEFAULTS.accent),
       units: pick(r.units, UNIT_SYSTEMS, DEFAULTS.units),
       wheelMode: pick(r.wheelMode, WHEEL_MODES, DEFAULTS.wheelMode),
+      uiScale: pick(r.uiScale, UI_SCALES, DEFAULTS.uiScale),
       // pre-0.7.0 envelopes stored the boolean `showDimensions`; honor it
       // when the enum key is absent (true was exactly today's 'walls')
       dimensionLevel: pick(
@@ -169,6 +179,7 @@ const persist = (s: AppSettings): void => {
         accent: s.accent,
         units: s.units,
         wheelMode: s.wheelMode,
+        uiScale: s.uiScale,
         dimensionLevel: s.dimensionLevel,
         showAnnotations: s.showAnnotations,
         snapEnabled: s.snapEnabled,
@@ -194,6 +205,7 @@ interface AppSettingsState extends AppSettings {
   setAccent: (accent: AccentId) => void
   setUnits: (units: UnitSystem) => void
   setWheelMode: (mode: WheelMode) => void
+  setUiScale: (scale: UiScale) => void
   setDimensionLevel: (level: DimensionLevel) => void
   setShowAnnotations: (show: boolean) => void
   setSnapEnabled: (enabled: boolean) => void
@@ -219,6 +231,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setAccent: (accent) => apply({ accent }),
       setUnits: (units) => apply({ units }),
       setWheelMode: (wheelMode) => apply({ wheelMode }),
+      setUiScale: (uiScale) => apply({ uiScale }),
       setDimensionLevel: (dimensionLevel) => apply({ dimensionLevel }),
       setShowAnnotations: (showAnnotations) => apply({ showAnnotations }),
       setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),

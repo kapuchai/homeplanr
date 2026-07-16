@@ -27,6 +27,9 @@ export interface MeasureInput {
    * suppresses the passive full-wall drag pills so the same wall length
    * never renders twice (B4). */
   dimensionLevel?: DimensionLevel
+  /** Chrome scale (0.7.0) — clearance math must match the Pill render size
+   * or side labels land on their walls. Absent = 1 (exports never scale). */
+  uiScale?: number
 }
 
 /** Furniture rays longer than this (m) measure nothing. */
@@ -46,8 +49,8 @@ export const MIN_GAP = 0.005
 const PILL_GAP_PX = PILL_OFFSET_PX - PILL_H_PX / 2
 
 /** Anchor offset (px) that clears the pill box along unit normal n. */
-const pillClearancePx = (text: string, n: Vec2): number =>
-  pillHalfExtentPx(text, n) + PILL_GAP_PX
+const pillClearancePx = (text: string, n: Vec2, scale = 1): number =>
+  pillHalfExtentPx(text, n, scale) + PILL_GAP_PX
 
 export function incidentWallIds(doc: ProjectDocument, nodeId: NodeId): WallId[] {
   const out: WallId[] = []
@@ -83,7 +86,7 @@ export function openingDragPills(
   const side = cross(solid.frame.dir, sub(cursor, solid.frame.origin)) >= 0 ? 1 : -1
   const vFace = (side * wall.thickness) / 2
   const n = scale(perp(solid.frame.dir), side)
-  const off = (text: string) => scale(n, pillClearancePx(text, n) * m.pxToWorld)
+  const off = (text: string) => scale(n, pillClearancePx(text, n, m.uiScale ?? 1) * m.pxToWorld)
 
   const widthText = formatLength(self.u1 - self.u0, m.units)
   const pills: DimensionPill[] = [
@@ -186,7 +189,7 @@ export function furnitureDragPills(m: MeasureInput, grabbedId: FurnitureId): Dim
       const wn = scale(perp(wDir), sideSign)
       const text = formatLength(dist(na, nb), m.units)
       passiveByWall.set(best.wallId, {
-        at: add(lerp(na, nb, 0.5), scale(wn, pillClearancePx(text, wn) * m.pxToWorld)),
+        at: add(lerp(na, nb, 0.5), scale(wn, pillClearancePx(text, wn, m.uiScale ?? 1) * m.pxToWorld)),
         text,
         tone: 'passive',
       })
@@ -206,7 +209,7 @@ export function wallLengthPills(m: MeasureInput, wallIds: Iterable<WallId>): Dim
     const n = perp(normalize(sub(nb, na)))
     const text = formatLength(dist(na, nb), m.units)
     pills.push({
-      at: add(lerp(na, nb, 0.5), scale(n, pillClearancePx(text, n) * m.pxToWorld)),
+      at: add(lerp(na, nb, 0.5), scale(n, pillClearancePx(text, n, m.uiScale ?? 1) * m.pxToWorld)),
       text,
     })
   }
@@ -290,6 +293,7 @@ export function dimensionLabels(
   derived: DerivedGeometry,
   units: UnitSystem,
   pxToWorld = 0,
+  uiScale = 1,
 ): WallDimensionLabel[] {
   const out: WallDimensionLabel[] = []
   for (const w of Object.values(doc.walls)) {
@@ -304,7 +308,7 @@ export function dimensionLabels(
     const text = formatLength(length, units)
     out.push({
       wallId: w.id,
-      at: add(mid, scale(n, side * (w.thickness / 2 + pillClearancePx(text, n) * pxToWorld))),
+      at: add(mid, scale(n, side * (w.thickness / 2 + pillClearancePx(text, n, uiScale) * pxToWorld))),
       length,
       text,
     })
@@ -322,6 +326,7 @@ export function openingWidthLabels(
   derived: DerivedGeometry,
   units: UnitSystem,
   pxToWorld = 0,
+  uiScale = 1,
 ): OpeningWidthLabel[] {
   const out: OpeningWidthLabel[] = []
   for (const solid of Object.values(derived.wallSolids)) {
@@ -339,7 +344,7 @@ export function openingWidthLabels(
       const nSide = scale(n, side)
       out.push({
         openingId: o.openingId,
-        at: add(face, scale(nSide, pillClearancePx(text, nSide) * pxToWorld)),
+        at: add(face, scale(nSide, pillClearancePx(text, nSide, uiScale) * pxToWorld)),
         length: width,
         text,
       })
@@ -359,6 +364,7 @@ export function furnitureSizeLabels(
   ids: readonly string[],
   units: UnitSystem,
   pxToWorld = 0,
+  uiScale = 1,
 ): FurnitureSizeLabel[] {
   const out: FurnitureSizeLabel[] = []
   for (const id of ids) {
@@ -369,7 +375,7 @@ export function furnitureSizeLabels(
     const n = normalize(arm)
     out.push({
       furnitureId: f.id,
-      at: add(add({ x: f.x, y: f.y }, arm), scale(n, pillClearancePx(text, n) * pxToWorld)),
+      at: add(add({ x: f.x, y: f.y }, arm), scale(n, pillClearancePx(text, n, uiScale) * pxToWorld)),
       length: Math.max(f.size.w, f.size.d),
       text,
     })

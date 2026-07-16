@@ -10,8 +10,12 @@ import type { Vec2 } from '../../geometry/vec'
  * cleared the 9 px half-height).
  */
 export const PILL_H_PX = 18
-export const pillWidthPx = (text: string): number => text.length * 6.6 + 12
+/** `scale` = the uiScale chrome multiplier (0.7.0). It MUST match what the
+ * Pill renderer draws with, or clearance-placed pills sit on their walls —
+ * default 1 is load-bearing: the exporter's paper metrics never scale. */
+export const pillWidthPx = (text: string, scale = 1): number =>
+  (text.length * 6.6 + 12) * scale
 
 /** Half-extent of the (axis-aligned) pill box along unit direction n. */
-export const pillHalfExtentPx = (text: string, n: Vec2): number =>
-  Math.abs(n.x) * (pillWidthPx(text) / 2) + Math.abs(n.y) * (PILL_H_PX / 2)
+export const pillHalfExtentPx = (text: string, n: Vec2, scale = 1): number =>
+  Math.abs(n.x) * (pillWidthPx(text, scale) / 2) + Math.abs(n.y) * ((PILL_H_PX * scale) / 2)

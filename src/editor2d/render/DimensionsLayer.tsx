@@ -28,19 +28,21 @@ export function DimensionsLayer() {
 function Labels({ level }: { level: Exclude<DimensionLevel, 'off'> }) {
   const doc = useDocStore((s) => s.doc)
   const units = useAppSettings((s) => s.units)
+  const uiScale = useAppSettings((s) => s.uiScale)
   const k = useViewportStore((s) => Math.round(s.k / 4) * 4)
   const selection = useUiStore((s) => s.selection)
   const walls = useMemo(
-    () => dimensionLabels(doc, getDerived(doc), units, 1 / k),
-    [doc, units, k],
+    () => dimensionLabels(doc, getDerived(doc), units, 1 / k, uiScale),
+    [doc, units, k, uiScale],
   )
   const openings = useMemo(
-    () => (level === 'walls' ? [] : openingWidthLabels(doc, getDerived(doc), units, 1 / k)),
-    [doc, units, k, level],
+    () =>
+      level === 'walls' ? [] : openingWidthLabels(doc, getDerived(doc), units, 1 / k, uiScale),
+    [doc, units, k, level, uiScale],
   )
   const sizes = useMemo(
-    () => (level === 'all' ? furnitureSizeLabels(doc, selection, units, 1 / k) : []),
-    [doc, units, k, level, selection],
+    () => (level === 'all' ? furnitureSizeLabels(doc, selection, units, 1 / k, uiScale) : []),
+    [doc, units, k, level, selection, uiScale],
   )
   return (
     <g pointerEvents="none">
