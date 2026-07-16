@@ -1,7 +1,7 @@
 {
   "name": "homeplanr",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Home planning app — draw floor plans in 2D, furnish them, and view in 3D",
   "license": "MIT",
   "type": "module",

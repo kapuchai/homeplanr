@@ -5,6 +5,58 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-16
+
+### Added
+
+- **Trackpad-friendly scrolling** — new `Options → View → Mouse wheel`
+  setting: keep the default (wheel zooms) or switch to *Pan (trackpad)*
+  where two-finger scroll pans the plan and pinch (Ctrl+wheel) zooms.
+  **Space+wheel now pans in any mode**; Shift+wheel still pans sideways
+- **Sensible save/export folders** — exports (PNG/SVG/PDF/3D shots) open
+  in Downloads, project save/open dialogs in Documents, and each dialog
+  remembers the last folder you actually picked
+- **Cyrillic (and more) in PDF exports** — a bundled Noto Sans subset is
+  embedded in every PDF, so project names, room names, and labels in
+  Russian and other non-Latin scripts render correctly everywhere,
+  including the title block
+
+### Fixed
+
+- **Editing a wall then clicking another no longer misdirects the value** —
+  a typed-but-uncommitted number (e.g. thickness) now always applies to
+  the wall you typed it for, never to the one you clicked next, and never
+  silently disappears. The same fix covers doors/windows, furniture,
+  rooms, and multi-selections
+- **Esc in a properties field reverts** the typed value instead of
+  committing it (as always documented)
+- **Arrow-key nudge is no longer vertically inverted** — ArrowUp moves
+  the selection up on screen
+- **Fit-mode PDF export produces a correct page** — previously the plan
+  drew ~1 m wide off the sheet, leaving an effectively blank A4
+- **Wall lengths no longer show twice** while dragging furniture with
+  `Show dimensions` on (clearance distances stay)
+- **Dimension labels sit predictably** — interior/orphan walls take a
+  consistent side instead of a random one, and label pills are centered
+  on their anchor
+- **Keyboard-shortcuts window fits its content** — wider sheet, both
+  columns visible, vertical scrolling only
+- **Dark mode is legible** — room fills, the minor grid, furniture symbol
+  detail, pill borders, and muted chrome text all lifted to real
+  contrast (now pinned by tests); furniture keeps its light-mode look
+
+### Changed
+
+- Toolbar tools split into two groups: `Select · Measure · Text` and
+  `Wall · Door · Window`
+- The Options gear icon actually looks like a gear
+- The `Dim` toggle left the bottom-right cluster (it lives in
+  `Options → View` and on `Shift+D`)
+- Motion timing now respects `prefers-reduced-motion`
+
+No file-format change — `.homeplanr` files from 0.2.0+ open unchanged
+(schema v3).
+
 ## [0.4.0] - 2026-07-16
 
 ### Added

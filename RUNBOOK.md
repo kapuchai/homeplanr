@@ -4,31 +4,37 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.4.0, 2026-07-16)
+## State (as of v0.5.0, 2026-07-16)
 
-Shipped on top of 0.3.0 (no schema change — still v3): paste determinism
-(demoted-set pipeline: pasted geometry always loses welds/dedups, exact-
-overlay paste is a no-op), 3D camera presets (Top/Front/Iso/Reset) + one-
-time orbit hint + walk-mode furniture collision (body + eye bands),
-catalog hygiene (symbol2d deleted; per-part `symbol` hints + near-dup
-dedup; drag ghost renders the real symbol), pre-click door swing-arc
-preview (shared doorGlyph), panel drag-resize/collapse (device prefs),
-export dialog (PNG/SVG/PDF + scale presets 1:50/1:100/1:200 + grid/margin;
-true-vector PDF via jsPDF+svg2pdf with paper.ts layout + overflow prompt),
-two bundled template plans (File → New: …), and the i18n seam (src/i18n —
-all chrome strings through t()). Splitting painted walls keeps paint;
-doc-replacing ops re-fit the viewport and reset the last-saved stamp.
+0.5.0 "Foundations & Fixes" (no schema change — still v3): the **agent
+testing rig** (Tier 0: e2e/helpers.ts + visual baselines; Tier 1:
+`npm run smoke:native` native WebDriver smoke — see the rig section), all
+nine reported bugs fixed — B1 panel commit misdirection (focus-time commit
+capture + keyed branches + Esc-reverts, e2e-pinned), B2 trackpad support
+(Space+wheel pan + `wheelMode` device pref via resolveWheel), B3 nudge
+y-inversion, B4 duplicate wall-length pills under showDimensions, B5
+deterministic dimension-label sides + centered pills, B6 PDF fit-mode fix
+(svg2pdf {width,height}) + embedded Noto Sans subset (95 KB, OFL, Latin+
+Cyrillic, registered at normal AND weight-500), B7 dialog default dirs
+(exports→Downloads, saves→Documents, remember-last per kind), B8 wide
+shortcut modal, B9 dark-mode contrast retune (floors test-pinned via
+src/test/contrast.ts) — plus split tool groups, a real gear icon, Dim out
+of the zoom cluster, and motion tokens (--dur-1/--dur-2/--ease-out,
+reduced-motion aware). Rename decision: keeping "homeplanr".
 
-0.3.0 recap: schema v3 (persistent dimension/label annotations;
-snapEnabled → device pref), marquee multi-select (+Ctrl+A/Shift+2; pan moved
-to right-drag/Space/middle), right-click context menu + batch property
-editing + Split wall, wall/room copy-paste + Duplicate room, align/
-distribute, furniture corner-resize handles, opt-in autosave over a
-serialized write chain, save feedback, S/G toggles + '?' shortcut sheet +
-catalog search, UI token system + WCAG accent contrast (test-pinned) +
-focus-trapped modals + ARIA. Underneath: transaction ownership tokens and
-eleven 0.2.0-era bugs fixed (save race, live-mode opening deletion, nudge
-races, prompt force-resolution, chorded-button ghosts).
+0.4.0 recap (no schema change): paste determinism (demoted-set pipeline),
+3D camera presets + orbit hint + walk furniture collision (body + eye
+bands), catalog hygiene (derived symbols everywhere), pre-click door
+swing preview (shared doorGlyph), panel drag-resize/collapse, export
+dialog (PNG/SVG/PDF, scale presets, true-vector PDF + overflow prompt),
+two bundled templates, the i18n seam (all chrome through t()).
+
+0.3.0 recap: schema v3 (annotations; snapEnabled → device pref), marquee
+multi-select, context menu + batch editing + Split wall, copy-paste +
+Duplicate room, align/distribute, corner-resize handles, opt-in autosave
+(serialized write chain), '?' shortcut sheet, catalog search, UI tokens +
+WCAG accent contrast (test-pinned) + focus-trapped modals + ARIA,
+transaction ownership tokens, eleven 0.2.0-era bug fixes.
 
 0.2.0 baseline: 2D editor (walls/doors/windows/furniture, snapping, undo),
 3D view, 35-item procedural catalog with iso thumbnails, native `.homeplanr`
