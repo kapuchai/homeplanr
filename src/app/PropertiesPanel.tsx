@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { useAppSettings } from '../store/appSettings'
@@ -17,9 +17,34 @@ import { t, type MessageKey } from '../i18n'
 /**
  * Right properties panel. Inputs are DRAFT-BUFFERED (plan-pinned): typing
  * never mutates; commit on Enter or blur as ONE mutation (one undo entry);
- * invalid drafts revert on blur; Esc reverts + blurs (keymap handles it —
- * shortcuts never fire while an input has focus).
+ * invalid drafts revert on blur; Esc reverts + blurs WITHOUT committing
+ * (handled here — the keymap's Esc-blur is only the net for other fields).
  */
+
+/**
+ * Commit-safety for draft-buffered fields (B1, 0.5.0): the commit callback
+ * is CAPTURED when the field gains focus. Selection swaps at pointerdown
+ * re-render the panel with the NEW entity's onCommit closure BEFORE blur
+ * fires — an uncaptured blur-commit writes the typed value into whatever
+ * was just clicked. And because entity branches are keyed by id, a swap
+ * unmounts the focused input with NO blur at all — the effect cleanup
+ * commits the draft through the same capture (mutations no-op on deleted
+ * ids). take() clears the capture so blur/unmount can never double-commit;
+ * Esc clears it first so nothing commits.
+ */
+function useFocusCommit(draft: string) {
+  const capture = useRef<((raw: string) => void) | null>(null)
+  const draftRef = useRef(draft)
+  draftRef.current = draft
+  const take = useCallback(() => {
+    const commit = capture.current
+    capture.current = null
+    return commit
+  }, [])
+  useEffect(() => () => take()?.(draftRef.current), [take])
+  return { capture, take }
+}
+
 function NumField({
   label,
   value,
@@ -43,12 +68,7 @@ function NumField({
   useEffect(() => {
     if (!focused) setDraft(String(display))
   }, [display, focused])
-
-  const commit = () => {
-    const parsed = Number(draft.replace(',', '.'))
-    if (Number.isFinite(parsed)) onCommit(fromDisplay(parsed))
-    else setDraft(String(display))
-  }
+  const { capture, take } = useFocusCommit(draft)
 
   return (
     <label className="prop-field">
@@ -58,14 +78,26 @@ function NumField({
           type="number"
           value={draft}
           step={step ?? 0.01}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            setFocused(true)
+            capture.current = (raw) => {
+              const parsed = Number(raw.replace(',', '.'))
+              if (Number.isFinite(parsed)) onCommit(fromDisplay(parsed))
+            }
+          }}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
+            // invalid drafts revert via the !focused re-sync effect
             setFocused(false)
-            commit()
+            take()?.(draft)
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') {
+              capture.current = null // revert, never commit
+              setDraft(String(display))
+              ;(e.target as HTMLInputElement).blur()
+            }
           }}
         />
         <em>{unit}</em>
@@ -117,6 +149,7 @@ function TextField({
   useEffect(() => {
     if (!focused) setDraft(value)
   }, [value, focused])
+  const { capture, take } = useFocusCommit(draft)
   return (
     <label className="prop-field">
       <span>{label}</span>
@@ -127,15 +160,21 @@ function TextField({
         autoFocus={autoFocus}
         onFocus={(e) => {
           setFocused(true)
+          capture.current = (raw) => onCommit(raw)
           if (autoFocus) e.target.select()
         }}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           setFocused(false)
-          onCommit(draft)
+          take()?.(draft)
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          if (e.key === 'Escape') {
+            capture.current = null // revert, never commit
+            setDraft(value)
+            ;(e.target as HTMLInputElement).blur()
+          }
         }}
       />
     </label>
@@ -238,7 +277,9 @@ function MultiPanel({ selection }: { selection: string[] }) {
     ) => (wallIds.every((id) => doc.walls[id]![k] === first[k]) ? first[k] : null)
     const sharedFinish = shared('finish')
     return (
-      <aside className="props-panel">
+      // keyed by the id set: a different multi-selection remounts the panel
+      // so no focused draft can survive the swap (B1)
+      <aside className="props-panel" key={`walls:${wallIds.join()}`}>
         <h3>{t('props.countWalls', { count: wallIds.length })}</h3>
         <LengthField
           label={t('props.thickness')}
@@ -285,7 +326,7 @@ function MultiPanel({ selection }: { selection: string[] }) {
   if (furnitureIds.length === selection.length && furnitureIds.length > 0) {
     const first = doc.furniture[furnitureIds[0]!]!
     return (
-      <aside className="props-panel">
+      <aside className="props-panel" key={`items:${furnitureIds.join()}`}>
         <h3>{t('props.countItems', { count: furnitureIds.length })}</h3>
         <NumField
           label={t('props.rotation')}
@@ -330,7 +371,7 @@ function MultiPanel({ selection }: { selection: string[] }) {
   if (openingIds.length === selection.length && openingIds.length > 0) {
     const first = doc.openings[openingIds[0]!]!
     return (
-      <aside className="props-panel">
+      <aside className="props-panel" key={`openings:${openingIds.join()}`}>
         <h3>{t('props.countOpenings', { count: openingIds.length })}</h3>
         <LengthField
           label={t('props.width')}
@@ -441,7 +482,9 @@ export function PropertiesPanel() {
     const nb = doc.nodes[wall.b]!
     const length = dist(na, nb)
     return (
-      <aside className="props-panel">
+      // key: entity swaps REMOUNT the panel so a focused draft can never
+      // meet another entity's closures (B1) — same pattern as annotations
+      <aside className="props-panel" key={wall.id}>
         <h3>{t('props.wall')}</h3>
         <LengthField label={t('props.length')} value={length} onCommit={(v) => a.setWallLength(wall.id, v)} />
         <LengthField
@@ -492,7 +535,7 @@ export function PropertiesPanel() {
     const L = na && nb ? dist(na, nb) : 0
     const u = opening.t * L
     return (
-      <aside className="props-panel">
+      <aside className="props-panel" key={opening.id}>
         <h3>{t(opening.kind === 'door' ? 'props.door' : 'props.window')}</h3>
         <LengthField
           label={t('props.width')}
@@ -576,7 +619,7 @@ export function PropertiesPanel() {
   if (furniture) {
     const item = CATALOG[furniture.catalogItemId]
     return (
-      <aside className="props-panel">
+      <aside className="props-panel" key={furniture.id}>
         <h3>{item?.name ?? furniture.catalogItemId}</h3>
         <TextField
           label={t('props.name')}
@@ -625,7 +668,7 @@ export function PropertiesPanel() {
     const derived = getDerived(doc)
     const dr = derived.rooms[room.id]
     return (
-      <aside className="props-panel">
+      <aside className="props-panel" key={room.id}>
         <h3>{t('props.room')}</h3>
         <TextField
           label={t('props.name')}
@@ -665,10 +708,11 @@ export function PropertiesPanel() {
     )
   }
 
-  // no selection: project settings
+  // no selection: project settings (keyed too — deselecting while a field
+  // is focused must remount, not reuse the input at the same tree position)
   const s = doc.settings
   return (
-    <aside className="props-panel">
+    <aside className="props-panel" key="project">
       <h3>{t('props.project')}</h3>
       <LengthField label={t('props.gridSize')} value={s.gridSize} onCommit={(v) => a.updateSettings({ gridSize: v })} />
       <Row>
