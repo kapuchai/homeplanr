@@ -252,23 +252,20 @@ in the running app → commit with a detailed message → push → `gh run watch
 User visual checks caught what tests couldn't (mirror chirality, arc sweep,
 pinch behavior, selector collisions) — always do the human pass for UX.
 
-## Backlog for 0.5.0
+## Roadmap (0.5.0 → 1.0.0)
 
-Everything deferred from 0.3.0 shipped in 0.4.0 except:
+**The user's feature list was collected and planned 2026-07-16 — see
+`docs/roadmap/`**: `ROADMAP.md` (release ladder + live status + deferred
+queue), `CONTEXT.md` (session protocol — read it at the start of every
+release session), one `vX.Y.0.md` per release. The user starts a release
+session by typing just the version number.
 
-- **AUR + Flatpak packaging** — user-deferred to 0.5.0 (2026-07-16). AUR:
-  `packaging/aur/PKGBUILD` (`homeplanr-bin` from the released .deb) +
-  release.yml job via `KSXGitHub/github-actions-deploy-aur`; needs an AUR
-  account, one-time package creation, and an `AUR_SSH_PRIVATE_KEY` secret.
-  Flatpak: manifest + local `flatpak-builder` verification first —
-  fs-scope/portal/single-instance under sandbox are genuine unknowns;
-  Flathub submission is post-release.
-- **The user's OWN feature list** — a separate planning session after
-  0.4.0 ships (their call; never yet collected).
-- Accepted non-fixes (documented, no work planned): PropertiesPanel
-  one-click edits inside the 300ms nudge window fold into the nudge undo
-  entry (physically negligible); argv multi-file opens are first-wins.
-- Nice-to-haves observed during 0.4.0: embedded PDF fonts (non-Latin title
-  blocks — WinAnsi limit documented in exportController); a runtime locale
-  switch (module-load t() tables in OptionsDialog/ExportDialog/shortcuts.ts
-  would need to move into render scope — noted in en.ts); icon polish.
+Absorbed into the ladder from the old 0.5.0 backlog: AUR + Flatpak
+packaging → v0.6.0 (gated on the naming decision, `docs/roadmap/naming.md`;
+the PKGBUILD/`github-actions-deploy-aur`/`AUR_SSH_PRIVATE_KEY`/
+flatpak-builder notes live in `v0.6.0.md`); embedded PDF fonts → v0.5.0
+(with the PDF-export fix); runtime locale switch + icon polish → v0.6.0.
+
+Accepted non-fixes (documented, no work planned): PropertiesPanel one-click
+edits inside the 300ms nudge window fold into the nudge undo entry
+(physically negligible); argv multi-file opens are first-wins.
