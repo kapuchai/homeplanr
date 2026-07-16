@@ -15,6 +15,10 @@ const DEFAULTS: AppSettings = {
   showGrid: true,
   autosaveEnabled: false,
   orbitHintSeen: false,
+  catalogPanelWidth: 232,
+  propsPanelWidth: 260,
+  catalogPanelCollapsed: false,
+  propsPanelCollapsed: false,
 }
 
 describe('parseAppSettings', () => {
@@ -37,6 +41,10 @@ describe('parseAppSettings', () => {
       showGrid: false,
       autosaveEnabled: true,
       orbitHintSeen: true,
+      catalogPanelWidth: 300,
+      propsPanelWidth: 320,
+      catalogPanelCollapsed: true,
+      propsPanelCollapsed: true,
     }
     expect(parseAppSettings(JSON.stringify({ v: 1, ...s }))).toEqual(s)
   })
@@ -62,8 +70,23 @@ describe('parseAppSettings', () => {
       showGrid: true,
       autosaveEnabled: false,
       orbitHintSeen: false,
+      catalogPanelWidth: 232,
+      propsPanelWidth: 260,
+      catalogPanelCollapsed: false,
+      propsPanelCollapsed: false,
     })
     expect(parseAppSettings(JSON.stringify({ v: 1, units: 'inches' }))).toEqual(DEFAULTS)
+  })
+
+  it('panel widths clamp to their limits; junk falls back to defaults', () => {
+    const parsed = parseAppSettings(
+      JSON.stringify({ v: 1, catalogPanelWidth: 9999, propsPanelWidth: 'wide' }),
+    )
+    expect(parsed.catalogPanelWidth).toBe(360) // clamped to max
+    expect(parsed.propsPanelWidth).toBe(260) // junk → default
+    expect(parseAppSettings(JSON.stringify({ v: 1, catalogPanelWidth: 1 })).catalogPanelWidth).toBe(
+      180,
+    )
   })
 })
 
@@ -102,6 +125,10 @@ describe('useAppSettings persistence', () => {
       showGrid: s.showGrid,
       autosaveEnabled: s.autosaveEnabled,
       orbitHintSeen: s.orbitHintSeen,
+      catalogPanelWidth: s.catalogPanelWidth,
+      propsPanelWidth: s.propsPanelWidth,
+      catalogPanelCollapsed: s.catalogPanelCollapsed,
+      propsPanelCollapsed: s.propsPanelCollapsed,
     }).toEqual(DEFAULTS)
   })
 
@@ -115,10 +142,14 @@ describe('useAppSettings persistence', () => {
     s.setShowGrid(false)
     s.setAutosaveEnabled(true)
     s.setOrbitHintSeen(true)
+    s.setPanelWidth('catalog', 999) // clamps to 360
+    s.setPanelWidth('props', 300)
+    s.setPanelCollapsed('catalog', true)
     expect(useAppSettings.getState().theme).toBe('dark')
     expect(useAppSettings.getState().units).toBe('cm')
     expect(useAppSettings.getState().snapEnabled).toBe(false)
     expect(useAppSettings.getState().orbitHintSeen).toBe(true)
+    expect(useAppSettings.getState().catalogPanelWidth).toBe(360)
     expect(JSON.parse(storage.get(APP_SETTINGS_KEY)!)).toEqual({
       v: 1,
       theme: 'dark',
@@ -129,6 +160,10 @@ describe('useAppSettings persistence', () => {
       showGrid: false,
       autosaveEnabled: true,
       orbitHintSeen: true,
+      catalogPanelWidth: 360,
+      propsPanelWidth: 300,
+      catalogPanelCollapsed: true,
+      propsPanelCollapsed: false,
     })
   })
 

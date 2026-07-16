@@ -94,6 +94,41 @@ export interface OpeningSymbol {
 
 const line = (a: Vec2, b: Vec2): Line => ({ x1: a.x, y1: a.y, x2: b.x, y2: b.y })
 
+export type DoorGlyph = NonNullable<OpeningSymbol['door']>
+
+/**
+ * Door leaf + swing arc from a wall-local (u, v) → world mapping — THE one
+ * source of the arc geometry, shared by openingSymbol (realized openings)
+ * and the place-opening tool's pre-click ghost (which maps u/v from raw
+ * node arithmetic instead of a WallSolid). Parameterizing the mapping is
+ * what keeps the EMPIRICALLY PINNED sweep flags from ever forking.
+ */
+export function doorGlyph(
+  pt: (u: number, v: number) => Vec2,
+  u0: number,
+  u1: number,
+  hinge: 'a' | 'b',
+  swing: 'front' | 'back',
+  half: number,
+): DoorGlyph {
+  const width = u1 - u0
+  const hingeU = hinge === 'a' ? u0 : u1
+  const farU = hinge === 'a' ? u1 : u0
+  // leaf drawn open 90°: from the hinge jamb corner, perpendicular to
+  // the wall on the swing side ('front' = +perp of a→b)
+  const swingSign = swing === 'front' ? 1 : -1
+  const vJamb = swingSign * half
+  const hingePt = pt(hingeU, vJamb)
+  const leafEnd = pt(hingeU, vJamb + swingSign * width)
+  const far = pt(farU, vJamb)
+  // Empirically pinned by TWO user checks (M2 y-down, M6 y-up): the
+  // y-flip mirrors both the sweep sense AND the leaf side, so the
+  // original value stands. Do not re-derive from theory — check the
+  // rendered arc.
+  const sweep: 0 | 1 = (hinge === 'a') === (swing === 'front') ? 0 : 1
+  return { leaf: line(hingePt, leafEnd), arc: { from: leafEnd, to: far, r: width, sweep } }
+}
+
 /**
  * The plan symbol of one realized opening — exactly what OpeningsLayer and
  * WallsLayer draw (extracted verbatim; pinned by the exportPlanSvg parity
@@ -126,22 +161,14 @@ export function openingSymbol(
       line(worldPoint(solid, u0, v), worldPoint(solid, u1, v)),
     )
   } else if (model.kind === 'door') {
-    const width = u1 - u0
-    const hingeU = model.hinge === 'a' ? u0 : u1
-    const farU = model.hinge === 'a' ? u1 : u0
-    // leaf drawn open 90°: from the hinge jamb corner, perpendicular to
-    // the wall on the swing side ('front' = +perp of a→b)
-    const swingSign = model.swing === 'front' ? 1 : -1
-    const vJamb = swingSign * half
-    const hinge = worldPoint(solid, hingeU, vJamb)
-    const leafEnd = worldPoint(solid, hingeU, vJamb + swingSign * width)
-    const far = worldPoint(solid, farU, vJamb)
-    // Empirically pinned by TWO user checks (M2 y-down, M6 y-up): the
-    // y-flip mirrors both the sweep sense AND the leaf side, so the
-    // original value stands. Do not re-derive from theory — check the
-    // rendered arc.
-    const sweep: 0 | 1 = (model.hinge === 'a') === (model.swing === 'front') ? 0 : 1
-    out.door = { leaf: line(hinge, leafEnd), arc: { from: leafEnd, to: far, r: width, sweep } }
+    out.door = doorGlyph(
+      (u, v) => worldPoint(solid, u, v),
+      u0,
+      u1,
+      model.hinge,
+      model.swing,
+      half,
+    )
   }
   return out
 }

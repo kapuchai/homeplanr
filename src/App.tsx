@@ -6,6 +6,7 @@ import { PlannerCanvas } from './scene3d/PlannerCanvas'
 import { useDocStore } from './store/docStore'
 import { useUiStore, initSelectionPruning } from './store/uiStore'
 import { safeRedo, safeUndo, useCanUndo, useCanRedo } from './store/transactions'
+import { useAppSettings } from './store/appSettings'
 import {
   launchPersistence,
   newProject,
@@ -19,6 +20,7 @@ import { exportImage } from './export/exportController'
 import { switchTool } from './editor2d/tools/toolRegistry'
 import { flushPendingNudge } from './editor2d/tools/keymap'
 import { CatalogPanel } from './app/CatalogPanel'
+import { PanelHandle } from './app/PanelHandle'
 import { PropertiesPanel } from './app/PropertiesPanel'
 import { ConfirmDialog } from './app/ConfirmDialog'
 import { OptionsDialog } from './app/OptionsDialog'
@@ -308,15 +310,36 @@ export default function App() {
   }, [])
 
   const is2d = viewMode === '2d'
+  const catalogW = useAppSettings((s) => s.catalogPanelWidth)
+  const propsW = useAppSettings((s) => s.propsPanelWidth)
+  const catalogCollapsed = useAppSettings((s) => s.catalogPanelCollapsed)
+  const propsCollapsed = useAppSettings((s) => s.propsPanelCollapsed)
+  const view2dClass =
+    'view-2d' +
+    (catalogCollapsed ? ' catalog-collapsed' : '') +
+    (propsCollapsed ? ' props-collapsed' : '')
   return (
     <div className="app-root">
       <Toolbar />
       <main className="content">
         {ready && (
           <>
-            <div className="view-2d" style={{ display: is2d ? 'flex' : 'none', flex: 1, minWidth: 0 }}>
+            <div
+              className={view2dClass}
+              style={
+                {
+                  display: is2d ? 'flex' : 'none',
+                  flex: 1,
+                  minWidth: 0,
+                  '--catalog-w': `${catalogW}px`,
+                  '--props-w': `${propsW}px`,
+                } as React.CSSProperties
+              }
+            >
               <CatalogPanel />
+              <PanelHandle panel="catalog" />
               <Editor2D />
+              <PanelHandle panel="props" />
               <PropertiesPanel />
             </div>
             {everShown3d && (

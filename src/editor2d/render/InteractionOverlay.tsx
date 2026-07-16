@@ -86,6 +86,22 @@ export function InteractionOverlay() {
         vectorEffect="non-scaling-stroke"
       />,
     )
+    // door ghosts preview the leaf + swing arc (same doorGlyph as placed
+    // doors — the pinned sweep flags flow straight through)
+    if (preview.door) {
+      const { leaf, arc } = preview.door
+      els.push(
+        <g key="ghost-door" stroke={theme.accent} fill="none">
+          <line {...leaf} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          <path
+            d={`M ${arc.from.x} ${arc.from.y} A ${arc.r} ${arc.r} 0 0 ${arc.sweep} ${arc.to.x} ${arc.to.y}`}
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        </g>,
+      )
+    }
     // furniture ghosts draw the REAL symbol over the tint underlay via the
     // shared furnitureTransform (ghosts render at natural catalog dims, so
     // no inner size-scale group here)

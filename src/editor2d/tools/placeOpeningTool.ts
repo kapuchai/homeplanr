@@ -3,6 +3,7 @@ import type { Vec2 } from '../../geometry/vec'
 import { add, normalize, perp, scale, sub } from '../../geometry/vec'
 import { closestPointOnSegment, distToSegment } from '../../geometry/segment'
 import { findOpeningSlot } from '../../model/mutations/openings'
+import { doorGlyph } from '../render/planGeometry'
 import { DEFAULTS } from '../../model/types'
 import type { WallId } from '../../model/ids'
 
@@ -14,6 +15,12 @@ import type { WallId } from '../../model/ids'
  * (door rows); Esc/right-click → select (via keymap ladder / Editor2D).
  */
 const WALL_PICK_PX = 14
+
+/** Swing side = the side of the centerline the cursor is on ('front' = +perp of a→b). */
+const swingFor = (world: Vec2, na: Vec2, dir: Vec2): 'front' | 'back' => {
+  const v = (world.x - na.x) * dir.y - (world.y - na.y) * dir.x
+  return v >= 0 ? 'front' : 'back'
+}
 
 export function createPlaceOpeningTool(): Tool {
   let hover: { wallId: WallId; u: number; valid: boolean } | null = null
@@ -54,6 +61,19 @@ export function createPlaceOpeningTool(): Tool {
     // ghost rectangle in world coords (wall-aligned)
     const half = w.thickness / 2 + 0.02
     const p = (uu: number, v: number) => add(add(na, scale(dir, uu)), scale(perp(dir), v))
+    // doors also preview the leaf + swing arc, swing side following the
+    // cursor exactly like the click will commit it (same cross product)
+    const door =
+      kind === 'door' && valid
+        ? doorGlyph(
+            p,
+            u - width / 2,
+            u + width / 2,
+            DEFAULTS.door.hinge,
+            swingFor(e.world, na, dir),
+            w.thickness / 2,
+          )
+        : undefined
     ctx.interaction().set({
       preview: {
         kind: 'ghost',
@@ -64,6 +84,7 @@ export function createPlaceOpeningTool(): Tool {
           p(u - width / 2, half),
         ],
         valid,
+        ...(door ? { door } : {}),
       },
       pills: [],
     })
@@ -89,14 +110,12 @@ export function createPlaceOpeningTool(): Tool {
       const L = Math.hypot(nb.x - na.x, nb.y - na.y)
       const kind = ctx.ui().toolParams.openingKind
       if (kind === 'door') {
-        // swing side = the side of the centerline the cursor is on
         const dir = normalize(sub(nb, na))
-        const v = (e.world.x - na.x) * dir.y - (e.world.y - na.y) * dir.x
         ctx.actions().addOpening({
           kind: 'door',
           wallId: hover.wallId,
           t: hover.u / L,
-          swing: v >= 0 ? 'front' : 'back',
+          swing: swingFor(e.world, na, dir),
         })
       } else {
         ctx.actions().addOpening({ kind: 'window', wallId: hover.wallId, t: hover.u / L })

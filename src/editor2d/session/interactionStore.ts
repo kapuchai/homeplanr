@@ -39,6 +39,15 @@ export interface GhostPreview {
    * = reflection across item-local x=0 before rotation.
    */
   furniture?: { itemId: string; at: Vec2; rot: number; mirrored: boolean }
+  /**
+   * Door ghosts: pre-click leaf + swing arc (world coords, produced by
+   * planGeometry.doorGlyph — the SAME code path as placed doors, so the
+   * pinned sweep flags cannot fork).
+   */
+  door?: {
+    leaf: { x1: number; y1: number; x2: number; y2: number }
+    arc: { from: Vec2; to: Vec2; r: number; sweep: 0 | 1 }
+  }
 }
 
 export interface MarqueePreview {

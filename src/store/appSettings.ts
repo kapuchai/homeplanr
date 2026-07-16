@@ -25,7 +25,18 @@ export interface AppSettings {
   autosaveEnabled: boolean
   /** One-time 3D orbit hint — set on the first orbit interaction. */
   orbitHintSeen: boolean
+  /** Side-panel layout (px, clamped to PANEL_LIMITS) + collapse toggles. */
+  catalogPanelWidth: number
+  propsPanelWidth: number
+  catalogPanelCollapsed: boolean
+  propsPanelCollapsed: boolean
 }
+
+/** Panel width clamps + defaults — shared with the PanelHandle splitter. */
+export const PANEL_LIMITS = {
+  catalog: { min: 180, max: 360, def: 232 },
+  props: { min: 220, max: 420, def: 260 },
+} as const
 
 export const APP_SETTINGS_KEY = 'homeplanr:v1:app-settings'
 
@@ -42,7 +53,16 @@ const DEFAULTS: AppSettings = {
   showGrid: true,
   autosaveEnabled: false,
   orbitHintSeen: false,
+  catalogPanelWidth: PANEL_LIMITS.catalog.def,
+  propsPanelWidth: PANEL_LIMITS.props.def,
+  catalogPanelCollapsed: false,
+  propsPanelCollapsed: false,
 }
+
+const clampWidth = (value: unknown, lim: { min: number; max: number; def: number }): number =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(lim.max, Math.max(lim.min, Math.round(value)))
+    : lim.def
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback
@@ -68,6 +88,16 @@ export function parseAppSettings(json: string | null): AppSettings {
         typeof r.autosaveEnabled === 'boolean' ? r.autosaveEnabled : DEFAULTS.autosaveEnabled,
       orbitHintSeen:
         typeof r.orbitHintSeen === 'boolean' ? r.orbitHintSeen : DEFAULTS.orbitHintSeen,
+      catalogPanelWidth: clampWidth(r.catalogPanelWidth, PANEL_LIMITS.catalog),
+      propsPanelWidth: clampWidth(r.propsPanelWidth, PANEL_LIMITS.props),
+      catalogPanelCollapsed:
+        typeof r.catalogPanelCollapsed === 'boolean'
+          ? r.catalogPanelCollapsed
+          : DEFAULTS.catalogPanelCollapsed,
+      propsPanelCollapsed:
+        typeof r.propsPanelCollapsed === 'boolean'
+          ? r.propsPanelCollapsed
+          : DEFAULTS.propsPanelCollapsed,
     }
   } catch {
     return { ...DEFAULTS }
@@ -97,6 +127,10 @@ const persist = (s: AppSettings): void => {
         showGrid: s.showGrid,
         autosaveEnabled: s.autosaveEnabled,
         orbitHintSeen: s.orbitHintSeen,
+        catalogPanelWidth: s.catalogPanelWidth,
+        propsPanelWidth: s.propsPanelWidth,
+        catalogPanelCollapsed: s.catalogPanelCollapsed,
+        propsPanelCollapsed: s.propsPanelCollapsed,
       }),
     )
   } catch {
@@ -113,6 +147,10 @@ interface AppSettingsState extends AppSettings {
   setShowGrid: (show: boolean) => void
   setAutosaveEnabled: (enabled: boolean) => void
   setOrbitHintSeen: (seen: boolean) => void
+  /** Clamped + persisted. During a drag, write via useAppSettings.setState
+   * (no localStorage churn per pointermove) and call this on pointer-up. */
+  setPanelWidth: (panel: 'catalog' | 'props', width: number) => void
+  setPanelCollapsed: (panel: 'catalog' | 'props', collapsed: boolean) => void
 }
 
 export const useAppSettings = create<AppSettingsState>()(
@@ -131,6 +169,18 @@ export const useAppSettings = create<AppSettingsState>()(
       setShowGrid: (showGrid) => apply({ showGrid }),
       setAutosaveEnabled: (autosaveEnabled) => apply({ autosaveEnabled }),
       setOrbitHintSeen: (orbitHintSeen) => apply({ orbitHintSeen }),
+      setPanelWidth: (panel, width) =>
+        apply(
+          panel === 'catalog'
+            ? { catalogPanelWidth: clampWidth(width, PANEL_LIMITS.catalog) }
+            : { propsPanelWidth: clampWidth(width, PANEL_LIMITS.props) },
+        ),
+      setPanelCollapsed: (panel, collapsed) =>
+        apply(
+          panel === 'catalog'
+            ? { catalogPanelCollapsed: collapsed }
+            : { propsPanelCollapsed: collapsed },
+        ),
     }
   }),
 )
