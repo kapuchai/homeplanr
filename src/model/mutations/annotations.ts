@@ -2,6 +2,7 @@ import type { Annotation, ProjectDocument } from '../types'
 import { DEFAULTS } from '../types'
 import { newAnnotationId, type AnnotationId } from '../ids'
 import { dist, type Vec2 } from '../../geometry/vec'
+import { area } from '../../geometry/polygon'
 
 /**
  * Annotation mutations (v3). Annotations are free plan artifacts — they
@@ -35,6 +36,23 @@ export function addLabel(doc: ProjectDocument, pos: Vec2, text: string): Annotat
   return id
 }
 
+/** Traces below this shoelace area (m²) are degenerate — rejected. */
+export const MIN_AREA_M2 = 0.001
+
+/** Traced area polygon (v4) — single mutation on trace close (one undo
+ * entry); rejects < 3 points or a near-zero (collinear) polygon, the
+ * addDimension precedent. */
+export function addArea(doc: ProjectDocument, points: readonly Vec2[]): AnnotationId | null {
+  if (points.length < 3 || area(points) < MIN_AREA_M2) return null
+  const id = newAnnotationId()
+  doc.annotations[id] = {
+    id,
+    kind: 'area',
+    points: points.map((p) => ({ x: p.x, y: p.y })),
+  }
+  return id
+}
+
 export interface AnnotationPatch {
   /** dimension: slide the line along its normal. */
   offset?: number
@@ -44,6 +62,8 @@ export interface AnnotationPatch {
   text?: string
   rotation?: number
   fontSize?: number
+  /** area: replace the traced polygon (rigid drags translate every point). */
+  points?: { x: number; y: number }[]
 }
 
 export function updateAnnotation(
@@ -57,6 +77,16 @@ export function updateAnnotation(
     if (patch.offset !== undefined && Number.isFinite(patch.offset)) {
       const m = DEFAULTS.maxDimensionOffset
       ann.offset = Math.min(m, Math.max(-m, patch.offset))
+    }
+    return
+  }
+  if (ann.kind === 'area') {
+    if (
+      patch.points &&
+      patch.points.length >= 3 &&
+      patch.points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+    ) {
+      ann.points = patch.points.map((p) => ({ x: p.x, y: p.y }))
     }
     return
   }

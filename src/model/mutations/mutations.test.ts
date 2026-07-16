@@ -437,6 +437,27 @@ describe('furniture', () => {
     expect(d.furniture[copy!]!.y).toBeCloseTo(2.25, 9)
   })
 
+  it('v4 per-item meta rides add + duplicate; overrides are CLONED, never aliased', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'sofa-3',
+      x: 1,
+      y: 2,
+      size: { w: 2.2, d: 0.95, h: 0.85 },
+      price: 499,
+      notes: 'corner unit',
+      materialOverrides: { fabric: '#aabbcc' },
+    })
+    const f = d.furniture[id]!
+    expect(f.price).toBe(499)
+    expect(f.notes).toBe('corner unit')
+    const [copy] = duplicateFurniture(d, [id])
+    const c = d.furniture[copy!]!
+    expect(c.price).toBe(499)
+    expect(c.materialOverrides).toEqual({ fabric: '#aabbcc' })
+    expect(c.materialOverrides).not.toBe(f.materialOverrides) // no aliasing
+  })
+
   it('transformFurniture mirrored: true writes the flag, false deletes it', () => {
     const d = doc()
     const id = addFurniture(d, {

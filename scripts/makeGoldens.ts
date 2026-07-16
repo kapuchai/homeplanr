@@ -17,7 +17,8 @@ import { SCHEMA_VERSION, emptyDocument, type ProjectDocument } from '../src/mode
 import { addWallChain, updateWall } from '../src/model/mutations/walls'
 import { setRoomFloorMaterial } from '../src/model/mutations/rooms'
 import { transformFurniture } from '../src/model/mutations/furniture'
-import { renameProject, updateSettings } from '../src/model/mutations/project'
+import { addDimension, addLabel, updateAnnotation } from '../src/model/mutations/annotations'
+import { renameProject } from '../src/model/mutations/project'
 import { serializeDocument } from '../src/store/persistence/serialize'
 import { buildFixtureDoc } from '../src/test/fixtureDoc'
 import { vec } from '../src/geometry/vec'
@@ -44,11 +45,12 @@ function buildBasic(): ProjectDocument {
 }
 
 /**
- * The fixture apartment plus the v2 surface worth freezing: floor material,
- * per-side wall paint + a finish, a mirrored furniture item, snap off.
- * (The v1-era builder exercised `unitDisplay`, which the v1→v2 migration
- * removes — each schema bump edits this builder to freeze the OUTGOING
- * version's real feature set.)
+ * The fixture apartment plus the v3 surface worth freezing: floor material,
+ * per-side wall paint + a finish, a mirrored furniture item, and the v3
+ * annotations — an offset dimension plus a rotated resized text label.
+ * (The v2-era builder froze `settings.snapEnabled`, which the v2→v3
+ * migration removes — each schema bump edits this builder to freeze the
+ * OUTGOING version's real feature set.)
  */
 function buildFull(): ProjectDocument {
   const doc = buildFixtureDoc()
@@ -57,13 +59,17 @@ function buildFull(): ProjectDocument {
   const living = Object.values(doc.rooms).find((r) => r.name === 'Living room')
   assert(living, 'full: fixture doc has no room named "Living room"')
   setRoomFloorMaterial(doc, living.id, 'darkFloor')
-  updateSettings(doc, { snapEnabled: false })
   const paintedWall = Object.values(doc.walls)[0]
   assert(paintedWall, 'full: fixture doc has no walls')
   updateWall(doc, paintedWall.id, { paintFront: 'sage', paintBack: 'terracotta', finish: 'brick' })
   const mirroredItem = Object.values(doc.furniture)[0]
   assert(mirroredItem, 'full: fixture doc has no furniture')
   transformFurniture(doc, mirroredItem.id, { mirrored: true })
+  const dimId = addDimension(doc, vec(0.5, 0.5), vec(3.5, 0.5), 0.35)
+  assert(dimId, 'full: dimension annotation rejected')
+  const labelId = addLabel(doc, vec(2, 2.5), 'Golden label')
+  assert(labelId, 'full: label annotation rejected')
+  updateAnnotation(doc, labelId, { rotation: Math.PI / 6, fontSize: 0.2 })
 
   const openings = Object.values(doc.openings)
   assert(openings.some((o) => o.kind === 'door'), 'full: expected a door')
@@ -74,10 +80,16 @@ function buildFull(): ProjectDocument {
     'full: catalog ids present',
   )
   assert(living.floorMaterialId === 'darkFloor', 'full: floor material not set')
-  assert(doc.settings.snapEnabled === false, 'full: snapEnabled not frozen off')
   assert(doc.walls[paintedWall.id]!.paintFront === 'sage', 'full: paintFront not set')
   assert(doc.walls[paintedWall.id]!.finish === 'brick', 'full: finish not set')
   assert(doc.furniture[mirroredItem.id]!.mirrored === true, 'full: mirrored not set')
+  const dim = doc.annotations[dimId]
+  assert(dim?.kind === 'dimension' && dim.offset === 0.35, 'full: dimension offset not frozen')
+  const label = doc.annotations[labelId]
+  assert(
+    label?.kind === 'label' && label.rotation !== undefined && label.fontSize === 0.2,
+    'full: label rotation/fontSize not frozen',
+  )
   return doc
 }
 

@@ -57,6 +57,7 @@ export interface DocState {
   // annotations
   addDimension: (a: Vec2, b: Vec2, offset?: number) => AnnotationId | null
   addLabel: (pos: Vec2, text: string) => AnnotationId | null
+  addArea: (points: readonly Vec2[]) => AnnotationId | null
   updateAnnotation: (id: AnnotationId, patch: annotations.AnnotationPatch) => void
   // rooms / project
   renameRoom: (id: RoomId, name: string) => void
@@ -108,6 +109,7 @@ export const useDocStore = create<DocState>()(
           pasteSubgraph: (payload, target) => mutate((d) => paste.pasteSubgraph(d, payload, target)),
           addDimension: (a, b, offset) => mutate((d) => annotations.addDimension(d, a, b, offset)),
           addLabel: (pos, text) => mutate((d) => annotations.addLabel(d, pos, text)),
+          addArea: (points) => mutate((d) => annotations.addArea(d, points)),
           updateAnnotation: (id, patch) => mutate((d) => annotations.updateAnnotation(d, id, patch)),
           renameRoom: (id, name) => mutate((d) => rooms.renameRoom(d, id, name)),
           setRoomFloorMaterial: (id, mat) => mutate((d) => rooms.setRoomFloorMaterial(d, id, mat)),

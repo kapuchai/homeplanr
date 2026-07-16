@@ -25,6 +25,10 @@ export interface AddFurnitureParams {
   elevation?: number
   name?: string
   mirrored?: boolean
+  /** v4 per-item meta (0.9.0 UI) — carried by paste so copies keep it. */
+  price?: number
+  notes?: string
+  materialOverrides?: Record<string, string>
 }
 
 export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): FurnitureId {
@@ -43,6 +47,9 @@ export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): 
     elevation: Math.min(ELEV_MAX, Math.max(ELEV_MIN, params.elevation ?? 0)),
     ...(params.name ? { name: params.name } : {}),
     ...(params.mirrored ? { mirrored: true } : {}),
+    ...(params.price !== undefined ? { price: params.price } : {}),
+    ...(params.notes ? { notes: params.notes } : {}),
+    ...(params.materialOverrides ? { materialOverrides: { ...params.materialOverrides } } : {}),
   }
   return id
 }
@@ -112,6 +119,8 @@ export function duplicateFurniture(
       x: q(f.x + 0.25),
       y: q(f.y + 0.25),
       size: { ...f.size },
+      // spread copies by REFERENCE — clone the record or duplicates alias it
+      ...(f.materialOverrides ? { materialOverrides: { ...f.materialOverrides } } : {}),
     }
     created.push(nid)
   }

@@ -80,6 +80,10 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
     if (isObj(settings)) delete settings.snapEnabled
     return { ...raw, settings, schemaVersion: 3 }
   },
+  // v3 → v4: purely additive (the 'area' annotation kind + optional
+  // roomType / price / notes / materialOverrides fields, all handled by the
+  // validator) — identity bump, no data moves.
+  3: (raw) => ({ ...raw, schemaVersion: 4 }),
 }
 
 export function parseDocument(json: string): ParseResult {
@@ -263,6 +267,8 @@ export function validateParsedObject(raw: unknown): ParseResult {
         ...(isStr(v.floorMaterialId) && v.floorMaterialId
           ? { floorMaterialId: v.floorMaterialId }
           : {}),
+        // v4, open registry: any non-empty string (render-side fallback)
+        ...(isStr(v.roomType) && v.roomType ? { roomType: v.roomType } : {}),
       }
     }
   }
@@ -299,6 +305,18 @@ export function validateParsedObject(raw: unknown): ParseResult {
         elevation: isFiniteNum(v.elevation) ? Math.min(3, Math.max(0, v.elevation)) : 0,
         ...(isStr(v.name) && v.name ? { name: v.name } : {}),
         ...(v.mirrored === true ? { mirrored: true } : {}),
+        // v4 additions — invalid values silently absent (field-level rule)
+        ...(isFiniteNum(v.price) && v.price >= 0 ? { price: v.price } : {}),
+        ...(isStr(v.notes) && v.notes ? { notes: v.notes } : {}),
+        ...(() => {
+          // open registry: slot → material id/hex, both non-empty strings;
+          // junk ENTRIES drop silently, an empty result drops the field
+          if (!isObj(v.materialOverrides)) return {}
+          const entries = Object.entries(v.materialOverrides).filter(
+            ([slot, val]) => slot && isStr(val) && val,
+          ) as [string, string][]
+          return entries.length ? { materialOverrides: Object.fromEntries(entries) } : {}
+        })(),
       }
     }
   }
@@ -349,6 +367,21 @@ export function validateParsedObject(raw: unknown): ParseResult {
             ? { fontSize: Math.min(1, Math.max(0.05, v.fontSize)) }
             : {}),
         }
+      } else if (isObj(v) && v.kind === 'area') {
+        // v4: junk vertices drop; the polygon survives iff ≥ 3 remain
+        const points = Array.isArray(v.points)
+          ? (v.points as unknown[])
+              .filter((p): p is { x: number; y: number } =>
+                isObj(p) && isFiniteNum(p.x) && isFiniteNum(p.y),
+              )
+              .map((p) => ({ x: p.x, y: p.y }))
+          : []
+        if (points.length < 3) {
+          warnings.push(`Removed invalid annotation ${key}`)
+          continue
+        }
+        const id = asAnnotationId(key)
+        doc.annotations[id] = { id, kind: 'area', points }
       } else {
         warnings.push(`Removed invalid annotation ${key}`)
       }

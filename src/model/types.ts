@@ -71,6 +71,9 @@ export interface Room {
   name?: string
   /** Key into the floor material registry; undefined = default. */
   floorMaterialId?: string
+  /** Open room-type registry (v4, UI lands in 0.8.0); any non-empty string —
+   * render-side fallback handles unknown values. */
+  roomType?: string
 }
 
 export interface FurnitureInstance {
@@ -89,6 +92,13 @@ export interface FurnitureInstance {
   elevation: number
   /** Reflection across item-local x=0, applied before rotation; absent = false. */
   mirrored?: boolean
+  /** Per-item price in the user's own currency (v4, UI lands in 0.9.0). */
+  price?: number
+  /** Free-form notes (v4, UI lands in 0.9.0). */
+  notes?: string
+  /** Material-slot recolors, slot → material id or hex (v4, open registry —
+   * render-side fallback handles unknown values; UI lands in 0.9.0). */
+  materialOverrides?: Record<string, string>
 }
 
 /**
@@ -119,7 +129,19 @@ export interface LabelAnnotation {
   fontSize?: number
 }
 
-export type Annotation = DimensionAnnotation | LabelAnnotation
+/**
+ * Traced area polygon (v4): free world-anchored like every annotation —
+ * NEVER graph-healed. Its area/label text is DERIVED at render from the
+ * shoelace of `points` plus the current unit preference (never stored).
+ */
+export interface AreaAnnotation {
+  id: AnnotationId
+  kind: 'area'
+  /** ≥ 3 vertices, world meters; implicitly closed. */
+  points: { x: number; y: number }[]
+}
+
+export type Annotation = DimensionAnnotation | LabelAnnotation | AreaAnnotation
 
 export interface ProjectSettings {
   /** m — base grid unit; display tiers and snap derive from it. */
@@ -129,7 +151,7 @@ export interface ProjectSettings {
 }
 
 export interface ProjectDocument {
-  schemaVersion: 3
+  schemaVersion: 4
   id: string
   name: string
   /** ISO strings. Mutations never touch updatedAt — serialize() stamps it. */
@@ -144,7 +166,7 @@ export interface ProjectDocument {
   annotations: Record<AnnotationId, Annotation>
 }
 
-export const SCHEMA_VERSION = 3 as const
+export const SCHEMA_VERSION = 4 as const
 
 /** Pinned defaults (plan: "DEFAULTS"). All meters. */
 export const DEFAULTS = {

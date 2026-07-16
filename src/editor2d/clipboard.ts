@@ -23,6 +23,11 @@ interface ClipboardItem {
   size: { w: number; d: number; h: number }
   elevation: number
   mirrored?: boolean
+  // v4 per-item meta rides copies too — a whitelist that forgets a field
+  // silently strips it on paste
+  price?: number
+  notes?: string
+  materialOverrides?: Record<string, string>
 }
 
 export interface ClipboardPayload {
@@ -102,11 +107,12 @@ export function buildPayload(
             ...(op.kind === 'door' ? { hinge: op.hinge, swing: op.swing } : {}),
           })),
         roomMeta: rooms
-          .filter((r) => r.name || r.floorMaterialId)
+          .filter((r) => r.name || r.floorMaterialId || r.roomType)
           .map((r) => ({
             wallKeys: [...r.wallCycle, ...r.holeCycles.flat()],
             ...(r.name ? { name: r.name } : {}),
             ...(r.floorMaterialId ? { floorMaterialId: r.floorMaterialId } : {}),
+            ...(r.roomType ? { roomType: r.roomType } : {}),
           })),
       }
     : null
@@ -122,6 +128,9 @@ export function buildPayload(
       size: { ...f.size },
       elevation: f.elevation,
       ...(f.mirrored ? { mirrored: true } : {}),
+      ...(f.price !== undefined ? { price: f.price } : {}),
+      ...(f.notes ? { notes: f.notes } : {}),
+      ...(f.materialOverrides ? { materialOverrides: { ...f.materialOverrides } } : {}),
     })),
     graph,
   }
@@ -167,6 +176,9 @@ export function materializeItems(p: ClipboardPayload, target: Vec2): AddFurnitur
     elevation: it.elevation,
     ...(it.name ? { name: it.name } : {}),
     ...(it.mirrored ? { mirrored: true } : {}),
+    ...(it.price !== undefined ? { price: it.price } : {}),
+    ...(it.notes ? { notes: it.notes } : {}),
+    ...(it.materialOverrides ? { materialOverrides: { ...it.materialOverrides } } : {}),
   }))
 }
 

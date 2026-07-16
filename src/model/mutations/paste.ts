@@ -50,7 +50,7 @@ export interface GraphPayload {
     hinge?: 'a' | 'b'
     swing?: 'front' | 'back'
   }[]
-  roomMeta: { wallKeys: string[]; name?: string; floorMaterialId?: string }[]
+  roomMeta: { wallKeys: string[]; name?: string; floorMaterialId?: string; roomType?: string }[]
 }
 
 export function pasteSubgraph(
@@ -130,6 +130,7 @@ export function pasteSubgraph(
       if (fingerprint([...room.wallCycle, ...room.holeCycles.flat()]) === want) {
         if (meta.name) room.name = meta.name
         if (meta.floorMaterialId) room.floorMaterialId = meta.floorMaterialId
+        if (meta.roomType) room.roomType = meta.roomType
         break
       }
     }

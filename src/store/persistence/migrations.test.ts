@@ -14,6 +14,10 @@ import {
 import { decodeRecovery } from './recovery'
 import { SCHEMA_VERSION } from '../../model/types'
 import type { FurnitureId, WallId } from '../../model/ids'
+import { addArea } from '../../model/mutations/annotations'
+import { addWallSegment } from '../../model/mutations/walls'
+import { reconcileRooms } from '../../model/mutations/rooms'
+import { vec } from '../../geometry/vec'
 
 const golden = (name: string) =>
   readFileSync(new URL(`../../test/goldens/${name}`, import.meta.url), 'utf8')
@@ -22,6 +26,8 @@ const v1Basic = golden('v1-basic.homeplanr')
 const v1Full = golden('v1-full.homeplanr')
 const v2Basic = golden('v2-basic.homeplanr')
 const v2Full = golden('v2-full.homeplanr')
+const v3Basic = golden('v3-basic.homeplanr')
+const v3Full = golden('v3-full.homeplanr')
 
 const deepFreeze = (o: unknown): void => {
   if (typeof o === 'object' && o !== null) {
@@ -32,7 +38,7 @@ const deepFreeze = (o: unknown): void => {
 
 describe('schema migrations (v1 goldens)', () => {
   it('EVERY historical golden opens silently: current version, healed=false, zero warnings', () => {
-    for (const g of [v1Basic, v1Full, v2Basic, v2Full]) {
+    for (const g of [v1Basic, v1Full, v2Basic, v2Full, v3Basic, v3Full]) {
       const r = parseDocument(g)
       expect(r.doc.schemaVersion).toBe(SCHEMA_VERSION)
       expect(r.healed).toBe(false)
@@ -54,8 +60,8 @@ describe('schema migrations (v1 goldens)', () => {
     expect(Object.keys(doc.settings)).not.toContain('unitDisplay')
   })
 
-  it('migration steps are pure: frozen v1/v2 inputs are untouched, output is current', () => {
-    for (const g of [v1Full, v2Full]) {
+  it('migration steps are pure: frozen v1/v2/v3 inputs are untouched, output is current', () => {
+    for (const g of [v1Full, v2Full, v3Full]) {
       const raw = JSON.parse(g)
       const snapshot = JSON.stringify(raw)
       deepFreeze(raw)
@@ -238,5 +244,114 @@ describe('v3: snapEnabled leaves the document; annotations arrive', () => {
     }
     const r = parseDocument(serializeDocument(doc, '2026-07-13T00:00:00.000Z'))
     expect(r.healed).toBe(false)
+  })
+})
+
+describe('v4: area annotations + roomType / price / notes / materialOverrides', () => {
+  it('v3-full opens clean with its frozen annotations intact', () => {
+    const r = parseDocument(v3Full)
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    const anns = Object.values(r.doc.annotations)
+    const dim = anns.find((a) => a.kind === 'dimension')
+    expect(dim?.kind === 'dimension' && dim.offset).toBe(0.35)
+    const lab = anns.find((a) => a.kind === 'label')
+    expect(lab?.kind === 'label' && lab.fontSize).toBe(0.2)
+    expect(lab?.kind === 'label' && lab.text).toBe('Golden label')
+  })
+
+  it('a v3 recovery blob decodes through the migration chokepoint', () => {
+    const json = JSON.stringify({
+      v: 1,
+      filePath: null,
+      docId: 'x',
+      savedAt: 1,
+      doc: JSON.parse(v3Basic),
+    })
+    const blob = decodeRecovery(json)
+    expect(blob).not.toBeNull()
+    expect(blob!.doc.schemaVersion).toBe(SCHEMA_VERSION)
+  })
+
+  it('area annotations roundtrip; junk vertices drop; degenerate polygons prune', () => {
+    const { doc } = parseDocument(v3Basic)
+    const id = addArea(doc, [vec(0, 0), vec(2, 0), vec(2, 2), vec(0, 2)])
+    expect(id).not.toBeNull()
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    const area = r.doc.annotations[id! as never]!
+    expect(area.kind === 'area' && area.points).toHaveLength(4)
+
+    const base = JSON.parse(v3Basic)
+    base.schemaVersion = 4
+    base.annotations = {
+      a_mixed: {
+        kind: 'area',
+        points: [{ x: 0, y: 0 }, { x: 'a', y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }, null],
+      },
+      a_degenerate: { kind: 'area', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] },
+      a_pointless: { kind: 'area' },
+    }
+    const v = validateParsedObject(base)
+    const mixed = v.doc.annotations['a_mixed' as never]!
+    expect(mixed.kind === 'area' && mixed.points).toHaveLength(3) // junk vertices dropped
+    expect(v.doc.annotations['a_degenerate' as never]).toBeUndefined()
+    expect(v.doc.annotations['a_pointless' as never]).toBeUndefined()
+    expect(v.warnings).toHaveLength(2)
+  })
+
+  it('addArea rejects degenerate traces (< 3 points, near-zero area)', () => {
+    const { doc } = parseDocument(v3Basic)
+    expect(addArea(doc, [vec(0, 0), vec(1, 0)])).toBeNull()
+    expect(addArea(doc, [vec(0, 0), vec(1, 0), vec(2, 0)])).toBeNull() // collinear
+  })
+
+  it('batched v4 fields roundtrip; junk values normalize silently', () => {
+    const { doc } = parseDocument(v3Full)
+    const room = Object.values(doc.rooms)[0]!
+    room.roomType = 'balcony'
+    const item = Object.values(doc.furniture)[0]!
+    item.price = 129.99
+    item.notes = 'IKEA, 2024'
+    item.materialOverrides = { fabric: '#aabbcc', legs: 'oakDark' }
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.rooms[room.id]!.roomType).toBe('balcony')
+    const f2 = r.doc.furniture[item.id]!
+    expect(f2.price).toBe(129.99)
+    expect(f2.notes).toBe('IKEA, 2024')
+    expect(f2.materialOverrides).toEqual({ fabric: '#aabbcc', legs: 'oakDark' })
+
+    const base = JSON.parse(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    const roomKey = room.id as string
+    const itemKey = item.id as string
+    base.rooms[roomKey].roomType = ''
+    base.furniture[itemKey].price = 'free'
+    base.furniture[itemKey].notes = 42
+    base.furniture[itemKey].materialOverrides = { fabric: 7, legs: 'oakDark', '': 'x' }
+    const v = validateParsedObject(base)
+    expect(v.warnings).toHaveLength(0) // field-level junk is silent
+    expect(v.doc.rooms[room.id]!.roomType).toBeUndefined()
+    const f3 = v.doc.furniture[item.id]!
+    expect(f3.price).toBeUndefined()
+    expect(f3.notes).toBeUndefined()
+    expect(f3.materialOverrides).toEqual({ legs: 'oakDark' }) // junk ENTRIES drop
+  })
+
+  it('roomType survives a room-splitting edit (as durable as name)', () => {
+    const { doc } = parseDocument(v3Basic) // one 4×3 room
+    const room = Object.values(doc.rooms)[0]!
+    room.roomType = 'bedroom'
+    room.name = 'Master'
+    addWallSegment(doc, vec(2, 0), vec(2, 3)) // split into two 2×3 rooms
+    reconcileRooms(doc)
+    const rooms = Object.values(doc.rooms)
+    expect(rooms).toHaveLength(2)
+    // the identity carrier (Jaccard ≥ 0.3) keeps BOTH meta fields together
+    const carrier = rooms.find((r) => r.roomType === 'bedroom')
+    expect(carrier).toBeDefined()
+    expect(carrier!.name).toBe('Master')
   })
 })
