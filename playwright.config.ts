@@ -10,6 +10,15 @@ export default defineConfig({
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
+  // Visual baselines (visual.spec.ts) live next to the specs, one folder per
+  // file. They are a LOCAL chromium-only rig (skipped on CI) — see the spec.
+  snapshotPathTemplate: '{testDir}/__screenshots__/{testFileName}/{arg}{ext}',
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.02,
+      animations: 'disabled',
+    },
+  },
   use: {
     baseURL: 'http://localhost:5173',
     // Pin the scheme so screenshots/selectors don't depend on the host OS theme.

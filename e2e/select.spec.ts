@@ -1,34 +1,16 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { drawRoom } from './helpers'
 
 /**
  * Marquee multi-select smoke (0.3.0 M3): draw a room, place two sofas,
  * rubber-band across everything, batch-delete, undo restores. Mirrors
- * smoke.spec's setup conventions.
+ * smoke.spec's setup conventions. Rooms are drawn `exact` (Ctrl suspends
+ * snapping) so later fraction-based clicks hit entities deterministically.
  */
-
-async function drawRoom(page: Page) {
-  const canvas = page.locator('svg.editor-canvas')
-  await expect(canvas).toBeVisible()
-  await page.keyboard.press('w')
-  const box = (await canvas.boundingBox())!
-  const at = (fx: number, fy: number) =>
-    ({ x: box.x + box.width * fx, y: box.y + box.height * fy }) as const
-  const corners = [at(0.3, 0.3), at(0.7, 0.3), at(0.7, 0.7), at(0.3, 0.7)]
-  // Ctrl suspends snapping: walls land EXACTLY at the click fractions, so
-  // later fraction-based clicks (context menu on a wall) hit deterministically
-  await page.keyboard.down('Control')
-  for (const c of corners) {
-    await page.mouse.click(c.x, c.y)
-    await page.waitForTimeout(350) // > double-click window
-  }
-  await page.mouse.click(corners[0]!.x, corners[0]!.y) // close the loop
-  await page.keyboard.up('Control')
-  await page.keyboard.press('Escape')
-}
 
 test('marquee select → batch delete → undo restores', async ({ page }) => {
   await page.goto('/')
-  await drawRoom(page)
+  await drawRoom(page, { exact: true })
   await expect(page.locator('svg.editor-canvas text').filter({ hasText: 'm²' })).toBeVisible()
 
   const canvas = page.locator('svg.editor-canvas')
@@ -63,7 +45,7 @@ test('marquee select → batch delete → undo restores', async ({ page }) => {
 
 test('Ctrl+A selects everything; Escape clears', async ({ page }) => {
   await page.goto('/')
-  await drawRoom(page)
+  await drawRoom(page, { exact: true })
   await expect(page.locator('svg.editor-canvas text').filter({ hasText: 'm²' })).toBeVisible()
   await page.keyboard.press('Control+a')
   await expect(page.locator('.props-panel')).toContainText('4 walls')
@@ -73,7 +55,7 @@ test('Ctrl+A selects everything; Escape clears', async ({ page }) => {
 
 test('right-click context menu: duplicate furniture, split wall', async ({ page }) => {
   await page.goto('/')
-  await drawRoom(page)
+  await drawRoom(page, { exact: true })
   const canvas = page.locator('svg.editor-canvas')
   const box = (await canvas.boundingBox())!
   const at = (fx: number, fy: number) =>

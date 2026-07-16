@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { canvasPoint, dismissRecovery, drawRoom, placeFurniture, show2d, show3d } from './helpers'
 
 /**
  * The core-loop smoke (plan-pinned): draw a room with synthetic pointers →
@@ -11,22 +12,6 @@ import { expect, test, type Page } from '@playwright/test'
  * clear would run on EVERY navigation and wipe the recovery blob mid-test.
  */
 
-async function drawRoom(page: Page) {
-  const canvas = page.locator('svg.editor-canvas')
-  await expect(canvas).toBeVisible()
-  await page.keyboard.press('w')
-  const box = (await canvas.boundingBox())!
-  const at = (fx: number, fy: number) =>
-    ({ x: box.x + box.width * fx, y: box.y + box.height * fy }) as const
-  const corners = [at(0.3, 0.3), at(0.7, 0.3), at(0.7, 0.7), at(0.3, 0.7)]
-  for (const c of corners) {
-    await page.mouse.click(c.x, c.y)
-    await page.waitForTimeout(350) // > double-click window
-  }
-  await page.mouse.click(corners[0]!.x, corners[0]!.y) // close the loop
-  await page.keyboard.press('Escape')
-}
-
 test('draw → furnish → 3D → crash recovery', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.toolbar .brand')).toHaveText('homeplanr')
@@ -36,29 +21,22 @@ test('draw → furnish → 3D → crash recovery', async ({ page }) => {
   await drawRoom(page)
   await expect(page.locator('svg.editor-canvas text').filter({ hasText: 'm²' })).toBeVisible()
 
-  // --- place furniture via click-to-place ---
-  await page.locator('.catalog-card', { hasText: 'Sofa, 3-seat' }).click()
-  const canvasBox = (await page.locator('svg.editor-canvas').boundingBox())!
-  await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5)
-  await page.keyboard.press('Escape') // disarm
-  // select it → properties panel shows the item
-  await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5)
+  // --- place furniture via click-to-place, then select it ---
+  await placeFurniture(page, 'Sofa, 3-seat', 0.5, 0.5)
+  const p = await canvasPoint(page, 0.5, 0.5)
+  await page.mouse.click(p.x, p.y)
   await expect(page.locator('.props-panel h3')).toHaveText('Sofa, 3-seat')
 
   // --- toggle 3D: canvas mounts and renders non-blank ---
-  await page.getByRole('button', { name: '3D', exact: true }).click()
-  const gl = page.locator('.view-3d canvas')
-  await expect(gl).toBeVisible()
-  await page.waitForTimeout(800) // first frame + env
+  const gl = await show3d(page)
   const shot = await gl.screenshot()
   expect(shot.byteLength).toBeGreaterThan(10_000) // blank canvases compress tiny
-  await page.getByRole('button', { name: '2D', exact: true }).click()
+  await show2d(page)
 
   // --- crash recovery: reload with unsaved work ---
   await page.waitForTimeout(700) // > autosave debounce
   await page.reload()
-  await expect(page.locator('.modal h3')).toHaveText('Restore unsaved work?')
-  await page.getByRole('button', { name: 'Restore' }).click()
+  await dismissRecovery(page, 'Restore')
   await expect(page.locator('svg.editor-canvas text').filter({ hasText: 'm²' })).toBeVisible()
   await expect(page.locator('.dirty-dot')).toBeVisible()
 })

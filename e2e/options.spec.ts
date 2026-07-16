@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { closeOptions, openOptions, optionsDialog as dialog } from './helpers'
 
 /**
  * Options dialog: theme + units apply instantly and persist across reload.
@@ -8,18 +9,6 @@ import { expect, test, type Page } from '@playwright/test'
  * without manual clearing. Each test still restores the defaults it changed
  * so the storage it leaves behind stays neutral.
  */
-
-const dialog = (page: Page) => page.getByRole('dialog', { name: 'Options' })
-
-async function openOptions(page: Page) {
-  await page.getByRole('button', { name: 'Options' }).click()
-  await expect(dialog(page)).toBeVisible()
-}
-
-async function closeOptions(page: Page) {
-  await dialog(page).getByRole('button', { name: 'Close' }).click()
-  await expect(dialog(page)).toBeHidden()
-}
 
 test('dark theme applies and persists', async ({ page }) => {
   await page.goto('/')

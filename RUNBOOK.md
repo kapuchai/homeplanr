@@ -46,6 +46,7 @@ export + 3D screenshot, file association + single instance, Linux
 | Dev (browser only) | `npm run dev` |
 | Unit tests (599) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
+| Visual baselines (local rig) | `npx playwright test --project=chromium e2e/visual.spec.ts` — add `--update-snapshots` to rebaseline, then EYEBALL the new PNGs |
 | Typecheck / lint | `npm run typecheck` / `npm run lint` |
 | Color-token lint | `npm run lint:colors` (raw colors outside the allowed dirs fail CI) |
 | Goldens (pre-schema-bump ONLY) | `npx vite-node scripts/makeGoldens.ts` — refuses to overwrite |
@@ -181,6 +182,36 @@ export + 3D screenshot, file association + single instance, Linux
 9. Catalog thumbnails render; then force a context loss (devtools
    `WEBGL_lose_context`) and confirm cards fall back to SVG symbols.
 10. PNG and SVG exports open in an external viewer.
+11. Visual baselines green (`e2e/visual.spec.ts`); after INTENTIONAL visual
+    changes rebaseline with `--update-snapshots` and eyeball every changed
+    PNG before committing.
+
+## Agent testing rig (0.5.0 — how the agent sees the app)
+
+Tier 0: Playwright chromium against the browser build (`npm run dev` is
+auto-started by the Playwright webServer). The loop for UI-visible work:
+
+1. **Ad-hoc probe**: throwaway spec (scratchpad or `e2e/`) importing
+   `e2e/helpers.ts` — `drawRoom` (opts.exact holds Ctrl to suspend
+   snapping), `placeFurniture`, `canvasPoint`, `show3d`/`show2d`,
+   `cameraPreset`, `openOptions`/`openExport`, `newFromTemplate`,
+   `seedAppSettings`, `dismissRecovery`. Run
+   `npx playwright test --project=chromium <spec>`, screenshot, Read the
+   PNG. Promote worthwhile probes to real specs.
+2. **Visual baselines** (`e2e/visual.spec.ts` → `e2e/__screenshots__/`):
+   2D Studio-template plan (± dimensions, ± dark), toolbar (± dark), 3D
+   iso, Options/Export dialogs, shortcut sheet. Chromium-only and SKIPPED
+   ON CI — font rasterization is per-box; this is the local rig, CI keeps
+   the functional suite.
+3. **Dark-mode probes**: `seedAppSettings(context, { theme: 'dark' })`
+   BEFORE `goto` (data-theme stamps pre-first-paint), or drive the
+   Options UI like options.spec.
+4. Browser-mode caveats: no native dialogs/fs (browser adapter downloads
+   via Blob — interceptable with `page.waitForEvent('download')`), no
+   WebKitGTK quirks, no Tauri IPC. Fresh contexts have empty localStorage;
+   an edit + reload triggers the recovery prompt (`dismissRecovery`).
+5. WebGL specs (walk, the 3D baseline) run isolated under full-suite load
+   (see quirks).
 
 ## Platform quirks (hard-won; don't re-learn)
 

@@ -1,18 +1,11 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { exportDialog as dialog, openExport } from './helpers'
 
 /**
  * Export dialog (M5, 0.4.0): File → Export… opens the modal; the PDF format
  * reveals the paper section; Escape closes with focus restored. The actual
  * byte outputs ride the packaged manual gate (native save dialogs).
  */
-
-const dialog = (page: Page) => page.getByRole('dialog', { name: 'Export plan' })
-
-async function openExport(page: Page) {
-  await page.getByRole('button', { name: 'File' }).click()
-  await page.getByRole('menuitem', { name: 'Export…' }).click()
-  await expect(dialog(page)).toBeVisible()
-}
 
 test('export dialog: format switch reveals paper controls; Esc closes', async ({ page }) => {
   await page.goto('/')
