@@ -61,6 +61,8 @@ export + 3D screenshot, file association + single instance, Linux
 | Local bundles | `npm run tauri build` (deb/rpm); AppImage on this Arch box needs `APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=1 npm run tauri build -- --bundles appimage` (no fuse2 installed) |
 | Run local AppImage | `./src-tauri/target/release/bundle/appimage/*.AppImage --appimage-extract-and-run` |
 | Release | push a `v*` tag → `release.yml` builds both OSes + drafts the GitHub release; dry-run anytime via `gh workflow run release.yml` |
+| AUR package (local) | `packaging/aur/` — PKGBUILD + README with local-verify + publish runbook (publishing deferred; needs user's AUR account) |
+| Flatpak (local) | `packaging/flatpak/` — manifest + README (local build via org.flatpak.Builder, per-user, no sudo) |
 
 ## Non-negotiable invariants (tests pin all of these)
 
@@ -238,6 +240,30 @@ the script header; it exits 2 with instructions when they're missing.
 Debug binaries load from the vite devUrl (5173) — the smoke uses the
 RELEASE binary so the bundled dist is what's tested. Run it as part of
 the release gates, right after the local bundle build.
+
+## Distribution channels (0.6.0 — verified on this Arch box)
+
+- **AUR**: `homeplanr-bin` repacks the released .deb. makepkg picks up
+  source files sitting next to the PKGBUILD before downloading — that's the
+  local-verify route (draft release assets are NOT downloadable). Deps on
+  Arch: `webkit2gtk-4.1 gtk3 hicolor-icon-theme shared-mime-info` (deb
+  declares libwebkit2gtk-4.1-0 + libgtk-3-0). hicolor's `256x256@2` dir is
+  REAL on Arch (not a tauri bug) — but tauri puts a 256px png there where
+  512px is implied; ship a plain 256x256 (+512) in the icon refresh.
+- **Flatpak**: app-id `com.kapuchai.homeplanr`, runtime org.gnome.Platform
+  //49 (ships libwebkit2gtk-4.1; an ARCH-built deb runs fine against it —
+  runtime glibc is new enough). Verified under the sandbox: argv file-open
+  via document portal (cold + second-instance relay both work; fs-scope
+  `allow_file` accepts `/run/user/*/doc/*` paths), single-instance D-Bus
+  name allowed (app-id-prefixed), recents written with parsed doc name,
+  **doc-portal grants persist after app exit** (Recents reopen works).
+  localStorage/appdata = a THIRD storage root: `~/.var/app/<app-id>/`.
+  Flatpak auto-rewrites the exported desktop Exec with `--file-forwarding
+  … @@ %F @@` — double-click rides the portal with no manifest work.
+  Quirk: org.flatpak.Builder's sandbox can't see host `/tmp` — run local
+  builds from a dir under $HOME (we use `src-tauri/target/flatpak-scratch`).
+  Keep finish-args minimal (wayland/fallback-x11/ipc/dri, NO --filesystem).
+  Flathub submission is post-release; see packaging/flatpak/README.md.
 
 ## Platform quirks (hard-won; don't re-learn)
 

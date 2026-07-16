@@ -1,0 +1,46 @@
+# Flatpak manifest — wraps the released .deb (Tauri-recommended shape).
+# Local verification: see README.md (swaps the url source for a local path).
+# Publish flow: set the sha256 of the PUBLISHED release asset before
+# submitting to Flathub (submission is post-release; Flathub uses its own
+# repo with this manifest as the template).
+app-id: com.kapuchai.homeplanr
+runtime: org.gnome.Platform
+runtime-version: '49'   # ships libwebkit2gtk-4.1 (verified 2026-07-16)
+sdk: org.gnome.Sdk
+command: homeplanr
+finish-args:
+  # Minimal on purpose: file access rides the XDG portals via the Tauri
+  # dialog plugin — no blanket --filesystem.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+modules:
+  - name: homeplanr
+    buildsystem: simple
+    build-commands:
+      - ar -x homeplanr.deb
+      - tar -xf data.tar.gz
+      - install -Dm755 usr/bin/homeplanr /app/bin/homeplanr
+      - install -Dm644 usr/share/icons/hicolor/32x32/apps/homeplanr.png
+        /app/share/icons/hicolor/32x32/apps/com.kapuchai.homeplanr.png
+      - install -Dm644 usr/share/icons/hicolor/128x128/apps/homeplanr.png
+        /app/share/icons/hicolor/128x128/apps/com.kapuchai.homeplanr.png
+      # the deb's 256x256@2 png is 256px physical — plain 256x256 here
+      - install -Dm644 'usr/share/icons/hicolor/256x256@2/apps/homeplanr.png'
+        /app/share/icons/hicolor/256x256/apps/com.kapuchai.homeplanr.png
+      - install -Dm644 usr/share/applications/homeplanr.desktop
+        /app/share/applications/com.kapuchai.homeplanr.desktop
+      - sed -i 's/^Icon=homeplanr$/Icon=com.kapuchai.homeplanr/'
+        /app/share/applications/com.kapuchai.homeplanr.desktop
+      - install -Dm644 usr/share/mime/packages/homeplanr.xml
+        /app/share/mime/packages/com.kapuchai.homeplanr.xml
+      - install -Dm644 com.kapuchai.homeplanr.metainfo.xml
+        /app/share/metainfo/com.kapuchai.homeplanr.metainfo.xml
+    sources:
+      - type: file
+        url: https://github.com/kapuchai/homeplanr/releases/download/v0.5.0/homeplanr_0.5.0_amd64.deb
+        sha256: TODO_SET_FROM_PUBLISHED_RELEASE_ASSET
+        dest-filename: homeplanr.deb
+      - type: file
+        path: com.kapuchai.homeplanr.metainfo.xml

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.kapuchai.homeplanr</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>homeplanr</name>
+  <summary>Draw floor plans in 2D, furnish them, and view in 3D</summary>
+  <description>
+    <p>
+      homeplanr is a home planning app: draw walls, doors and windows on a
+      2D floor plan, furnish rooms from a built-in catalog, and walk through
+      the result in 3D. Plans export to PNG, SVG and true-vector PDF.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>2D editor with snapping, measuring, dimensions and annotations</li>
+      <li>3D view with camera presets and first-person walk mode</li>
+      <li>Furniture catalog with 35+ procedurally drawn items</li>
+      <li>Per-side wall paint, floor finishes, dark mode, metric and imperial units</li>
+      <li>Native .homeplanr project files with crash recovery</li>
+    </ul>
+  </description>
+  <developer id="com.kapuchai">
+    <name>kapuchai</name>
+  </developer>
+  <launchable type="desktop-id">com.kapuchai.homeplanr.desktop</launchable>
+  <provides>
+    <mediatype>application/x-homeplanr</mediatype>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <url type="homepage">https://github.com/kapuchai/homeplanr</url>
+  <url type="bugtracker">https://github.com/kapuchai/homeplanr/issues</url>
+  <releases>
+    <release version="0.5.0" date="2026-07-16"/>
+  </releases>
+</component>

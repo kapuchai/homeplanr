@@ -1,0 +1,28 @@
+# Maintainer: kapuchai
+# Binary package repacking the official .deb release asset.
+# Release flow: bump pkgver, reset pkgrel, run `updpkgsums` against the
+# PUBLISHED GitHub release (draft assets are not downloadable), then
+# `makepkg --printsrcinfo > .SRCINFO`. See README.md next to this file.
+pkgname=homeplanr-bin
+pkgver=0.5.0
+pkgrel=1
+pkgdesc="Home planning app — draw floor plans in 2D, furnish them, and view in 3D"
+arch=('x86_64')
+url="https://github.com/kapuchai/homeplanr"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'shared-mime-info')
+provides=("${pkgname%-bin}=${pkgver}")
+conflicts=("${pkgname%-bin}")
+options=('!strip' '!debug')
+source=("${url}/releases/download/v${pkgver}/homeplanr_${pkgver}_amd64.deb"
+        "LICENSE-v${pkgver}::https://raw.githubusercontent.com/kapuchai/homeplanr/v${pkgver}/LICENSE")
+sha256sums=('SKIP'
+            'SKIP')
+
+package() {
+  # makepkg already unpacked the .deb (ar) into $srcdir; the payload is
+  # data.tar.* (gzip today — glob stays compression-agnostic).
+  bsdtar -xf "${srcdir}"/data.tar.* -C "${pkgdir}"
+  install -Dm644 "${srcdir}/LICENSE-v${pkgver}" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
