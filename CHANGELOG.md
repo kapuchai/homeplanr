@@ -5,6 +5,63 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-16
+
+### Added
+
+- **Camera presets in 3D** — Top / Front / Iso / Reset buttons refit the
+  view instantly (Top matches the 2D plan orientation); a one-time
+  "drag orbits · wheel zooms" hint shows until your first orbit
+- **Walk mode collides with furniture** — tables, sofas, and anything at
+  body or head height now block you (and teleports); rugs pass underfoot
+  and genuinely overhead shelves pass over
+- **Export dialog** (`File → Export…`) — one place for PNG / SVG / **PDF**,
+  print scale presets (Fit, 1:50, 1:100, 1:200 — SVG/PDF at true physical
+  size, PNG at 150 DPI), grid toggle, and margin control
+- **PDF export** — true vector output on A4 / A3 / Letter, portrait or
+  landscape, with an optional title block (name · date · scale). If a fixed
+  scale doesn't fit the paper you're asked to fit, clip, or cancel — never
+  silently cropped
+- **Bundled template plans** — `File → New: Studio 25 m²` and
+  `New: 1-bedroom 45 m²` start you from a furnished starter plan (fresh
+  untitled document each time)
+- **Door swing preview** — the door tool shows the leaf and swing arc
+  *before* you click, following the cursor's side of the wall
+- **Real drag ghost** — dragging or placing furniture previews the item's
+  actual plan symbol (with rotation/mirror) instead of a plain rectangle,
+  and `R`/`F` update the ghost immediately
+- **Resizable side panels** — drag the splitters next to the catalog and
+  properties panels (double-click resets), or collapse either panel with
+  the chevron; sizes persist per device
+
+### Changed
+
+- Cleaner catalog symbols — stacked parts no longer double-draw
+  (the office chair reads as a chair, not a fan); the same derived symbol
+  now also drives the drag ghost, editor, and exports through one shared
+  transform
+- Copy/paste is deterministic: pasting exactly over existing walls now
+  preserves the existing rooms (names, floors) and never conjures phantom
+  doors — pasted geometry always yields to what's already there
+- Splitting a painted wall keeps paint and finish on both halves
+- Walk-mode teleport rejections say "That spot is blocked" (it can be
+  furniture now, not just walls)
+- Opening a file or template now zooms to fit the plan
+- All interface text lives in one table (`src/i18n`) — groundwork for
+  future translations; no visible change
+
+### Fixed
+
+- Catalog cards no longer swallow clicks when the mouse moves 1px during
+  the click
+- Alignment guides use the wall-snapped orientation when a rotated item
+  snaps against a wall (previously they could misalign by ~0.4 m)
+- The File menu no longer shows the previous document's "Last saved" time
+  after `File → New` / opening another file
+- WASD no longer walks the camera behind an open dialog in 3D
+
+*No file-format change — 0.3.0 files open unchanged (schema v3).*
+
 ## [0.3.0] - 2026-07-13
 
 ### Added

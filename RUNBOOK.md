@@ -4,9 +4,22 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.3.0, 2026-07-13)
+## State (as of v0.4.0, 2026-07-16)
 
-Shipped on top of 0.2.0: schema v3 (persistent dimension/label annotations;
+Shipped on top of 0.3.0 (no schema change — still v3): paste determinism
+(demoted-set pipeline: pasted geometry always loses welds/dedups, exact-
+overlay paste is a no-op), 3D camera presets (Top/Front/Iso/Reset) + one-
+time orbit hint + walk-mode furniture collision (body + eye bands),
+catalog hygiene (symbol2d deleted; per-part `symbol` hints + near-dup
+dedup; drag ghost renders the real symbol), pre-click door swing-arc
+preview (shared doorGlyph), panel drag-resize/collapse (device prefs),
+export dialog (PNG/SVG/PDF + scale presets 1:50/1:100/1:200 + grid/margin;
+true-vector PDF via jsPDF+svg2pdf with paper.ts layout + overflow prompt),
+two bundled template plans (File → New: …), and the i18n seam (src/i18n —
+all chrome strings through t()). Splitting painted walls keeps paint;
+doc-replacing ops re-fit the viewport and reset the last-saved stamp.
+
+0.3.0 recap: schema v3 (persistent dimension/label annotations;
 snapEnabled → device pref), marquee multi-select (+Ctrl+A/Shift+2; pan moved
 to right-drag/Space/middle), right-click context menu + batch property
 editing + Split wall, wall/room copy-paste + Duplicate room, align/
@@ -36,6 +49,7 @@ export + 3D screenshot, file association + single instance, Linux
 | Typecheck / lint | `npm run typecheck` / `npm run lint` |
 | Color-token lint | `npm run lint:colors` (raw colors outside the allowed dirs fail CI) |
 | Goldens (pre-schema-bump ONLY) | `npx vite-node scripts/makeGoldens.ts` — refuses to overwrite |
+| Templates (regen at every schema bump) | `npx vite-node scripts/makeTemplates.ts` — MAY overwrite (bytes churn, content matters) |
 | Local bundles | `npm run tauri build` (deb/rpm); AppImage on this Arch box needs `APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=1 npm run tauri build -- --bundles appimage` (no fuse2 installed) |
 | Run local AppImage | `./src-tauri/target/release/bundle/appimage/*.AppImage --appimage-extract-and-run` |
 | Release | push a `v*` tag → `release.yml` builds both OSes + drafts the GitHub release; dry-run anytime via `gh workflow run release.yml` |
@@ -71,6 +85,27 @@ export + 3D screenshot, file association + single instance, Linux
 - **Collision passability oracle = doors only** (`scene3d/walk/collision.ts`):
   blocking rects are the wall's outline u-span minus door intervals; windows
   always block. Never decide passability from eye-height prism slices.
+  **Furniture rects are ADDITIVE** (0.4.0) — they never perturb the wall
+  spans; an item blocks iff its vertical extent intersects the body band
+  (BODY_BAND_LO..HI, 0.3–1.2m) OR the eye band (EYE_HEIGHT ± 0.2m — else
+  the camera clips through head-height cabinets). Constants exported +
+  test-pinned; `mirrored` never affects the footprint rect.
+- **Paste demotion** (0.4.0): `pasteSubgraph` passes every minted id as the
+  pipeline's `demoted` set — a demoted node/wall never survives a weld/
+  dedupe against a kept one (split fragments INHERIT demotion via
+  splitWallRaw), and demoted openings are near-exact-fit-or-drop against
+  kept ones (never evict, never relocate beyond DEMOTED_FIT_TOLERANCE).
+  An empty set is bit-identical to pre-0.4.0 behavior — never demote on
+  non-paste paths.
+- **One furniture symbol transform** (`planGeometry.furnitureTransform`)
+  shared by WorldLayers, exportPlanSvg, and the InteractionOverlay ghost;
+  **one door glyph** (`planGeometry.doorGlyph`, parameterized (u,v)→world)
+  shared by placed doors and the pre-click ghost — the empirically-pinned
+  arc sweep flags must never fork per consumer.
+- **Chrome strings live in `src/i18n/en.ts`** and render via `t()` — new
+  raw literals in chrome components are a review flag. File-format
+  sentinels ('Untitled') and catalog/material names stay OUT of the table
+  (compared/content, not chrome).
 - **Keymap 3D matrix**: in the 3D view only the file accelerators
   (Ctrl+N/O/S/Shift+S) stay live — every editing/navigation key is 2D-only,
   and walk mode owns its keys inside WalkControls.
@@ -124,7 +159,10 @@ export + 3D screenshot, file association + single instance, Linux
    golden opens with healed=false and zero warnings; forward-refusal at
    N+1; a vN recovery blob decodes; new-field roundtrip + invalid-value
    normalization.
-6. Invariant: migrations are silent — old files open clean and upgrade on
+6. Regenerate the bundled templates at the NEW version
+   (`npx vite-node scripts/makeTemplates.ts` — overwrites freely) so they
+   keep parsing with healed=false; `templates.test.ts` pins it.
+7. Invariant: migrations are silent — old files open clean and upgrade on
    the next explicit save.
 
 ## Verification gates (used at every milestone; keep using them)
@@ -214,33 +252,23 @@ in the running app → commit with a detailed message → push → `gh run watch
 User visual checks caught what tests couldn't (mirror chirality, arc sweep,
 pinch behavior, selector collisions) — always do the human pass for UX.
 
-## Deferred to 0.4.0 (user-approved cut when 0.3.0 shipped)
+## Backlog for 0.5.0
 
-Planned-and-designed in the 0.3.0 plan (`~/.claude/plans/let-s-plan-the-
-next-enchanted-dragon.md`) but cut for scope — pick up here:
+Everything deferred from 0.3.0 shipped in 0.4.0 except:
 
-- **M10 — 3D**: Top/Front/Iso/Reset camera presets (pose+target only; never
-  touch the one `rotation-x={-π/2}` mapping point), one-time orbit hint,
-  walk-mode furniture collision (additive body-band RectObstacles, 0.3–1.2m;
-  the doors-only passability oracle governs WALLS and is not violated).
-- **M11 — Output**: export options dialog (wire the dead `includeGrid`/
-  `marginM` params + scale presets), PDF via jsPDF+svg2pdf (design reviewed,
-  on the shelf), bundled template plans via Vite `?raw` + a
-  `scripts/makeTemplates.ts` (regenerate per schema version).
-- **M12 — Catalog hygiene**: per-part `symbol?: 'omit'|'outline'` authoring
-  hints + near-dup prim dedup + 35-item visual pass; DELETE the legacy
-  `symbol2d` field; drag-from-catalog ghost renders the real symbol.
-- **M13 — i18n seam**: `src/i18n/en.ts` + `t()` (chrome strings only, no
-  library) — must be the LAST string-touching milestone of its release.
-- Smaller carried items: panel drag-resize/collapse; opening swing-arc
-  pre-click preview; overlay-paste weld determinism (designate pasted ids
-  as weld/dedupe LOSERS in normalizeGraph so exact-overlay paste preserves
-  room identity — see paste.ts + M9 commit notes); pasted openings bypass
-  `findOpeningSlot` (can displace an existing door on a dedup — bends the
-  never-evict invariant on this one path); PropertiesPanel one-click edits
-  inside the 300ms nudge window fold into the nudge entry (accepted,
-  physically negligible); App.tsx subscribes `docTemporal` directly
-  (violates the transactions-own-zundo rule — route via canUndo/canRedo);
-  AUR + Flatpak packaging; furniture symbol quality polish.
-- **Ask the user for THEIR 0.4.0 feature list first** — they deferred it
-  when 0.3.0 was cut and it has never been collected.
+- **AUR + Flatpak packaging** — user-deferred to 0.5.0 (2026-07-16). AUR:
+  `packaging/aur/PKGBUILD` (`homeplanr-bin` from the released .deb) +
+  release.yml job via `KSXGitHub/github-actions-deploy-aur`; needs an AUR
+  account, one-time package creation, and an `AUR_SSH_PRIVATE_KEY` secret.
+  Flatpak: manifest + local `flatpak-builder` verification first —
+  fs-scope/portal/single-instance under sandbox are genuine unknowns;
+  Flathub submission is post-release.
+- **The user's OWN feature list** — a separate planning session after
+  0.4.0 ships (their call; never yet collected).
+- Accepted non-fixes (documented, no work planned): PropertiesPanel
+  one-click edits inside the 300ms nudge window fold into the nudge undo
+  entry (physically negligible); argv multi-file opens are first-wins.
+- Nice-to-haves observed during 0.4.0: embedded PDF fonts (non-Latin title
+  blocks — WinAnsi limit documented in exportController); a runtime locale
+  switch (module-load t() tables in OptionsDialog/ExportDialog/shortcuts.ts
+  would need to move into render scope — noted in en.ts); icon polish.
