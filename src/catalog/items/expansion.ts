@@ -3,8 +3,7 @@ import type { CatalogItem } from '../types'
 /**
  * M5-R expansion — kitchen, bathroom, living, dining, bedroom, office.
  * Item-local meters; front = −y; at = [cx, cy, bottomZ].
- * Symbols are DERIVED from the parts (symbolFromParts) — the deprecated
- * symbol2d field stays empty for these items.
+ * Symbols are DERIVED from the parts (symbolFromParts).
  */
 
 export const stove: CatalogItem = {
@@ -21,7 +20,6 @@ export const stove: CatalogItem = {
     window: 'screenBlack',
     handle: 'metal',
   },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     b.box('body', { size: [w, d - 0.02, h - 0.03], at: [0, 0.01, 0] })
     b.box('cooktop', { size: [w, d, 0.03], at: [0, 0, h - 0.03] })
@@ -49,7 +47,6 @@ export const kitchenSink: CatalogItem = {
   dims: { w: 0.6, d: 0.6, h: 0.9 }, // 60×60×90 cm (faucet included)
   wallSnap: true,
   materials: { counter: 'whiteLacquer', top: 'woodLight', basin: 'metal', faucet: 'metal' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     const topZ = 0.72 // counter surface; faucet rises to h
     b.box('counter', { size: [w, d, topZ], at: [0, 0, 0] })
@@ -72,7 +69,6 @@ export const kitchenIsland: CatalogItem = {
   dims: { w: 1.8, d: 0.9, h: 0.9 }, // 180×90×90 cm
   wallSnap: false,
   materials: { body: 'whiteLacquer', top: 'woodLight' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     b.box('body', { size: [w - 0.12, d - 0.12, 0.1], at: [0, 0, 0] }) // inset toe-kick
     b.box('body', { size: [w - 0.08, d - 0.08, h - 0.14], at: [0, 0, 0.1] })
@@ -88,7 +84,6 @@ export const wallCabinet: CatalogItem = {
   wallSnap: true,
   defaultElevation: 1.45,
   materials: { carcass: 'whiteLacquer', door: 'linen', handle: 'metal' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     b.box('carcass', { size: [w, d - 0.01, h], at: [0, 0.005, 0] })
     // two door fronts, 1cm proud of the carcass
@@ -107,7 +102,6 @@ export const washbasin: CatalogItem = {
   dims: { w: 0.55, d: 0.45, h: 0.85 }, // 55×45×85 cm
   wallSnap: true,
   materials: { ceramic: 'ceramic', faucet: 'metal' },
-  symbol2d: [],
   build3d: (b, { d, h }) => {
     b.box('ceramic', { size: [0.14, 0.18, 0.66], at: [0, d / 2 - 0.16, 0] }) // pedestal
     // squashed-cylinder bowl, back rim at the wall
@@ -129,7 +123,6 @@ export const shower: CatalogItem = {
   dims: { w: 0.9, d: 0.9, h: 2.1 }, // 90×90×210 cm
   wallSnap: true,
   materials: { tray: 'ceramic', glass: 'glass', frame: 'metal' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     b.box('tray', { size: [w, d, 0.05], at: [0, 0, 0] })
     // corner posts to full height
@@ -153,7 +146,6 @@ export const washingMachine: CatalogItem = {
   dims: { w: 0.6, d: 0.6, h: 0.85 }, // 60×60×85 cm
   wallSnap: true,
   materials: { body: 'whiteLacquer', ring: 'metalDark', eye: 'glass', panel: 'metalDark' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     b.box('body', { size: [w, d - 0.02, h], at: [0, 0.01, 0] })
     // porthole: dark ring disc with a glass eye proud of it
@@ -170,7 +162,6 @@ export const sofaCorner: CatalogItem = {
   dims: { w: 2.6, d: 1.6, h: 0.85 }, // 260×160×85 cm
   wallSnap: true,
   materials: { body: 'fabricGray', cushion: 'fabricGray', feet: 'metalDark' },
-  symbol2d: [],
   // chaise pinned on +x — handedness comes from the instance-level
   // `mirrored` flag, so no builder.mirrorX here.
   build3d: (b, { w, d, h }) => {
@@ -225,7 +216,6 @@ export const floorLamp: CatalogItem = {
   dims: { w: 0.35, d: 0.35, h: 1.6 }, // 35×35×160 cm
   wallSnap: false,
   materials: { base: 'metalDark', pole: 'metal', shade: 'linen' },
-  symbol2d: [],
   build3d: (b, { h }) => {
     b.cylinder('base', { r: 0.17, h: 0.02, at: [0, 0, 0] })
     b.cylinder('pole', { r: 0.015, h: h - 0.3, at: [0, 0, 0.02] })
@@ -240,7 +230,6 @@ export const plant: CatalogItem = {
   dims: { w: 0.4, d: 0.4, h: 1.2 }, // 40×40×120 cm
   wallSnap: false,
   materials: { pot: 'ceramic', leaves: 'foliage' },
-  symbol2d: [],
   build3d: (b, { h }) => {
     b.cylinder('pot', { r: 0.14, h: 0.3, at: [0, 0, 0] })
     // stacked squashed foliage tiers
@@ -257,7 +246,6 @@ export const rug: CatalogItem = {
   dims: { w: 2.0, d: 1.4, h: 0.02 }, // 200×140×2 cm — flat floor covering
   wallSnap: false,
   materials: { pile: 'fabricBeige' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     b.box('pile', { size: [w, d, h], at: [0, 0, 0], round: 0.01 })
   },
@@ -273,7 +261,6 @@ export const tvWall: CatalogItem = {
   wallSnap: true,
   defaultElevation: 1.1,
   materials: { screen: 'screenBlack', frame: 'metalDark' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     // mount box reaching the back (wall) edge
     b.box('frame', { size: [0.4, 0.135, 0.28], at: [0, d / 2 - 0.0675, (h - 0.28) / 2] })
@@ -290,7 +277,6 @@ export const sideTable: CatalogItem = {
   dims: { w: 0.5, d: 0.5, h: 0.55 }, // 50×50×55 cm
   wallSnap: false,
   materials: { top: 'woodLight', frame: 'metalDark' },
-  symbol2d: [],
   build3d: (b, { w, h }) => {
     b.cylinder('top', { r: w / 2, h: 0.03, at: [0, 0, h - 0.03] })
     b.cylinder('frame', { r: 0.025, h: h - 0.05, at: [0, 0, 0.02] })
@@ -305,7 +291,6 @@ export const diningTableRound: CatalogItem = {
   dims: { w: 1.2, d: 1.2, h: 0.74 }, // ⌀120×74 cm
   wallSnap: false,
   materials: { top: 'woodLight', pedestal: 'woodDark' },
-  symbol2d: [],
   build3d: (b, { w, h }) => {
     b.cylinder('top', { r: w / 2, h: 0.035, at: [0, 0, h - 0.035] })
     b.cylinder('pedestal', { r: 0.07, h: h - 0.095, at: [0, 0, 0.06] })
@@ -320,7 +305,6 @@ export const barStool: CatalogItem = {
   dims: { w: 0.4, d: 0.4, h: 0.75 }, // 40×40×75 cm
   wallSnap: false,
   materials: { seat: 'leather', frame: 'metalDark' },
-  symbol2d: [],
   build3d: (b, { h }) => {
     b.cylinder('seat', { r: 0.17, h: 0.05, at: [0, 0, h - 0.05] })
     b.cylinder('frame', { r: 0.02, h: h - 0.08, at: [0, 0, 0.03] })
@@ -336,7 +320,6 @@ export const dresser: CatalogItem = {
   dims: { w: 1.2, d: 0.5, h: 0.8 }, // 120×50×80 cm
   wallSnap: true,
   materials: { carcass: 'woodLight', drawer: 'whiteLacquer', handle: 'metal' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     // low feet
     b.mirrorX(() => {
@@ -361,7 +344,6 @@ export const filingCabinet: CatalogItem = {
   dims: { w: 0.4, d: 0.5, h: 0.6 }, // 40×50×60 cm
   wallSnap: false,
   materials: { body: 'metalDark', drawer: 'metalDark', handle: 'metal' },
-  symbol2d: [],
   build3d: (b, { w, d, h }) => {
     b.box('body', { size: [w, d - 0.02, h], at: [0, 0.01, 0] })
     // 3 drawer fronts, 1cm proud, with handle bars

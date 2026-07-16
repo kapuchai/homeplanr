@@ -38,20 +38,34 @@ const overCanvas = (clientX: number, clientY: number): { world: Vec2 } | null =>
  * - CLICK a card: arms the place-furniture tool (accent ring on the card);
  *   each canvas click places and stays armed; clicking the card disarms.
  */
+/** Press-to-drag threshold — under this many px the gesture is a CLICK
+ * (pointer capture delivers every 1px jitter to the card; without the
+ * threshold a jittery click was silently cancelled as a chrome-drop). */
+const DRAG_THRESHOLD_PX = 5
+
 function ItemCard({ item }: { item: CatalogItem }) {
   const armed = useUiStore((s) => s.toolParams.catalogItemId) === item.id
-  const dragRef = useRef<{ pointerId: number; started: boolean } | null>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    started: boolean
+    x0: number
+    y0: number
+  } | null>(null)
 
   const viewScale = 44 / Math.max(item.dims.w, item.dims.d)
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return
-    dragRef.current = { pointerId: e.pointerId, started: false }
+    dragRef.current = { pointerId: e.pointerId, started: false, x0: e.clientX, y0: e.clientY }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return
-    dragRef.current.started = true
+    const drag = dragRef.current
+    if (!drag.started) {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < DRAG_THRESHOLD_PX) return
+      drag.started = true
+    }
     // world footprint ghost while dragging over the canvas
     const over = overCanvas(e.clientX, e.clientY)
     const interaction = useInteractionStore.getState()
@@ -68,6 +82,7 @@ function ItemCard({ item }: { item: CatalogItem }) {
             { x: over.world.x - hw, y: over.world.y + hh },
           ],
           valid: true,
+          furniture: { itemId: item.id, at: over.world, rot: 0, mirrored: false },
         },
       })
     } else if (interaction.preview) {

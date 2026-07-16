@@ -3,7 +3,13 @@ import type { DerivedGeometry } from '../store/derived'
 import type { Bounds } from '../geometry/polygon'
 import { polygonBounds } from '../geometry/polygon'
 import { docContentBounds } from '../editor2d/render/bounds'
-import { openingSymbol, polyPath, roomFill, type Line } from '../editor2d/render/planGeometry'
+import {
+  furnitureTransform,
+  openingSymbol,
+  polyPath,
+  roomFill,
+  type Line,
+} from '../editor2d/render/planGeometry'
 import { dimensionLabels } from '../editor2d/measure/liveMeasurements'
 import { CATALOG } from '../catalog'
 import { symbolFor } from '../catalog/symbolFromParts'
@@ -184,17 +190,15 @@ export function renderPlanSvg(
   }
   parts.push(...covers, ...symbols)
 
-  // furniture symbols — transform mirrors WorldLayers exactly (trailing
-  // scale(-1 1) = reflection across item-local x=0 before the rotation)
+  // furniture symbols — the shared furnitureTransform keeps this, the
+  // editor (WorldLayers), and the placement ghost pixel-identical
   for (const f of Object.values(doc.furniture)) {
     const item = CATALOG[f.catalogItemId]
-    const deg = (f.rotation * 180) / Math.PI
-    const mirror = f.mirrored ? ' scale(-1 1)' : ''
     const prims = item ? symbolFor(item).map((p) => primEl(p, theme)).join('') : ''
     const inner = item
       ? `<g transform="scale(${f.size.w / item.dims.w} ${f.size.d / item.dims.d})">${prims}</g>`
       : `<rect x="${-f.size.w / 2}" y="${-f.size.d / 2}" width="${f.size.w}" height="${f.size.d}" fill="${theme.symbolBody}" fill-opacity="0.9" stroke="${theme.invalid}" stroke-width="${HAIRLINE}" stroke-dasharray="0.04 0.03"/>`
-    parts.push(`<g transform="translate(${f.x} ${f.y}) rotate(${deg})${mirror}">${inner}</g>`)
+    parts.push(`<g transform="${furnitureTransform(f.x, f.y, f.rotation, f.mirrored)}">${inner}</g>`)
   }
 
   // labels counter-flip (scale(1 -1)) so text reads upright in the y-up view

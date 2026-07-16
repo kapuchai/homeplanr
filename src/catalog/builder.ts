@@ -7,6 +7,15 @@
  */
 export type V3 = [number, number, number]
 
+/**
+ * 2D-symbol authoring hint (M3, 0.4.0) — how symbolFromParts renders this
+ * part's plan projection: 'omit' skips it (inner structure that only
+ * clutters the top view), 'outline' emits it with the stronger outline role
+ * (the part that should read as the item's silhouette). Absent = 'detail'
+ * hairline, the default. 3D rendering is unaffected.
+ */
+export type SymbolHint = 'omit' | 'outline'
+
 export interface BoxPart {
   kind: 'box'
   mat: string
@@ -18,6 +27,7 @@ export interface BoxPart {
   round?: number
   /** Euler rotation [rx, ry, rz] about the part's own center. */
   rot?: V3
+  symbol?: SymbolHint
 }
 
 export interface CylinderPart {
@@ -31,6 +41,7 @@ export interface CylinderPart {
   axis?: 'x' | 'y' | 'z'
   /** Non-uniform scale applied to the geometry (elongated bowls). */
   scale?: V3
+  symbol?: SymbolHint
 }
 
 export type Part = BoxPart | CylinderPart

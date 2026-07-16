@@ -37,14 +37,18 @@ export function createPlaceFurnitureTool(): Tool {
     const item = itemId ? CATALOG[itemId] : null
     if (!item) return null
     const doc = ctx.doc()
-    const quarter = Math.round(rotation / (Math.PI / 2)) % 2 !== 0
+    // guide extents must reflect the EFFECTIVE rotation — wall snap can
+    // impose one (snap.rotation); the previous frame's resolution is the
+    // best available before this frame's resolveSnap runs
+    const effRot = lastSnap?.rotation ?? rotation
+    const quarter = Math.round(effRot / (Math.PI / 2)) % 2 !== 0
     const candidates = [
       ...alignmentGuideCandidates(
         doc,
         {
           hw: (quarter ? item.dims.d : item.dims.w) / 2,
           hh: (quarter ? item.dims.w : item.dims.d) / 2,
-          rotation,
+          rotation: effRot,
         },
         new Set(),
       ),
@@ -69,7 +73,15 @@ export function createPlaceFurnitureTool(): Tool {
       { x: hw, y: hh },
       { x: -hw, y: hh },
     ].map((p) => add(snap.point, rotate(p, rot)))
-    ctx.interaction().set({ preview: { kind: 'ghost', polygon: corners, valid: true }, snap })
+    ctx.interaction().set({
+      preview: {
+        kind: 'ghost',
+        polygon: corners,
+        valid: true,
+        furniture: { itemId: item.id, at: snap.point, rot, mirrored },
+      },
+      snap,
+    })
     return snap
   }
 
@@ -116,6 +128,11 @@ export function createPlaceFurnitureTool(): Tool {
       if ((k === 'r' || k === 'f') && ctx.ui().toolParams.catalogItemId) {
         if (k === 'r') rotation += key === 'R' ? -Math.PI / 2 : Math.PI / 2
         else mirrored = !mirrored
+        // refresh the ghost in place — otherwise the preview shows the OLD
+        // orientation until the next pointermove while a click would place
+        // with the new one
+        const pw = ctx.interaction().pointerWorld
+        if (pw) ghost(ctx, pw)
         return true
       }
       if (key === 'Escape') {

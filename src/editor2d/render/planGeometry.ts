@@ -20,6 +20,21 @@ export const worldPoint = (s: WallSolid, u: number, v: number): Vec2 =>
   add(add(s.frame.origin, scale(s.frame.dir, u)), scale(perp(s.frame.dir), v))
 
 /**
+ * The ONE furniture symbol placement transform (SVG syntax), shared by
+ * WorldLayers, exportPlanSvg, and the InteractionOverlay ghost: trailing
+ * scale(-1 1) = reflection across item-local x=0 BEFORE the rotation (SVG
+ * lists apply right-to-left) — world = T·R·S(-1,1). Per-instance size
+ * scaling is a separate inner group at the call sites that need it.
+ */
+export const furnitureTransform = (
+  x: number,
+  y: number,
+  rotation: number,
+  mirrored: boolean | undefined,
+): string =>
+  `translate(${x} ${y}) rotate(${(rotation * 180) / Math.PI})${mirrored ? ' scale(-1 1)' : ''}`
+
+/**
  * Light tint of a floor color: mix(color, white, 0.55) — channels lerp
  * toward 255 (no hex literal here; lint:colors). Memoized per (id, theme).
  */

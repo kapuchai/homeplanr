@@ -2,6 +2,10 @@ import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
 import { useThemeStore } from '../../theme/themeStore'
 import { normalize, perp, scale, sub, type Vec2 } from '../../geometry/vec'
+import { CATALOG } from '../../catalog'
+import { symbolFor } from '../../catalog/symbolFromParts'
+import { furnitureTransform } from './planGeometry'
+import { SymbolRenderer } from './SymbolRenderer'
 import { Pill } from './Pill'
 
 /**
@@ -82,6 +86,22 @@ export function InteractionOverlay() {
         vectorEffect="non-scaling-stroke"
       />,
     )
+    // furniture ghosts draw the REAL symbol over the tint underlay via the
+    // shared furnitureTransform (ghosts render at natural catalog dims, so
+    // no inner size-scale group here)
+    const f = preview.furniture
+    const item = f ? CATALOG[f.itemId] : null
+    if (f && item) {
+      els.push(
+        <g
+          key="ghost-symbol"
+          opacity={0.75}
+          transform={furnitureTransform(f.at.x, f.at.y, f.rot, f.mirrored)}
+        >
+          <SymbolRenderer prims={symbolFor(item)} />
+        </g>,
+      )
+    }
   }
   if (preview?.kind === 'marquee') {
     els.push(

@@ -1,7 +1,7 @@
 /**
- * Catalog item schema — one definition carries BOTH renderers:
- * symbol2d (declarative SVG prims for the 2D editor) and build3d (procedural
- * part list for the 3D view) live side by side so they can never drift.
+ * Catalog item schema — build3d (procedural part list) is the ONE authoring
+ * source: the 3D view renders the parts and the 2D symbol is DERIVED from
+ * them (symbolFromParts.ts), so the two renderers can never drift.
  *
  * Item-local frame (pinned, see src/model/README.md): origin at footprint
  * center, z = 0 at floor, FRONT faces −y. dims are meters.
@@ -61,13 +61,6 @@ export interface CatalogItem {
   defaultElevation?: number
   /** Named material slots → default palette entries. */
   materials: Record<string, MaterialId>
-  /**
-   * @deprecated Top-view symbols are DERIVED from build3d parts
-   * (symbolFromParts.ts) since the M6 gate — hand symbols drifted from the
-   * 3D look. This field is ignored by all renderers and kept only until the
-   * item files drop their legacy data.
-   */
-  symbol2d: SymbolPrim[]
   /** Procedural 3D parts (see builder.ts). */
   build3d: (b: Builder, dims: Dims) => void
   /** FUTURE: presence switches the 3D renderer to a GLTF loader. */

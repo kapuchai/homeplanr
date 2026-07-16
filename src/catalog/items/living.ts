@@ -9,13 +9,6 @@ export const sofa2: CatalogItem = {
   dims: { w: 1.7, d: 0.92, h: 0.85 },
   wallSnap: true,
   materials: { body: 'fabricBeige', cushion: 'fabricBeige' },
-  symbol2d: [
-    { kind: 'rect', x: -0.85, y: -0.46, w: 1.7, h: 0.92, rx: 0.04, role: 'body' },
-    { kind: 'rect', x: -0.85, y: 0.24, w: 1.7, h: 0.22, role: 'detail' },
-    { kind: 'rect', x: -0.85, y: -0.46, w: 0.18, h: 0.92, role: 'detail' },
-    { kind: 'rect', x: 0.67, y: -0.46, w: 0.18, h: 0.92, role: 'detail' },
-    { kind: 'line', x1: 0, y1: -0.44, x2: 0, y2: 0.24, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     const armW = 0.18
     const backD = 0.22
@@ -47,12 +40,6 @@ export const armchair: CatalogItem = {
   dims: { w: 0.85, d: 0.85, h: 0.8 },
   wallSnap: false,
   materials: { body: 'leather', cushion: 'leather', legs: 'woodDark' },
-  symbol2d: [
-    { kind: 'rect', x: -0.425, y: -0.425, w: 0.85, h: 0.85, rx: 0.06, role: 'body' },
-    { kind: 'rect', x: -0.425, y: 0.2, w: 0.85, h: 0.22, role: 'detail' },
-    { kind: 'rect', x: -0.425, y: -0.4, w: 0.16, h: 0.8, role: 'detail' },
-    { kind: 'rect', x: 0.265, y: -0.4, w: 0.16, h: 0.8, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     const armW = 0.16
     const backD = 0.2
@@ -80,7 +67,6 @@ export const coffeeTable: CatalogItem = {
   dims: { w: 1.1, d: 0.6, h: 0.45 },
   wallSnap: false,
   materials: { top: 'woodDark', legs: 'metalDark' },
-  symbol2d: [{ kind: 'rect', x: -0.55, y: -0.3, w: 1.1, h: 0.6, rx: 0.03, role: 'body' }],
   build3d: (b, { w, d, h }) => {
     b.box('top', { size: [w, d, 0.035], at: [0, 0, h - 0.035] })
     b.box('top', { size: [w - 0.16, d - 0.16, 0.03], at: [0, 0, h * 0.45] }) // shelf
@@ -98,10 +84,6 @@ export const tvStand: CatalogItem = {
   dims: { w: 1.6, d: 0.42, h: 1.2 },
   wallSnap: true,
   materials: { body: 'woodDark', screen: 'screenBlack', legs: 'metalDark' },
-  symbol2d: [
-    { kind: 'rect', x: -0.8, y: -0.21, w: 1.6, h: 0.42, role: 'body' },
-    { kind: 'line', x1: -0.55, y1: 0.12, x2: 0.55, y2: 0.12, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     const standH = 0.45
     b.box('body', { size: [w, d, standH - 0.1], at: [0, 0, 0.1] })
@@ -119,10 +101,6 @@ export const bookshelf: CatalogItem = {
   dims: { w: 0.8, d: 0.32, h: 2.02 },
   wallSnap: true,
   materials: { body: 'woodLight' },
-  symbol2d: [
-    { kind: 'rect', x: -0.4, y: -0.16, w: 0.8, h: 0.32, role: 'body' },
-    { kind: 'line', x1: -0.4, y1: 0, x2: 0.4, y2: 0, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     const t = 0.025
     b.box('body', { size: [t, d, h], at: [-(w / 2 - t / 2), 0, 0] })

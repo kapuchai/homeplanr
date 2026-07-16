@@ -13,7 +13,7 @@ import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { DimensionsLayer } from './DimensionsLayer'
 import { AnnotationsLayer } from './AnnotationsLayer'
-import { openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
+import { furnitureTransform, openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
 import { resizeHandlePositions, rotateHandlePos } from '../tools/handles'
 import { dimensionSpan, labelBox } from '../hit/hitTest'
 import { useThemeStore } from '../../theme/themeStore'
@@ -178,14 +178,10 @@ function FurnitureLayer({ doc }: { doc: ProjectDocument }) {
     <g>
       {Object.values(doc.furniture).map((f) => {
         const item = CATALOG[f.catalogItemId]
-        const deg = (f.rotation * 180) / Math.PI
-        // trailing scale(-1 1) = reflection across item-local x=0 BEFORE the
-        // rotation (SVG lists apply right-to-left): world = T·R·S(-1,1).
-        // Symbols are stroke prims — negative scale is safe here (no mesh
-        // winding), and non-scaling-stroke widths are unaffected.
-        const mirror = f.mirrored ? ' scale(-1 1)' : ''
+        // symbols are stroke prims — the mirror's negative scale is safe
+        // here (no mesh winding), non-scaling-stroke widths unaffected
         return (
-          <g key={f.id} transform={`translate(${f.x} ${f.y}) rotate(${deg})${mirror}`}>
+          <g key={f.id} transform={furnitureTransform(f.x, f.y, f.rotation, f.mirrored)}>
             {item ? (
               <g
                 transform={`scale(${f.size.w / item.dims.w} ${f.size.d / item.dims.d})`}

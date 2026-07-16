@@ -13,17 +13,6 @@ export const sofa3: CatalogItem = {
   dims: { w: 2.2, d: 0.95, h: 0.85 },
   wallSnap: true,
   materials: { body: 'fabricGray', cushion: 'fabricGray', feet: 'metalDark' },
-  symbol2d: [
-    { kind: 'rect', x: -1.1, y: -0.475, w: 2.2, h: 0.95, rx: 0.04, role: 'body' },
-    // back rest along the back (+y) edge
-    { kind: 'rect', x: -1.1, y: 0.255, w: 2.2, h: 0.22, role: 'detail' },
-    // armrests
-    { kind: 'rect', x: -1.1, y: -0.475, w: 0.2, h: 0.95, role: 'detail' },
-    { kind: 'rect', x: 0.9, y: -0.475, w: 0.2, h: 0.95, role: 'detail' },
-    // seat split lines
-    { kind: 'line', x1: -0.3, y1: -0.45, x2: -0.3, y2: 0.25, role: 'detail' },
-    { kind: 'line', x1: 0.3, y1: -0.45, x2: 0.3, y2: 0.25, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     const armW = 0.2
     const backD = 0.22
@@ -58,14 +47,6 @@ export const bedDouble: CatalogItem = {
   dims: { w: 1.67, d: 2.12, h: 1.0 },
   wallSnap: true,
   materials: { frame: 'woodLight', mattress: 'linen', pillow: 'whiteLacquer' },
-  symbol2d: [
-    { kind: 'rect', x: -0.835, y: -1.06, w: 1.67, h: 2.12, role: 'body' },
-    // pillows near the back (+y, headboard side)
-    { kind: 'rect', x: -0.72, y: 0.62, w: 0.66, h: 0.36, rx: 0.05, role: 'detail' },
-    { kind: 'rect', x: 0.06, y: 0.62, w: 0.66, h: 0.36, rx: 0.05, role: 'detail' },
-    // fold line
-    { kind: 'line', x1: -0.835, y1: 0.42, x2: 0.835, y2: 0.42, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     b.box('frame', { size: [w, d, 0.22], at: [0, 0, 0.08] }) // frame on low feet
     b.box('frame', { size: [0.06, d, 0.08], at: [-(w / 2 - 0.06), 0, 0] })
@@ -91,7 +72,6 @@ export const diningTable: CatalogItem = {
   dims: { w: 1.6, d: 0.9, h: 0.74 },
   wallSnap: false,
   materials: { top: 'woodLight', legs: 'woodDark' },
-  symbol2d: [{ kind: 'rect', x: -0.8, y: -0.45, w: 1.6, h: 0.9, rx: 0.02, role: 'body' }],
   build3d: (b, { w, d, h }) => {
     b.box('top', { size: [w, d, 0.04], at: [0, 0, h - 0.04] })
     const inset = 0.08
@@ -111,11 +91,6 @@ export const diningChair: CatalogItem = {
   dims: { w: 0.45, d: 0.52, h: 0.88 },
   wallSnap: false,
   materials: { seat: 'fabricBeige', frame: 'woodDark' },
-  symbol2d: [
-    { kind: 'rect', x: -0.225, y: -0.26, w: 0.45, h: 0.46, rx: 0.03, role: 'body' },
-    // back rest bar at +y
-    { kind: 'rect', x: -0.225, y: 0.2, w: 0.45, h: 0.06, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     const seatH = 0.46
     b.box('seat', { size: [w, d - 0.06, 0.06], at: [0, -0.03, seatH - 0.06], round: 0.02 })
@@ -148,12 +123,6 @@ export const wardrobe: CatalogItem = {
   dims: { w: 1.5, d: 0.6, h: 2.2 },
   wallSnap: true,
   materials: { body: 'whiteLacquer', handles: 'metal' },
-  symbol2d: [
-    { kind: 'rect', x: -0.75, y: -0.3, w: 1.5, h: 0.6, role: 'body' },
-    { kind: 'line', x1: 0, y1: -0.3, x2: 0, y2: 0.3, role: 'detail' }, // door split
-    { kind: 'line', x1: -0.75, y1: -0.3, x2: -0.45, y2: -0.42, role: 'detail' }, // swing tick
-    { kind: 'line', x1: 0.75, y1: -0.3, x2: 0.45, y2: -0.42, role: 'detail' },
-  ],
   build3d: (b, { w, d, h }) => {
     b.box('body', { size: [w, d, h - 0.06], at: [0, 0, 0.06] })
     // plinth: kick-recessed at the front, flush with the back
@@ -172,16 +141,6 @@ export const toilet: CatalogItem = {
   dims: { w: 0.38, d: 0.65, h: 0.78 },
   wallSnap: true,
   materials: { ceramic: 'ceramic', seat: 'whiteLacquer' },
-  symbol2d: [
-    // tank at the back
-    { kind: 'rect', x: -0.19, y: 0.185, w: 0.38, h: 0.14, rx: 0.02, role: 'body' },
-    // bowl — elongated ellipse-ish path (front = −y)
-    {
-      kind: 'path',
-      d: 'M -0.155 0.18 C -0.155 -0.05 -0.12 -0.28 0 -0.30 C 0.12 -0.28 0.155 -0.05 0.155 0.18 Z',
-      role: 'body',
-    },
-  ],
   build3d: (b, { w, d, h }) => {
     // tank
     b.box('ceramic', { size: [w, 0.16, 0.4], at: [0, d / 2 - 0.09, h - 0.42], round: 0.02 })

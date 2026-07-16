@@ -32,6 +32,13 @@ export interface GhostPreview {
   kind: 'ghost'
   polygon: Vec2[]
   valid: boolean
+  /**
+   * Furniture ghosts: the real catalog symbol rendered at this transform
+   * (InteractionOverlay); the polygon stays as the valid/invalid tint
+   * underlay. Item-local prims at natural dims — rot in radians, mirrored
+   * = reflection across item-local x=0 before rotation.
+   */
+  furniture?: { itemId: string; at: Vec2; rot: number; mirrored: boolean }
 }
 
 export interface MarqueePreview {
