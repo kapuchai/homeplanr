@@ -127,6 +127,7 @@ export function createSelectTool(): Tool {
     derived: ctx.derived(),
     pxToWorld: ctx.pxToWorld(),
     units: useAppSettings.getState().units,
+    showDimensions: useAppSettings.getState().showDimensions,
   })
 
   const beginFurnitureDrag = (

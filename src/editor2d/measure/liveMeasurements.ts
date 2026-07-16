@@ -21,6 +21,9 @@ export interface MeasureInput {
   /** meters per screen px at current zoom. */
   pxToWorld: number
   units: UnitSystem
+  /** Permanent dimension labels are ON — passive full-wall drag pills are
+   * suppressed so the same wall length never renders twice (B4). */
+  showDimensions?: boolean
 }
 
 /** Furniture rays longer than this (m) measure nothing. */
@@ -96,7 +99,8 @@ export function openingDragPills(
  * Pills for a furniture drag: one clearance measurement per OBB edge
  * (edge-midpoint ray along the local axis, front = local −y per handles.ts,
  * nearest wall-face hit within MEASURE_MAX_DIST), plus one passive
- * full-length pill per unique wall hit.
+ * full-length pill per unique wall hit — unless showDimensions already
+ * labels every wall permanently (the clearance pills are the useful part).
  */
 export function furnitureDragPills(m: MeasureInput, grabbedId: FurnitureId): DimensionPill[] {
   const f = m.doc.furniture[grabbedId]
@@ -154,7 +158,7 @@ export function furnitureDragPills(m: MeasureInput, grabbedId: FurnitureId): Dim
       from: edgeMid,
       to: best.hit,
     })
-    if (!passiveByWall.has(best.wallId)) {
+    if (!m.showDimensions && !passiveByWall.has(best.wallId)) {
       const w = m.doc.walls[best.wallId]!
       const na = m.doc.nodes[w.a]!
       const nb = m.doc.nodes[w.b]!
@@ -220,8 +224,10 @@ const wallRooms = (doc: ProjectDocument): Map<WallId, RoomId[]> => {
 }
 
 /**
- * One length label per wall, placed on the OUTSIDE of the owning room
- * (boundary walls between two rooms, or walls in none, default to +perp).
+ * One length label per wall, placed on the OUTSIDE of the owning room.
+ * Boundary walls between two rooms (either side is interior) and walls in
+ * no room have no outside — they take the SCREEN-UP side deterministically
+ * instead of the arbitrary a→b winding side (B5).
  */
 export function dimensionLabels(
   doc: ProjectDocument,
@@ -239,16 +245,18 @@ export function dimensionLabels(
     if (length < MIN_LABEL_LENGTH) continue
     const n = perp(normalize(sub(nb, na)))
     const mid = lerp(na, nb, 0.5)
-    let side = 1
+    let side: 1 | -1
     const owners = byWall.get(w.id)
-    if (owners?.length === 1) {
-      const room = derived.rooms[owners[0]!]
-      if (
-        room &&
-        pointInPolygonWithHoles(add(mid, scale(n, SIDE_PROBE)), room.polygon, room.holePolygons)
-      ) {
-        side = -1 // +perp probes into the room ⇒ label on the opposite side
-      }
+    const room = owners?.length === 1 ? derived.rooms[owners[0]!] : undefined
+    if (room) {
+      // +perp probes into the room ⇒ label on the opposite (outside) side
+      side = pointInPolygonWithHoles(add(mid, scale(n, SIDE_PROBE)), room.polygon, room.holePolygons)
+        ? -1
+        : 1
+    } else {
+      // no unique outside: pick screen-up (+y renders up; vertical walls
+      // tie-break toward +x) so the side never depends on a→b winding
+      side = n.y > 0 || (n.y === 0 && n.x > 0) ? 1 : -1
     }
     out.push({
       wallId: w.id,

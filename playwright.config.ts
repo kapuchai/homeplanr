@@ -15,7 +15,10 @@ export default defineConfig({
   snapshotPathTemplate: '{testDir}/__screenshots__/{testFileName}/{arg}{ext}',
   expect: {
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.02,
+      // DOM renders are deterministic on one box — a tight ABSOLUTE budget
+      // (a ratio lets whole pills drift inside big viewport shots). The
+      // WebGL shot overrides this with maxDiffPixelRatio in the spec.
+      maxDiffPixels: 64,
       animations: 'disabled',
     },
   },

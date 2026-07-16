@@ -305,7 +305,10 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
       return
     }
     e.preventDefault()
-    const step = (e.shiftKey ? 0.1 : 0.01) * (key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1)
+    // the 2D view renders y-UP (screen.y = ty − y·k), so ArrowUp = +y in
+    // data space — the B3 0.4.0 bug was mapping ArrowUp to −y (data-space
+    // y-down thinking), which nudged furniture visually DOWNWARD
+    const step = (e.shiftKey ? 0.1 : 0.01) * (key === 'ArrowLeft' || key === 'ArrowDown' ? -1 : 1)
     const dx = key === 'ArrowLeft' || key === 'ArrowRight' ? step : 0
     const dy = key === 'ArrowUp' || key === 'ArrowDown' ? step : 0
     // arrows while a FOREIGN gesture owns the tx (mid-drag) are swallowed —

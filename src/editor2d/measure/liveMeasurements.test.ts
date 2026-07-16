@@ -159,6 +159,15 @@ describe('furnitureDragPills', () => {
     expect(passives).toHaveLength(3) // bottom (deduped), left, right
     expect(passives.map((p) => p.text).sort()).toEqual(['3.00 m', '3.00 m', '4.00 m'])
   })
+
+  it('suppresses passive wall pills when permanent dimensions are shown (B4)', () => {
+    const d = doc()
+    room4x3(d)
+    const fid = box(d, 2, 1.5)
+    const pills = furnitureDragPills({ ...mi(d), showDimensions: true }, fid)
+    expect(pills.filter((p) => !p.tone)).toHaveLength(4) // clearances stay
+    expect(pills.filter((p) => p.tone === 'passive')).toEqual([])
+  })
 })
 
 describe('incidentWallIds', () => {
@@ -183,6 +192,32 @@ describe('dimensionLabels', () => {
     for (const l of labels) {
       expect(pointInPolygonWithHoles(l.at, room.polygon, room.holePolygons)).toBe(false)
     }
+  })
+
+  it('orphan walls take the screen-up side regardless of a→b winding (B5)', () => {
+    const d1 = doc()
+    addWallSegment(d1, vec(0, 0), vec(2, 0))
+    const d2 = doc()
+    addWallSegment(d2, vec(2, 0), vec(0, 0)) // reversed winding
+    const l1 = dimensionLabels(d1, getDerived(d1), 'm')[0]!
+    const l2 = dimensionLabels(d2, getDerived(d2), 'm')[0]!
+    expect(l1.at.y).toBeGreaterThan(0) // +y renders screen-up
+    expect(l2.at.y).toBeGreaterThan(0)
+    expect(l2.at).toEqual(l1.at)
+  })
+
+  it('a wall shared by two rooms takes the deterministic side, not the winding side (B5)', () => {
+    const d = doc()
+    room4x3(d)
+    addWallSegment(d, vec(2, 0), vec(2, 3)) // splits into two 2×3 rooms
+    const derived = getDerived(d)
+    expect(Object.keys(derived.rooms)).toHaveLength(2)
+    const labels = dimensionLabels(d, derived, 'm')
+    const shared = labels.filter((l) => l.at.x > 1 && l.at.x < 3 && l.text === '3.00 m')
+    expect(shared).toHaveLength(1)
+    // vertical boundary wall: both sides are interior ⇒ tie-break toward +x
+    expect(shared[0]!.at.x).toBeGreaterThan(2)
+    expect(shared[0]!.at.y).toBeCloseTo(1.5, 9)
   })
 })
 

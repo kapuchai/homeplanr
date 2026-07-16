@@ -468,7 +468,19 @@ describe('keymap', () => {
     expect(past()).toBe(base + 1)
     const f = useDocStore.getState().doc.furniture[id]!
     expect(f.x).toBeCloseTo(2.02, 9)
-    expect(f.y).toBeCloseTo(2.1, 9)
+    expect(f.y).toBeCloseTo(1.9, 9) // Down = −y: the view renders y-UP (B3)
+  })
+
+  it('nudge directions match the y-up render: Up = +y, Down = −y (B3)', () => {
+    const id = addSofa()
+    useUiStore.getState().setSelection([id])
+    handleKey(key('ArrowUp'), ctx, registry)
+    flushPendingNudge()
+    expect(useDocStore.getState().doc.furniture[id]!.y).toBeCloseTo(2.01, 9)
+    handleKey(key('ArrowDown'), ctx, registry)
+    handleKey(key('ArrowDown'), ctx, registry)
+    flushPendingNudge()
+    expect(useDocStore.getState().doc.furniture[id]!.y).toBeCloseTo(1.99, 9)
   })
 
   it('undo/redo are swallowed while a transaction is live', () => {

@@ -20,11 +20,13 @@ export function Pill({
   const theme = useThemeStore((s) => s.theme)
   const w = text.length * 6.6 + 12
   return (
-    // counter-scale flips y back (world renders y-up) so text stays upright
+    // counter-scale flips y back (world renders y-up) so text stays upright;
+    // the box is CENTERED on the anchor (B5) — an above-anchor box read as
+    // asymmetric placement whenever the side rule put a label below a wall
     <g transform={`translate(${at.x} ${at.y}) scale(${1 / k} ${-1 / k})`} pointerEvents="none">
       <rect
         x={-w / 2}
-        y={-20}
+        y={-9}
         width={w}
         height={18}
         rx={5}
@@ -33,7 +35,7 @@ export function Pill({
       />
       <text
         textAnchor="middle"
-        y={-7}
+        y={4}
         fontSize={11}
         fill={tone === 'passive' ? theme.textMuted : theme.text}
       >
