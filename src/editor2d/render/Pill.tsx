@@ -1,4 +1,5 @@
 import { useThemeStore } from '../../theme/themeStore'
+import { PILL_H_PX, pillWidthPx } from './pillMetrics'
 import type { Vec2 } from '../../geometry/vec'
 
 /**
@@ -18,7 +19,7 @@ export function Pill({
   tone?: 'measure' | 'passive'
 }) {
   const theme = useThemeStore((s) => s.theme)
-  const w = text.length * 6.6 + 12
+  const w = pillWidthPx(text)
   return (
     // counter-scale flips y back (world renders y-up) so text stays upright;
     // the box is CENTERED on the anchor (B5) — an above-anchor box read as
@@ -26,9 +27,9 @@ export function Pill({
     <g transform={`translate(${at.x} ${at.y}) scale(${1 / k} ${-1 / k})`} pointerEvents="none">
       <rect
         x={-w / 2}
-        y={-9}
+        y={-PILL_H_PX / 2}
         width={w}
-        height={18}
+        height={PILL_H_PX}
         rx={5}
         fill={theme.pillBg}
         stroke={theme.pillBorder}

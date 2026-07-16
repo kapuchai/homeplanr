@@ -12,7 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Trackpad-friendly scrolling** — new `Options → View → Mouse wheel`
   setting: keep the default (wheel zooms) or switch to *Pan (trackpad)*
   where two-finger scroll pans the plan and pinch (Ctrl+wheel) zooms.
-  **Space+wheel now pans in any mode**; Shift+wheel still pans sideways
+  **Space+wheel now pans in any mode**; Shift+wheel still pans sideways.
+  *Known issue: on some Linux trackpads the desktop app doesn't receive
+  these scroll events yet, so the new modes may have no effect there —
+  tracked for a future bug-fix release*
 - **Sensible save/export folders** — exports (PNG/SVG/PDF/3D shots) open
   in Downloads, project save/open dialogs in Documents, and each dialog
   remembers the last folder you actually picked

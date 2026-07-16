@@ -15,6 +15,7 @@ import {
   openingDragPills,
   type MeasureInput,
 } from './liveMeasurements'
+import { pillWidthPx } from '../render/pillMetrics'
 
 /**
  * Pure measurement geometry: gaps come from REALIZED opening intervals and
@@ -204,6 +205,19 @@ describe('dimensionLabels', () => {
     expect(l1.at.y).toBeGreaterThan(0) // +y renders screen-up
     expect(l2.at.y).toBeGreaterThan(0)
     expect(l2.at).toEqual(l1.at)
+  })
+
+  it('vertical-wall labels clear the wall by the pill half-WIDTH (0.5.0 checklist)', () => {
+    const d = doc()
+    addWallSegment(d, vec(0, 0), vec(0, 2)) // vertical orphan wall at x=0
+    const pxToWorld = 1 / 60
+    const [label] = dimensionLabels(d, getDerived(d), 'm', pxToWorld)
+    // the pill box is centered on `at`; its near EDGE must clear the wall
+    // face (a flat 16px anchor offset only cleared the 9px half-height)
+    const halfW = (pillWidthPx(label!.text) / 2) * pxToWorld
+    const face = d.settings.defaultWallThickness / 2
+    expect(Math.abs(label!.at.x) - halfW).toBeGreaterThanOrEqual(face)
+    expect(label!.at.y).toBeCloseTo(1, 9) // still at the wall midpoint
   })
 
   it('a wall shared by two rooms takes the deterministic side, not the winding side (B5)', () => {

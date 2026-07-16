@@ -60,6 +60,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
     title: t('shortcuts.section.view'),
     rows: [
       { keys: 'Space+drag / middle / right-drag', does: t('shortcuts.does.pan') },
+      { keys: 'Space+wheel', does: t('shortcuts.does.panWheel') },
       { keys: 'Wheel', does: t('shortcuts.does.zoomCursor') },
       { keys: '+ / −', does: t('shortcuts.does.zoomInOut') },
       { keys: 'Shift+1', does: t('shortcuts.does.zoomToFit') },

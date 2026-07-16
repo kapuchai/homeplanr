@@ -919,11 +919,14 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px 24px;
-  max-height: 60vh;
+  max-height: 72vh;
   /* vertical scroll only — the wide modal gives the columns their room;
-     never let overflow-y force a horizontal scrollbar in (B8) */
+     never let overflow-y force a horizontal scrollbar in (B8). The gutter
+     + padding keep the (overlay) scrollbar off the kbd chips. */
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding-right: 10px;
 }
 
 .shortcut-row kbd {

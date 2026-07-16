@@ -8,6 +8,7 @@ import type { Vec2 } from '../../geometry/vec'
 import { add, cross, dist, lerp, normalize, perp, rotate, scale, sub } from '../../geometry/vec'
 import { segSegIntersection } from '../../geometry/segment'
 import { pointInPolygonWithHoles } from '../../geometry/polygon'
+import { PILL_H_PX, pillHalfExtentPx } from '../render/pillMetrics'
 
 /**
  * Live drag measurements + permanent wall dimensions — PURE (type-only store
@@ -32,6 +33,19 @@ export const MEASURE_MAX_DIST = 8
 export const PILL_OFFSET_PX = 16
 /** Gaps below this (m) are flush placements — suppressed. */
 export const MIN_GAP = 0.005
+/**
+ * Visual gap between geometry and the pill BOX EDGE (screen px). Pills
+ * are centered on their anchor, so the anchor offset must clear the box's
+ * half-extent along the offset normal (half-WIDTH for vertical walls —
+ * the 0.5.0 checklist caught side labels sitting on the wall when a flat
+ * 16 px offset only cleared the half-height). 16 − 18/2 keeps horizontal
+ * labels exactly where they were.
+ */
+const PILL_GAP_PX = PILL_OFFSET_PX - PILL_H_PX / 2
+
+/** Anchor offset (px) that clears the pill box along unit normal n. */
+const pillClearancePx = (text: string, n: Vec2): number =>
+  pillHalfExtentPx(text, n) + PILL_GAP_PX
 
 export function incidentWallIds(doc: ProjectDocument, nodeId: NodeId): WallId[] {
   const out: WallId[] = []
@@ -66,12 +80,14 @@ export function openingDragPills(
 
   const side = cross(solid.frame.dir, sub(cursor, solid.frame.origin)) >= 0 ? 1 : -1
   const vFace = (side * wall.thickness) / 2
-  const off = scale(perp(solid.frame.dir), side * PILL_OFFSET_PX * m.pxToWorld)
+  const n = scale(perp(solid.frame.dir), side)
+  const off = (text: string) => scale(n, pillClearancePx(text, n) * m.pxToWorld)
 
+  const widthText = formatLength(self.u1 - self.u0, m.units)
   const pills: DimensionPill[] = [
     {
-      at: add(facePoint(solid, (self.u0 + self.u1) / 2, vFace), off),
-      text: formatLength(self.u1 - self.u0, m.units),
+      at: add(facePoint(solid, (self.u0 + self.u1) / 2, vFace), off(widthText)),
+      text: widthText,
     },
   ]
   const prev = solid.openings[idx - 1]
@@ -85,9 +101,10 @@ export function openingDragPills(
     if (gap < MIN_GAP) continue
     const from = facePoint(solid, u0, vFace)
     const to = facePoint(solid, u1, vFace)
+    const text = formatLength(gap, m.units)
     pills.push({
-      at: add(lerp(from, to, 0.5), off),
-      text: formatLength(gap, m.units),
+      at: add(lerp(from, to, 0.5), off(text)),
+      text,
       from,
       to,
     })
@@ -164,12 +181,11 @@ export function furnitureDragPills(m: MeasureInput, grabbedId: FurnitureId): Dim
       const nb = m.doc.nodes[w.b]!
       const wDir = normalize(sub(nb, na))
       const sideSign = cross(wDir, sub(center, na)) >= 0 ? 1 : -1
+      const wn = scale(perp(wDir), sideSign)
+      const text = formatLength(dist(na, nb), m.units)
       passiveByWall.set(best.wallId, {
-        at: add(
-          lerp(na, nb, 0.5),
-          scale(perp(wDir), sideSign * PILL_OFFSET_PX * m.pxToWorld),
-        ),
-        text: formatLength(dist(na, nb), m.units),
+        at: add(lerp(na, nb, 0.5), scale(wn, pillClearancePx(text, wn) * m.pxToWorld)),
+        text,
         tone: 'passive',
       })
     }
@@ -185,10 +201,11 @@ export function wallLengthPills(m: MeasureInput, wallIds: Iterable<WallId>): Dim
     const na = w && m.doc.nodes[w.a]
     const nb = w && m.doc.nodes[w.b]
     if (!w || !na || !nb) continue
-    const dir = normalize(sub(nb, na))
+    const n = perp(normalize(sub(nb, na)))
+    const text = formatLength(dist(na, nb), m.units)
     pills.push({
-      at: add(lerp(na, nb, 0.5), scale(perp(dir), PILL_OFFSET_PX * m.pxToWorld)),
-      text: formatLength(dist(na, nb), m.units),
+      at: add(lerp(na, nb, 0.5), scale(n, pillClearancePx(text, n) * m.pxToWorld)),
+      text,
     })
   }
   return pills
@@ -258,11 +275,12 @@ export function dimensionLabels(
       // tie-break toward +x) so the side never depends on a→b winding
       side = n.y > 0 || (n.y === 0 && n.x > 0) ? 1 : -1
     }
+    const text = formatLength(length, units)
     out.push({
       wallId: w.id,
-      at: add(mid, scale(n, side * (w.thickness / 2 + PILL_OFFSET_PX * pxToWorld))),
+      at: add(mid, scale(n, side * (w.thickness / 2 + pillClearancePx(text, n) * pxToWorld))),
       length,
-      text: formatLength(length, units),
+      text,
     })
   }
   return out
