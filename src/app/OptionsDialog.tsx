@@ -167,6 +167,27 @@ export function OptionsDialog() {
               ))}
             </div>
           </div>
+          <div className="options-row">
+            <span>{t('options.showAnnotations')}</span>
+            <div className="segmented small">
+              <button
+                type="button"
+                aria-pressed={settings.showAnnotations}
+                className={settings.showAnnotations ? 'active' : ''}
+                onClick={() => settings.setShowAnnotations(true)}
+              >
+                {t('common.on')}
+              </button>
+              <button
+                type="button"
+                aria-pressed={!settings.showAnnotations}
+                className={!settings.showAnnotations ? 'active' : ''}
+                onClick={() => settings.setShowAnnotations(false)}
+              >
+                {t('common.off')}
+              </button>
+            </div>
+          </div>
         </section>
         <div className="modal-buttons">
           <button type="button" className="primary" onClick={() => setOpen(false)}>

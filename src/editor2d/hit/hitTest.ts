@@ -25,6 +25,10 @@ export type EntityRef =
 export interface HitOptions {
   /** Nodes eligible for hitting (plan: only when self/neighbor selected). */
   nodeCandidates?: ReadonlySet<NodeId>
+  /** The showAnnotations toggle (0.7.0): pass false when the annotations
+   * layer is hidden so hidden annotations never steal clicks/marquees —
+   * the same visibility-parity rule as the zoom culls below. */
+  annotationsVisible?: boolean
 }
 
 const ANNOTATION_TOLERANCE_PX = 5
@@ -71,7 +75,7 @@ export function hitTestAll(
 
   // --- annotations (topmost render layer; invisible-at-zoom ones excluded) ---
   const annTol = ANNOTATION_TOLERANCE_PX * pxToWorld
-  for (const ann of Object.values(doc.annotations)) {
+  for (const ann of opts.annotationsVisible === false ? [] : Object.values(doc.annotations)) {
     if (ann.kind === 'dimension') {
       const { p, q } = dimensionSpan(ann)
       if (dist(p, q) < DIMENSION_MIN_PX * pxToWorld) continue // layer culls it
@@ -216,12 +220,13 @@ export function hitTestRect(
   a: Vec2,
   b: Vec2,
   pxToWorld?: number,
+  opts: HitOptions = {},
 ): EntityRef[] {
   const min = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) }
   const max = { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) }
   const hits: EntityRef[] = []
 
-  for (const ann of Object.values(doc.annotations)) {
+  for (const ann of opts.annotationsVisible === false ? [] : Object.values(doc.annotations)) {
     if (ann.kind === 'dimension') {
       const { p, q } = dimensionSpan(ann)
       if (pxToWorld !== undefined && dist(p, q) < DIMENSION_MIN_PX * pxToWorld) continue

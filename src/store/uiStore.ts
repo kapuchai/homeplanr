@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { useDocStore } from './docStore'
+import { useAppSettings } from './appSettings'
 
 /**
  * UI/session state — never undoable, never persisted.
@@ -100,12 +101,14 @@ export const useUiStore = create<UiState>()(
 )
 
 /**
- * Prune selection/hover ids that no longer exist in the document.
+ * Prune selection/hover ids that no longer exist in the document, and drop
+ * annotation ids when the annotations layer is hidden (0.7.0) — an invisible
+ * selection outline with a live Delete key reads as broken.
  * Called once from app bootstrap (kept out of module scope so importing the
  * store in tests has no side effects). Returns the unsubscribe function.
  */
 export function initSelectionPruning(): () => void {
-  return useDocStore.subscribe(
+  const unsubDoc = useDocStore.subscribe(
     (s) => s.doc,
     (doc) => {
       const exists = (id: string) =>
@@ -121,4 +124,19 @@ export function initSelectionPruning(): () => void {
       if (ui.hoveredId && !exists(ui.hoveredId)) ui.setHovered(null)
     },
   )
+  const unsubVisibility = useAppSettings.subscribe(
+    (s) => s.showAnnotations,
+    (show) => {
+      if (show) return
+      const doc = useDocStore.getState().doc
+      const ui = useUiStore.getState()
+      const kept = ui.selection.filter((id) => !(id in doc.annotations))
+      if (kept.length !== ui.selection.length) ui.setSelection(kept)
+      if (ui.hoveredId && ui.hoveredId in doc.annotations) ui.setHovered(null)
+    },
+  )
+  return () => {
+    unsubDoc()
+    unsubVisibility()
+  }
 }

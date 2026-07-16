@@ -109,6 +109,7 @@ export const en = {
   'options.dimsWalls': 'Walls',
   'options.dimsOpenings': '+ Openings',
   'options.dimsAll': 'All',
+  'options.showAnnotations': 'Measurements & labels',
 
   // ---- export dialog + flow ----
   'export.title': 'Export plan',
@@ -286,6 +287,7 @@ export const en = {
   'shortcuts.does.zoomToFit': 'Zoom to fit',
   'shortcuts.does.zoomToSelection': 'Zoom to selection',
   'shortcuts.does.wallDimensions': 'Cycle dimension labels (walls / openings / all)',
+  'shortcuts.does.annotations': 'Show/hide measurements & labels',
   'shortcuts.does.thisSheet': 'This sheet',
   'shortcuts.does.newProject': 'New project',
   'shortcuts.does.open': 'Open…',
@@ -343,6 +345,8 @@ export const en = {
   'hint.placeOpening': 'Click a wall to place the {kind} · stays armed for more · Esc to finish',
   'hint.placeFurniture': 'Click to place · R rotates the ghost · Esc to finish',
   'hint.measure': 'Click two points to measure · Enter keeps it as a dimension · Esc clears',
+  'hint.measureHidden':
+    'Kept measurements are hidden (Shift+A shows them) · Enter keeps & shows · Esc clears',
   'hint.annotateText': 'Click to place a text label · type its text in the panel · Esc exits',
   'hint.multiSelect': '{count} selected · drag moves all · R rotates · Ctrl+D duplicates · Del deletes',
   'hint.singleSelect':

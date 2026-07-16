@@ -273,7 +273,9 @@ export function Editor2D() {
         // deselects so the menu shows document-level actions
         const n = normalize(e)
         const ui = useUiStore.getState()
-        const hit = hitTestTop(ctx.doc(), ctx.derived(), n.world, ctx.pxToWorld())
+        const hit = hitTestTop(ctx.doc(), ctx.derived(), n.world, ctx.pxToWorld(), {
+          annotationsVisible: useAppSettings.getState().showAnnotations,
+        })
         if (hit && !ui.selection.includes(hit.id)) ui.setSelection([hit.id])
         else if (!hit && ui.selection.length) ui.clearSelection()
         ui.setContextMenu({ x: n.screen.x, y: n.screen.y, world: n.world })

@@ -106,7 +106,13 @@ export function createMeasureTool(): Tool {
         // immediate offset-drag or delete
         if (state.a && state.b) {
           const id = ctx.actions().addDimension(state.a, state.b, 0)
-          if (id) ctx.ui().setSelection([id])
+          if (id) {
+            ctx.ui().setSelection([id])
+            // persisting into a hidden layer would look like a dead Enter —
+            // creating an annotation re-enables visibility (0.7.0)
+            const settings = useAppSettings.getState()
+            if (!settings.showAnnotations) settings.setShowAnnotations(true)
+          }
           reset(ctx) // even a sub-cm (rejected) freeze is consumed
           return true
         }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
+import { useAppSettings } from '../store/appSettings'
 import { usePersistStore } from '../store/persistence/controller'
 import { t } from '../i18n'
 
@@ -9,6 +10,7 @@ export function StatusHint() {
   const tool = useUiStore((s) => s.activeTool)
   const selection = useUiStore((s) => s.selection)
   const openingKind = useUiStore((s) => s.toolParams.openingKind)
+  const showAnnotations = useAppSettings((s) => s.showAnnotations)
   const empty = useDocStore(
     (s) => Object.keys(s.doc.walls).length === 0 && Object.keys(s.doc.furniture).length === 0,
   )
@@ -51,7 +53,8 @@ export function StatusHint() {
   } else if (tool === 'place-furniture') {
     text = t('hint.placeFurniture')
   } else if (tool === 'measure') {
-    text = t('hint.measure')
+    // hidden-layer variant: explains where persisted measures went
+    text = showAnnotations ? t('hint.measure') : t('hint.measureHidden')
   } else if (tool === 'annotate-text') {
     text = t('hint.annotateText')
   } else if (selection.length > 1) {

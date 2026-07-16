@@ -66,6 +66,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: 'Shift+1', does: t('shortcuts.does.zoomToFit') },
       { keys: 'Shift+2', does: t('shortcuts.does.zoomToSelection') },
       { keys: 'Shift+D', does: t('shortcuts.does.wallDimensions') },
+      { keys: 'Shift+A', does: t('shortcuts.does.annotations') },
       { keys: '?', does: t('shortcuts.does.thisSheet') },
     ],
   },

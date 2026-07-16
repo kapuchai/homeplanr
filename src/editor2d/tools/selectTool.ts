@@ -232,7 +232,10 @@ export function createSelectTool(): Tool {
         }
         if (doc.nodes[id as NodeId]) nodeCands.add(id as NodeId)
       }
-      const hits = hitTestAll(doc, ctx.derived(), e.world, px, { nodeCandidates: nodeCands })
+      const hits = hitTestAll(doc, ctx.derived(), e.world, px, {
+        nodeCandidates: nodeCands,
+        annotationsVisible: useAppSettings.getState().showAnnotations,
+      })
 
       // alt+click cycles immediately (deliberate gesture); same-spot-click
       // cycling advances on POINTER-UP only — a drag starting at the same
@@ -277,6 +280,7 @@ export function createSelectTool(): Tool {
           }
           const hit = hitTestAll(doc, ctx.derived(), e.world, px, {
             nodeCandidates: nodeCands,
+            annotationsVisible: useAppSettings.getState().showAnnotations,
           })[0]
           if (ui.hoveredId !== (hit?.id ?? null)) ui.setHovered(hit?.id ?? null)
           return
@@ -360,7 +364,9 @@ export function createSelectTool(): Tool {
 
         case 'marquee': {
           // live-updating selection: what you see boxed is what you get
-          const hits = hitTestRect(doc, ctx.derived(), state.origin, e.world, px)
+          const hits = hitTestRect(doc, ctx.derived(), state.origin, e.world, px, {
+            annotationsVisible: useAppSettings.getState().showAnnotations,
+          })
           const ids = new Set(state.base)
           for (const h of hits) ids.add(h.id)
           const next = [...ids]
@@ -576,7 +582,9 @@ export function createSelectTool(): Tool {
             // same-spot repeat CLICKS cycle the overlap stack (WM-independent
             // fallback for Alt+click, which Linux WMs often grab)
             const px = ctx.pxToWorld()
-            const hits = hitTestAll(doc, ctx.derived(), e.world, px)
+            const hits = hitTestAll(doc, ctx.derived(), e.world, px, {
+              annotationsVisible: useAppSettings.getState().showAnnotations,
+            })
             const samePlace = cycle && dist(cycle.screen, e.screen) < SLOP_PX
             if (samePlace && hits.length > 1) {
               const index = (cycle!.index + 1) % hits.length

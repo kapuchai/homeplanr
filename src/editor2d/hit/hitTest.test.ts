@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { hitTestAll, hitTestRect, hitTestTop } from './hitTest'
 import { buildFixtureDoc } from '../../test/fixtureDoc'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
+import { addDimension } from '../../model/mutations/annotations'
 import { vec } from '../../geometry/vec'
 
 const PX = 0.01 // pxToWorld at k=100
@@ -128,5 +129,33 @@ describe('hitTestRect (marquee) on the fixture apartment', () => {
     )
     const hits = hitTestRect(doc, derived, vec(c.x - 0.1, c.y - 0.1), vec(c.x + 0.1, c.y + 0.1))
     expect(hits.some((h) => h.kind === 'opening' && h.id === op.openingId)).toBe(true)
+  })
+})
+
+describe('annotationsVisible flag (0.7.0 visibility parity)', () => {
+  resetDerivedForTests()
+  const doc = buildFixtureDoc()
+  const id = addDimension(doc, vec(1, 1), vec(3, 1), 0)!
+  const derived = getDerived(doc)
+  const on = { x: 2, y: 1 } // on the dimension line
+
+  it('click: hidden annotations never steal hits; default stays hittable', () => {
+    expect(hitTestAll(doc, derived, on, PX)[0]).toEqual({ kind: 'annotation', id })
+    expect(
+      hitTestAll(doc, derived, on, PX, { annotationsVisible: true })[0],
+    ).toEqual({ kind: 'annotation', id })
+    const hidden = hitTestAll(doc, derived, on, PX, { annotationsVisible: false })
+    expect(hidden.some((h) => h.kind === 'annotation')).toBe(false)
+  })
+
+  it('marquee: hidden annotations are not rect-selectable', () => {
+    const a = vec(0.9, 0.9)
+    const b = vec(3.1, 1.1)
+    expect(hitTestRect(doc, derived, a, b, PX).some((h) => h.kind === 'annotation')).toBe(true)
+    expect(
+      hitTestRect(doc, derived, a, b, PX, { annotationsVisible: false }).some(
+        (h) => h.kind === 'annotation',
+      ),
+    ).toBe(false)
   })
 })

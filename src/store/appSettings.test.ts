@@ -12,6 +12,7 @@ const DEFAULTS: AppSettings = {
   units: 'm',
   wheelMode: 'zoom',
   dimensionLevel: 'off',
+  showAnnotations: true,
   snapEnabled: true,
   showGrid: true,
   autosaveEnabled: false,
@@ -42,6 +43,7 @@ describe('parseAppSettings', () => {
       units: 'ftin',
       wheelMode: 'pan',
       dimensionLevel: 'openings',
+      showAnnotations: false,
       snapEnabled: false,
       showGrid: false,
       autosaveEnabled: true,
@@ -78,6 +80,7 @@ describe('parseAppSettings', () => {
       units: 'cm',
       wheelMode: 'zoom',
       dimensionLevel: 'off',
+      showAnnotations: true,
       snapEnabled: true,
       showGrid: true,
       autosaveEnabled: false,
@@ -151,6 +154,7 @@ describe('useAppSettings persistence', () => {
       units: s.units,
       wheelMode: s.wheelMode,
       dimensionLevel: s.dimensionLevel,
+      showAnnotations: s.showAnnotations,
       snapEnabled: s.snapEnabled,
       showGrid: s.showGrid,
       autosaveEnabled: s.autosaveEnabled,
@@ -172,6 +176,7 @@ describe('useAppSettings persistence', () => {
     s.setUnits('cm')
     s.setWheelMode('pan')
     s.setDimensionLevel('walls')
+    s.setShowAnnotations(false)
     s.setSnapEnabled(false)
     s.setShowGrid(false)
     s.setAutosaveEnabled(true)
@@ -192,6 +197,7 @@ describe('useAppSettings persistence', () => {
       units: 'cm',
       wheelMode: 'pan',
       dimensionLevel: 'walls',
+      showAnnotations: false,
       snapEnabled: false,
       showGrid: false,
       autosaveEnabled: true,

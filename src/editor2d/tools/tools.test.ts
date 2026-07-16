@@ -1404,7 +1404,7 @@ describe('M8 (0.3.0): snap/grid hotkeys, help overlay, shortcut sheet', () => {
       'V', 'W', 'D', 'N', 'M', 'T', 'S', 'G',
       'Ctrl+A', 'Ctrl+D', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Z', 'Ctrl+Y',
       'Ctrl+N', 'Ctrl+O', 'Ctrl+S',
-      'Shift+1', 'Shift+2', 'Shift+D', 'Shift+R',
+      'Shift+1', 'Shift+2', 'Shift+D', 'Shift+A', 'Shift+R',
       'Del', 'Enter', 'Backspace', 'R', 'F', '?', 'Esc', 'Arrows',
     ]) {
       expect(tokens).toContain(k)

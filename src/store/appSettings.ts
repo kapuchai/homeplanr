@@ -27,6 +27,10 @@ export interface AppSettings {
   units: UnitSystem
   wheelMode: WheelMode
   dimensionLevel: DimensionLevel
+  /** Visibility of user annotations (persisted measures + text labels) —
+   * view-only: annotations stay document content and always export.
+   * Creating one while hidden re-enables this (else Enter looks dead). */
+  showAnnotations: boolean
   /** Snap master switch — device preference since schema v3 (doc-level snap
    * made every toggle an undo entry and dirtied the file). */
   snapEnabled: boolean
@@ -73,6 +77,7 @@ const DEFAULTS: AppSettings = {
   units: 'm',
   wheelMode: 'zoom',
   dimensionLevel: 'off',
+  showAnnotations: true,
   snapEnabled: true,
   showGrid: true,
   autosaveEnabled: false,
@@ -118,6 +123,8 @@ export function parseAppSettings(json: string | null): AppSettings {
         DIMENSION_LEVELS,
         r.showDimensions === true ? 'walls' : DEFAULTS.dimensionLevel,
       ),
+      showAnnotations:
+        typeof r.showAnnotations === 'boolean' ? r.showAnnotations : DEFAULTS.showAnnotations,
       snapEnabled: typeof r.snapEnabled === 'boolean' ? r.snapEnabled : DEFAULTS.snapEnabled,
       showGrid: typeof r.showGrid === 'boolean' ? r.showGrid : DEFAULTS.showGrid,
       autosaveEnabled:
@@ -163,6 +170,7 @@ const persist = (s: AppSettings): void => {
         units: s.units,
         wheelMode: s.wheelMode,
         dimensionLevel: s.dimensionLevel,
+        showAnnotations: s.showAnnotations,
         snapEnabled: s.snapEnabled,
         showGrid: s.showGrid,
         autosaveEnabled: s.autosaveEnabled,
@@ -187,6 +195,7 @@ interface AppSettingsState extends AppSettings {
   setUnits: (units: UnitSystem) => void
   setWheelMode: (mode: WheelMode) => void
   setDimensionLevel: (level: DimensionLevel) => void
+  setShowAnnotations: (show: boolean) => void
   setSnapEnabled: (enabled: boolean) => void
   setShowGrid: (show: boolean) => void
   setAutosaveEnabled: (enabled: boolean) => void
@@ -211,6 +220,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setUnits: (units) => apply({ units }),
       setWheelMode: (wheelMode) => apply({ wheelMode }),
       setDimensionLevel: (dimensionLevel) => apply({ dimensionLevel }),
+      setShowAnnotations: (showAnnotations) => apply({ showAnnotations }),
       setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),
       setShowGrid: (showGrid) => apply({ showGrid }),
       setAutosaveEnabled: (autosaveEnabled) => apply({ autosaveEnabled }),

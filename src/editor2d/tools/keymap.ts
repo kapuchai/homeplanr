@@ -363,6 +363,14 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     return
   }
 
+  // annotation visibility (persisted measures + text labels) — view-only;
+  // selection pruning on hide lives in the appSettings subscription
+  if (e.shiftKey && !e.ctrlKey && !e.altKey && key.toLowerCase() === 'a' && ui.viewMode === '2d') {
+    const settings = useAppSettings.getState()
+    settings.setShowAnnotations(!settings.showAnnotations)
+    return
+  }
+
   // keyboard zoom about the viewport center ('+'/'=' in, '-'/'_' out) —
   // like wheel zoom, deliberately not isTxActive-gated
   if (!e.ctrlKey && !e.altKey && ['+', '=', '-', '_'].includes(key) && ui.viewMode === '2d') {

@@ -1,4 +1,5 @@
 import type { Tool } from './toolTypes'
+import { useAppSettings } from '../../store/appSettings'
 
 /**
  * Text label tool (v3, 'T'): each click drops a label with placeholder text
@@ -19,7 +20,13 @@ export function createAnnotateTextTool(): Tool {
     onPointerDown(e, ctx) {
       if (e.button !== 0) return
       const id = ctx.actions().addLabel(e.world, LABEL_PLACEHOLDER)
-      if (id) ctx.ui().setSelection([id])
+      if (id) {
+        ctx.ui().setSelection([id])
+        // a label dropped into a hidden layer would vanish silently —
+        // creating an annotation re-enables visibility (0.7.0)
+        const settings = useAppSettings.getState()
+        if (!settings.showAnnotations) settings.setShowAnnotations(true)
+      }
     },
 
     onPointerUp() {},

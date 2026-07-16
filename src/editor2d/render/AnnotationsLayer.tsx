@@ -13,10 +13,16 @@ import { DIMENSION_MIN_PX, LABEL_MIN_PX } from '../hit/hitTest'
  * Dimension TEXT is derived here from dist(a,b) + the current unit
  * preference — never stored, so unit switches can't go stale. Labels are
  * world-sized (they scale with the plan), counter-flipped upright against
- * the y-up render transform. Interaction (hit/select/drag) lands in M6 —
- * this layer is render-only.
+ * the y-up render transform.
+ * Visibility (0.7.0): gated by the showAnnotations device pref; hitTest
+ * receives the same flag — hidden must never be hittable.
  */
 export function AnnotationsLayer({ doc }: { doc: ProjectDocument }) {
+  const show = useAppSettings((s) => s.showAnnotations)
+  return show ? <Annotations doc={doc} /> : null
+}
+
+function Annotations({ doc }: { doc: ProjectDocument }) {
   const k = useViewportStore((s) => s.k)
   const units = useAppSettings((s) => s.units)
   const theme = useThemeStore((s) => s.theme)
