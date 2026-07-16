@@ -31,6 +31,12 @@ export interface ExportPlanOptions {
   includeGrid?: boolean
   /** Paper margin around the content bounds, meters. Default 0.5. */
   marginM?: number
+  /**
+   * Fixed print scale 1:N — the SVG's width/height become REAL MILLIMETERS
+   * (1m of plan = 1000/N mm on paper; the meter-space viewBox is unchanged).
+   * Absent = fit-to-pixels sizing via exportPixelSize.
+   */
+  scaleDenominator?: number
 }
 
 export const EXPORT_MARGIN_M = 0.5
@@ -264,8 +270,15 @@ export function renderPlanSvg(
     }
   }
 
+  // fixed scale → physical mm size (true 1:N when printed at 100%);
+  // fit → the nominal pixel size as before
+  const denom = opts.scaleDenominator
+  const mm = (m: number) => Math.round((m * 1000 * 100) / denom!) / 100
+  const width = denom ? `${mm(vw)}mm` : String(px.w)
+  const height = denom ? `${mm(vh)}mm` : String(px.h)
+
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${-y1} ${vw} ${vh}" width="${px.w}" height="${px.h}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${-y1} ${vw} ${vh}" width="${width}" height="${height}">` +
     `<rect x="${x0}" y="${-y1}" width="${vw}" height="${vh}" fill="${theme.paper}"/>` +
     `<g transform="scale(1 -1)">${parts.join('')}</g>` +
     `</svg>`

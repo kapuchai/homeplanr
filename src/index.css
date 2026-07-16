@@ -384,6 +384,10 @@ textarea,
   border-color: var(--accent);
 }
 
+.export-margin {
+  width: 90px;
+}
+
 .catalog-panel h3 {
   margin: 10px 4px 6px;
   font-size: 11px;

@@ -41,6 +41,7 @@ export interface UiState {
   spaceHeld: boolean
   snapSuspended: boolean
   optionsOpen: boolean
+  exportOpen: boolean
   helpOpen: boolean
   contextMenu: ContextMenuState | null
   /** Wall side hovered in the paint rows of the properties panel (2D badge ring). */
@@ -55,6 +56,7 @@ export interface UiState {
   setSpaceHeld: (held: boolean) => void
   setSnapSuspended: (suspended: boolean) => void
   setOptionsOpen: (open: boolean) => void
+  setExportOpen: (open: boolean) => void
   setHelpOpen: (open: boolean) => void
   setContextMenu: (menu: ContextMenuState | null) => void
   setHighlightWallSide: (side: 'front' | 'back' | null) => void
@@ -70,6 +72,7 @@ export const useUiStore = create<UiState>()(
     spaceHeld: false,
     snapSuspended: false,
     optionsOpen: false,
+    exportOpen: false,
     helpOpen: false,
     contextMenu: null,
     highlightWallSide: null,
@@ -89,6 +92,7 @@ export const useUiStore = create<UiState>()(
     setSpaceHeld: (held) => set({ spaceHeld: held }),
     setSnapSuspended: (suspended) => set({ snapSuspended: suspended }),
     setOptionsOpen: (open) => set({ optionsOpen: open }),
+    setExportOpen: (open) => set({ exportOpen: open }),
     setHelpOpen: (open) => set({ helpOpen: open }),
     setContextMenu: (menu) => set({ contextMenu: menu }),
     setHighlightWallSide: (side) => set({ highlightWallSide: side }),

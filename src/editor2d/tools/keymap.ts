@@ -121,7 +121,7 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   // the resolve below is a belt-and-braces fallback that resolves the same
   // escValue if a modal ever renders without the Modal shell)
   const confirm = useConfirmStore.getState()
-  if (confirm.pending || ctx.ui().optionsOpen || ctx.ui().helpOpen) {
+  if (confirm.pending || ctx.ui().optionsOpen || ctx.ui().exportOpen || ctx.ui().helpOpen) {
     if (e.key === 'Escape' && confirm.pending) {
       // per-prompt escValue: non-destructive by contract (the recovery
       // prompt's Esc must never mean Discard)

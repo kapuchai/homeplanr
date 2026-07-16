@@ -16,13 +16,13 @@ import {
   saveProjectAs,
   usePersistStore,
 } from './store/persistence/controller'
-import { exportImage } from './export/exportController'
 import { switchTool } from './editor2d/tools/toolRegistry'
 import { flushPendingNudge } from './editor2d/tools/keymap'
 import { CatalogPanel } from './app/CatalogPanel'
 import { PanelHandle } from './app/PanelHandle'
 import { PropertiesPanel } from './app/PropertiesPanel'
 import { ConfirmDialog } from './app/ConfirmDialog'
+import { ExportDialog } from './app/ExportDialog'
 import { OptionsDialog } from './app/OptionsDialog'
 import { ShortcutHelp } from './app/ShortcutHelp'
 import { MenuList, type MenuEntry } from './app/MenuList'
@@ -91,8 +91,11 @@ function FileMenu() {
     { label: 'Open…', shortcut: 'Ctrl+O', onSelect: run(openProject) },
     { label: 'Save', shortcut: 'Ctrl+S', onSelect: run(saveProject) },
     { label: 'Save As…', shortcut: 'Ctrl+Shift+S', onSelect: run(saveProjectAs) },
-    { label: 'Export PNG…', separatorBefore: true, onSelect: run(() => exportImage('png')) },
-    { label: 'Export SVG…', onSelect: run(() => exportImage('svg')) },
+    {
+      label: 'Export…',
+      separatorBefore: true,
+      onSelect: run(() => useUiStore.getState().setExportOpen(true)),
+    },
     ...(canRecent && recents.length > 0
       ? recents.map((r, i) => ({
           label: r.name,
@@ -351,6 +354,7 @@ export default function App() {
         )}
       </main>
       <OptionsDialog />
+      <ExportDialog />
       <ShortcutHelp />
       <ConfirmDialog />
     </div>

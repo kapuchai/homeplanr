@@ -195,6 +195,21 @@ describe('renderPlanSvg', () => {
     )
   })
 
+  it('scaleDenominator emits REAL-MM width/height (1m = 1000/N mm); viewBox stays meters (M5)', () => {
+    const doc = roomFixture()
+    const derived = getDerived(doc)
+    const b = polygonBounds(docContentBounds(doc, derived))!
+    const m = 0.5
+    const vw = b.maxX - b.minX + 2 * m
+    const vh = b.maxY - b.minY + 2 * m
+    const svg = renderPlanSvg(doc, derived, { scaleDenominator: 100 })!
+    const mm = (meters: number) => Math.round(meters * 10 * 100) / 100 // 1:100 → 10mm/m
+    expect(svg).toContain(`width="${mm(vw)}mm" height="${mm(vh)}mm"`)
+    expect(svg).toContain(`viewBox="${b.minX - m} ${-b.maxY - m} ${vw} ${vh}"`)
+    // fit sizing (no denominator) keeps the pixel path
+    expect(renderPlanSvg(doc, derived)!).not.toContain('mm"')
+  })
+
   it('draws exactly one wall path and one paper cover per opening', () => {
     const doc = roomFixture()
     const svg = renderPlanSvg(doc, getDerived(doc))!

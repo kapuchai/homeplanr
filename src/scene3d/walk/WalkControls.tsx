@@ -230,8 +230,17 @@ export function WalkControls({
   const active = mode !== 'off'
   useEffect(() => {
     if (!active) return
-    const modalOpen = () =>
-      useConfirmStore.getState().pending !== null || useUiStore.getState().optionsOpen
+    // keep in sync with keymap.ts's modal guard — every app modal must
+    // swallow walk keys too (WASD walking behind a dialog is disorienting)
+    const modalOpen = () => {
+      const ui = useUiStore.getState()
+      return (
+        useConfirmStore.getState().pending !== null ||
+        ui.optionsOpen ||
+        ui.exportOpen ||
+        ui.helpOpen
+      )
+    }
     const editable = (t: EventTarget | null) =>
       t instanceof HTMLElement &&
       (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable)
