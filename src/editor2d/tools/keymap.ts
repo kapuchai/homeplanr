@@ -25,7 +25,7 @@ import { getDerived } from '../../store/derived'
 import { polygonBounds } from '../../geometry/polygon'
 import { docContentBounds } from '../render/bounds'
 import { useViewportStore } from '../viewport/viewportStore'
-import { useAppSettings } from '../../store/appSettings'
+import { DIMENSION_LEVELS, useAppSettings } from '../../store/appSettings'
 import { KEY_ZOOM_FACTOR } from '../viewport/viewportMath'
 import type { FurnitureId } from '../../model/ids'
 import type { ProjectDocument } from '../../model/types'
@@ -354,10 +354,12 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
     return
   }
 
-  // wall-dimension labels (2D annotation layer)
+  // permanent dimension labels — cycles the 0.7.0 ladder
+  // (off → walls → openings → all → off)
   if (e.shiftKey && !e.ctrlKey && !e.altKey && key.toLowerCase() === 'd' && ui.viewMode === '2d') {
     const settings = useAppSettings.getState()
-    settings.setShowDimensions(!settings.showDimensions)
+    const i = DIMENSION_LEVELS.indexOf(settings.dimensionLevel)
+    settings.setDimensionLevel(DIMENSION_LEVELS[(i + 1) % DIMENSION_LEVELS.length]!)
     return
   }
 

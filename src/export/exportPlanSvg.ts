@@ -10,7 +10,7 @@ import {
   roomFill,
   type Line,
 } from '../editor2d/render/planGeometry'
-import { dimensionLabels } from '../editor2d/measure/liveMeasurements'
+import { dimensionLabels, openingWidthLabels } from '../editor2d/measure/liveMeasurements'
 import { CATALOG } from '../catalog'
 import { symbolFor } from '../catalog/symbolFromParts'
 import type { SymbolPrim } from '../catalog/types'
@@ -128,7 +128,7 @@ export function renderPlanSvg(
   // print-friendly: ALWAYS light, regardless of app theme; only
   // accent-independent tokens are used so the accent choice cannot leak in
   const theme = getTheme2d('light', 'blue')
-  const { units, showDimensions } = useAppSettings.getState()
+  const { units, dimensionLevel } = useAppSettings.getState()
 
   const x0 = bounds.minX - margin
   const y0 = bounds.minY - margin
@@ -234,7 +234,7 @@ export function renderPlanSvg(
     )
   }
   // user annotations — document content: ALWAYS exported (unlike the
-  // showDimensions wall-label toggle below)
+  // dimension-ladder labels below)
   for (const ann of Object.values(doc.annotations)) {
     if (ann.kind === 'dimension') {
       const dx = ann.b.x - ann.a.x
@@ -277,13 +277,21 @@ export function renderPlanSvg(
     }
   }
 
-  if (showDimensions) {
+  // permanent dimension ladder (0.7.0): walls at ≥'walls', opening widths at
+  // ≥'openings'; the 'all' furniture-size pills are selection-dependent and
+  // deliberately never export
+  if (dimensionLevel !== 'off') {
+    const dimText = (at: { x: number; y: number }, text: string): string =>
+      `<g transform="translate(${at.x} ${at.y}) scale(1 -1)">` +
+      `<text text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${DIM_SIZE}" fill="${theme.text}" stroke="${theme.paper}" stroke-width="0.03" paint-order="stroke">${esc(text)}</text>` +
+      `</g>`
     for (const l of dimensionLabels(doc, derived, units, 1 / NOMINAL_PX_PER_M)) {
-      parts.push(
-        `<g transform="translate(${l.at.x} ${l.at.y}) scale(1 -1)">` +
-          `<text text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${DIM_SIZE}" fill="${theme.text}" stroke="${theme.paper}" stroke-width="0.03" paint-order="stroke">${esc(l.text)}</text>` +
-          `</g>`,
-      )
+      parts.push(dimText(l.at, l.text))
+    }
+    if (dimensionLevel !== 'walls') {
+      for (const l of openingWidthLabels(doc, derived, units, 1 / NOMINAL_PX_PER_M)) {
+        parts.push(dimText(l.at, l.text))
+      }
     }
   }
 

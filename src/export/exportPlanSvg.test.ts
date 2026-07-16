@@ -68,7 +68,7 @@ function doorFixture(hinge: 'a' | 'b', swing: 'front' | 'back'): {
 
 beforeEach(() => {
   resetDerivedForTests()
-  useAppSettings.getState().setShowDimensions(false)
+  useAppSettings.getState().setDimensionLevel('off')
 })
 
 describe('openingSymbol — WorldLayers parity pin', () => {
@@ -295,12 +295,22 @@ describe('renderPlanSvg', () => {
     expect(svg).toContain(theme.gridMajor)
   })
 
-  it('adds wall dimension labels only when showDimensions is on', () => {
+  it('adds wall dimension labels only when the dimension ladder is on', () => {
     const doc = roomFixture()
     const derived = getDerived(doc)
     expect(renderPlanSvg(doc, derived)).not.toContain('4.00 m')
-    useAppSettings.getState().setShowDimensions(true)
+    useAppSettings.getState().setDimensionLevel('walls')
     expect(renderPlanSvg(doc, derived)).toContain('4.00 m')
+  })
+
+  it('adds opening widths at ladder level ≥ openings; never furniture sizes', () => {
+    const doc = roomFixture()
+    addOpening(doc, { kind: 'door', wallId: Object.values(doc.walls)[0]!.id, t: 0.5, width: 0.9 })
+    const derived = getDerived(doc)
+    useAppSettings.getState().setDimensionLevel('walls')
+    expect(renderPlanSvg(doc, derived)).not.toContain('0.90 m')
+    useAppSettings.getState().setDimensionLevel('openings')
+    expect(renderPlanSvg(doc, derived)).toContain('0.90 m')
   })
 
   it('escapes user text in labels', () => {

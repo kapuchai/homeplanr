@@ -11,7 +11,7 @@ const DEFAULTS: AppSettings = {
   accent: 'blue',
   units: 'm',
   wheelMode: 'zoom',
-  showDimensions: false,
+  dimensionLevel: 'off',
   snapEnabled: true,
   showGrid: true,
   autosaveEnabled: false,
@@ -41,7 +41,7 @@ describe('parseAppSettings', () => {
       accent: 'teal',
       units: 'ftin',
       wheelMode: 'pan',
-      showDimensions: true,
+      dimensionLevel: 'openings',
       snapEnabled: false,
       showGrid: false,
       autosaveEnabled: true,
@@ -66,7 +66,7 @@ describe('parseAppSettings', () => {
           accent: 'hotpink',
           units: 'cm',
           wheelMode: 'scroll',
-          showDimensions: 1,
+          dimensionLevel: 'everything',
           snapEnabled: 'off',
           lastDirSave: '',
           lastDirExport: 5,
@@ -77,7 +77,7 @@ describe('parseAppSettings', () => {
       accent: 'blue',
       units: 'cm',
       wheelMode: 'zoom',
-      showDimensions: false,
+      dimensionLevel: 'off',
       snapEnabled: true,
       showGrid: true,
       autosaveEnabled: false,
@@ -91,6 +91,20 @@ describe('parseAppSettings', () => {
       lastDirOpen: null,
     })
     expect(parseAppSettings(JSON.stringify({ v: 1, units: 'inches' }))).toEqual(DEFAULTS)
+  })
+
+  it('honors the pre-0.7.0 showDimensions boolean when dimensionLevel is absent', () => {
+    expect(parseAppSettings(JSON.stringify({ v: 1, showDimensions: true })).dimensionLevel).toBe(
+      'walls',
+    )
+    expect(parseAppSettings(JSON.stringify({ v: 1, showDimensions: false })).dimensionLevel).toBe(
+      'off',
+    )
+    // the enum key wins over the legacy boolean when both exist
+    expect(
+      parseAppSettings(JSON.stringify({ v: 1, showDimensions: true, dimensionLevel: 'all' }))
+        .dimensionLevel,
+    ).toBe('all')
   })
 
   it('panel widths clamp to their limits; junk falls back to defaults', () => {
@@ -136,7 +150,7 @@ describe('useAppSettings persistence', () => {
       accent: s.accent,
       units: s.units,
       wheelMode: s.wheelMode,
-      showDimensions: s.showDimensions,
+      dimensionLevel: s.dimensionLevel,
       snapEnabled: s.snapEnabled,
       showGrid: s.showGrid,
       autosaveEnabled: s.autosaveEnabled,
@@ -157,7 +171,7 @@ describe('useAppSettings persistence', () => {
     s.setAccent('rose')
     s.setUnits('cm')
     s.setWheelMode('pan')
-    s.setShowDimensions(true)
+    s.setDimensionLevel('walls')
     s.setSnapEnabled(false)
     s.setShowGrid(false)
     s.setAutosaveEnabled(true)
@@ -177,7 +191,7 @@ describe('useAppSettings persistence', () => {
       accent: 'rose',
       units: 'cm',
       wheelMode: 'pan',
-      showDimensions: true,
+      dimensionLevel: 'walls',
       snapEnabled: false,
       showGrid: false,
       autosaveEnabled: true,

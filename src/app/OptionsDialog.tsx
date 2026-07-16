@@ -2,8 +2,10 @@ import { useUiStore } from '../store/uiStore'
 import { Modal } from './Modal'
 import {
   ACCENT_IDS,
+  DIMENSION_LEVELS,
   THEME_PREFERENCES,
   useAppSettings,
+  type DimensionLevel,
   type ThemePreference,
 } from '../store/appSettings'
 import { ACCENTS } from '../theme/accents'
@@ -27,6 +29,13 @@ const UNIT_CHOICES: { value: UnitSystem; label: string }[] = [
   { value: 'cm', label: t('options.unitCm') },
   { value: 'ftin', label: t('options.unitFtin') },
 ]
+
+const DIMENSION_LABELS: Record<DimensionLevel, string> = {
+  off: t('common.off'),
+  walls: t('options.dimsWalls'),
+  openings: t('options.dimsOpenings'),
+  all: t('options.dimsAll'),
+}
 
 export function OptionsDialog() {
   const open = useUiStore((s) => s.optionsOpen)
@@ -145,20 +154,17 @@ export function OptionsDialog() {
           <div className="options-row">
             <span>{t('options.showDimensions')}</span>
             <div className="segmented small">
-              <button
-                type="button"
-                className={settings.showDimensions ? 'active' : ''}
-                onClick={() => settings.setShowDimensions(true)}
-              >
-                {t('common.on')}
-              </button>
-              <button
-                type="button"
-                className={!settings.showDimensions ? 'active' : ''}
-                onClick={() => settings.setShowDimensions(false)}
-              >
-                {t('common.off')}
-              </button>
+              {DIMENSION_LEVELS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  aria-pressed={settings.dimensionLevel === level}
+                  className={settings.dimensionLevel === level ? 'active' : ''}
+                  onClick={() => settings.setDimensionLevel(level)}
+                >
+                  {DIMENSION_LABELS[level]}
+                </button>
+              ))}
             </div>
           </div>
         </section>

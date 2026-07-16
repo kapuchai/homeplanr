@@ -1,8 +1,9 @@
-import type { ProjectDocument } from '../../model/types'
+import type { ProjectDocument, Wall } from '../../model/types'
 import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
 import type { DerivedGeometry } from '../../store/derived'
 import type { DimensionPill } from '../session/interactionStore'
 import type { WallSolid } from '../../geometry/wallSolids'
+import type { DimensionLevel } from '../../store/appSettings'
 import { formatLength, type UnitSystem } from '../../format/units'
 import type { Vec2 } from '../../geometry/vec'
 import { add, cross, dist, lerp, normalize, perp, rotate, scale, sub } from '../../geometry/vec'
@@ -22,9 +23,10 @@ export interface MeasureInput {
   /** meters per screen px at current zoom. */
   pxToWorld: number
   units: UnitSystem
-  /** Permanent dimension labels are ON — passive full-wall drag pills are
-   * suppressed so the same wall length never renders twice (B4). */
-  showDimensions?: boolean
+  /** Permanent dimension ladder (0.7.0) — any level that labels walls
+   * suppresses the passive full-wall drag pills so the same wall length
+   * never renders twice (B4). */
+  dimensionLevel?: DimensionLevel
 }
 
 /** Furniture rays longer than this (m) measure nothing. */
@@ -116,7 +118,7 @@ export function openingDragPills(
  * Pills for a furniture drag: one clearance measurement per OBB edge
  * (edge-midpoint ray along the local axis, front = local −y per handles.ts,
  * nearest wall-face hit within MEASURE_MAX_DIST), plus one passive
- * full-length pill per unique wall hit — unless showDimensions already
+ * full-length pill per unique wall hit — unless the dimension ladder already
  * labels every wall permanently (the clearance pills are the useful part).
  */
 export function furnitureDragPills(m: MeasureInput, grabbedId: FurnitureId): DimensionPill[] {
@@ -175,7 +177,7 @@ export function furnitureDragPills(m: MeasureInput, grabbedId: FurnitureId): Dim
       from: edgeMid,
       to: best.hit,
     })
-    if (!m.showDimensions && !passiveByWall.has(best.wallId)) {
+    if ((m.dimensionLevel ?? 'off') === 'off' && !passiveByWall.has(best.wallId)) {
       const w = m.doc.walls[best.wallId]!
       const na = m.doc.nodes[w.a]!
       const nb = m.doc.nodes[w.b]!
@@ -211,12 +213,28 @@ export function wallLengthPills(m: MeasureInput, wallIds: Iterable<WallId>): Dim
   return pills
 }
 
-// --- permanent wall dimensions ---
+// --- permanent dimension labels (the Shift+D ladder) ---
 
 export interface WallDimensionLabel {
   wallId: WallId
   at: Vec2
   /** Centerline meters — the render layer culls by screen size (k·length). */
+  length: number
+  text: string
+}
+
+export interface OpeningWidthLabel {
+  openingId: OpeningId
+  at: Vec2
+  /** Opening width in meters — same k·length screen cull as wall labels. */
+  length: number
+  text: string
+}
+
+export interface FurnitureSizeLabel {
+  furnitureId: FurnitureId
+  at: Vec2
+  /** max(w, d) in meters — same k·length screen cull as wall labels. */
   length: number
   text: string
 }
@@ -241,18 +259,38 @@ const wallRooms = (doc: ProjectDocument): Map<WallId, RoomId[]> => {
 }
 
 /**
- * One length label per wall, placed on the OUTSIDE of the owning room.
+ * Label side for a wall (+1 = +perp): the OUTSIDE of the owning room.
  * Boundary walls between two rooms (either side is interior) and walls in
  * no room have no outside — they take the SCREEN-UP side deterministically
  * instead of the arbitrary a→b winding side (B5).
  */
+function wallLabelSide(
+  doc: ProjectDocument,
+  derived: DerivedGeometry,
+  w: Wall,
+  n: Vec2,
+  mid: Vec2,
+): 1 | -1 {
+  const owners = wallRooms(doc).get(w.id)
+  const room = owners?.length === 1 ? derived.rooms[owners[0]!] : undefined
+  if (room) {
+    // +perp probes into the room ⇒ label on the opposite (outside) side
+    return pointInPolygonWithHoles(add(mid, scale(n, SIDE_PROBE)), room.polygon, room.holePolygons)
+      ? -1
+      : 1
+  }
+  // no unique outside: pick screen-up (+y renders up; vertical walls
+  // tie-break toward +x) so the side never depends on a→b winding
+  return n.y > 0 || (n.y === 0 && n.x > 0) ? 1 : -1
+}
+
+/** One length label per wall ≥ MIN_LABEL_LENGTH, on the wallLabelSide. */
 export function dimensionLabels(
   doc: ProjectDocument,
   derived: DerivedGeometry,
   units: UnitSystem,
   pxToWorld = 0,
 ): WallDimensionLabel[] {
-  const byWall = wallRooms(doc)
   const out: WallDimensionLabel[] = []
   for (const w of Object.values(doc.walls)) {
     const na = doc.nodes[w.a]
@@ -262,24 +300,77 @@ export function dimensionLabels(
     if (length < MIN_LABEL_LENGTH) continue
     const n = perp(normalize(sub(nb, na)))
     const mid = lerp(na, nb, 0.5)
-    let side: 1 | -1
-    const owners = byWall.get(w.id)
-    const room = owners?.length === 1 ? derived.rooms[owners[0]!] : undefined
-    if (room) {
-      // +perp probes into the room ⇒ label on the opposite (outside) side
-      side = pointInPolygonWithHoles(add(mid, scale(n, SIDE_PROBE)), room.polygon, room.holePolygons)
-        ? -1
-        : 1
-    } else {
-      // no unique outside: pick screen-up (+y renders up; vertical walls
-      // tie-break toward +x) so the side never depends on a→b winding
-      side = n.y > 0 || (n.y === 0 && n.x > 0) ? 1 : -1
-    }
+    const side = wallLabelSide(doc, derived, w, n, mid)
     const text = formatLength(length, units)
     out.push({
       wallId: w.id,
       at: add(mid, scale(n, side * (w.thickness / 2 + pillClearancePx(text, n) * pxToWorld))),
       length,
+      text,
+    })
+  }
+  return out
+}
+
+/**
+ * One width label per realized opening (ladder level ≥ 'openings'), on the
+ * OPPOSITE side of the wall's own length label so the two never collide
+ * when an opening sits at the wall's midpoint.
+ */
+export function openingWidthLabels(
+  doc: ProjectDocument,
+  derived: DerivedGeometry,
+  units: UnitSystem,
+  pxToWorld = 0,
+): OpeningWidthLabel[] {
+  const out: OpeningWidthLabel[] = []
+  for (const solid of Object.values(derived.wallSolids)) {
+    const w = doc.walls[solid.wallId]
+    const na = w && doc.nodes[w.a]
+    const nb = w && doc.nodes[w.b]
+    if (!w || !na || !nb) continue
+    const n = perp(normalize(sub(nb, na)))
+    const wallSide = wallLabelSide(doc, derived, w, n, lerp(na, nb, 0.5))
+    const side = -wallSide
+    for (const o of solid.openings) {
+      const width = o.u1 - o.u0
+      const text = formatLength(width, units)
+      const face = facePoint(solid, (o.u0 + o.u1) / 2, (side * w.thickness) / 2)
+      const nSide = scale(n, side)
+      out.push({
+        openingId: o.openingId,
+        at: add(face, scale(nSide, pillClearancePx(text, nSide) * pxToWorld)),
+        length: width,
+        text,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * One w × d size label per SELECTED furniture item (ladder level 'all'),
+ * hung off the item's BACK edge (local +y, rotation applied) — the rotate
+ * handle owns the front edge, and both follow the local frame so they can
+ * never collide at any rotation.
+ */
+export function furnitureSizeLabels(
+  doc: ProjectDocument,
+  ids: readonly string[],
+  units: UnitSystem,
+  pxToWorld = 0,
+): FurnitureSizeLabel[] {
+  const out: FurnitureSizeLabel[] = []
+  for (const id of ids) {
+    const f = doc.furniture[id as FurnitureId]
+    if (!f) continue
+    const text = `${formatLength(f.size.w, units)} × ${formatLength(f.size.d, units)}`
+    const arm = rotate({ x: 0, y: f.size.d / 2 }, f.rotation)
+    const n = normalize(arm)
+    out.push({
+      furnitureId: f.id,
+      at: add(add({ x: f.x, y: f.y }, arm), scale(n, pillClearancePx(text, n) * pxToWorld)),
+      length: Math.max(f.size.w, f.size.d),
       text,
     })
   }

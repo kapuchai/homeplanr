@@ -11,8 +11,10 @@ import { dist, vec } from '../../geometry/vec'
 import {
   dimensionLabels,
   furnitureDragPills,
+  furnitureSizeLabels,
   incidentWallIds,
   openingDragPills,
+  openingWidthLabels,
   type MeasureInput,
 } from './liveMeasurements'
 import { pillWidthPx } from '../render/pillMetrics'
@@ -165,7 +167,7 @@ describe('furnitureDragPills', () => {
     const d = doc()
     room4x3(d)
     const fid = box(d, 2, 1.5)
-    const pills = furnitureDragPills({ ...mi(d), showDimensions: true }, fid)
+    const pills = furnitureDragPills({ ...mi(d), dimensionLevel: 'walls' }, fid)
     expect(pills.filter((p) => !p.tone)).toHaveLength(4) // clearances stay
     expect(pills.filter((p) => p.tone === 'passive')).toEqual([])
   })
@@ -232,6 +234,40 @@ describe('dimensionLabels', () => {
     // vertical boundary wall: both sides are interior ⇒ tie-break toward +x
     expect(shared[0]!.at.x).toBeGreaterThan(2)
     expect(shared[0]!.at.y).toBeCloseTo(1.5, 9)
+  })
+})
+
+describe('openingWidthLabels (0.7.0 ladder)', () => {
+  it('one width label per opening, on the OPPOSITE side of the wall label', () => {
+    const d = doc()
+    room4x3(d)
+    const wall = Object.values(d.walls).find(
+      (w) => d.nodes[w.a]!.y === 0 && d.nodes[w.b]!.y === 0,
+    )!
+    addOpening(d, { kind: 'door', wallId: wall.id, t: 0.5, width: 0.9 })
+    const derived = getDerived(d)
+    const labels = openingWidthLabels(d, derived, 'm', 0.01)
+    expect(labels.map((l) => l.text)).toEqual(['0.90 m'])
+    expect(labels[0]!.length).toBeCloseTo(0.9, 9)
+    expect(labels[0]!.at.x).toBeCloseTo(2, 6) // centered on the opening
+    // the wall's own label sits OUTSIDE the room (below); the opening width
+    // takes the opposite side (inside) so the two never collide mid-wall
+    const wallLabel = dimensionLabels(d, derived, 'm', 0.01).find((l) => l.wallId === wall.id)!
+    expect(wallLabel.at.y).toBeLessThan(0)
+    expect(labels[0]!.at.y).toBeGreaterThan(0)
+  })
+})
+
+describe('furnitureSizeLabels (0.7.0 ladder)', () => {
+  it('w × d label per given item, hung off the BACK edge; junk ids skipped', () => {
+    const d = doc()
+    const fid = box(d, 2, 1, 0, 1.2, 0.6) // rotation 0 ⇒ back = +y
+    const labels = furnitureSizeLabels(d, [fid, 'junk'], 'm', 0.01)
+    expect(labels).toHaveLength(1)
+    expect(labels[0]!.text).toBe('1.20 m × 0.60 m')
+    expect(labels[0]!.length).toBeCloseTo(1.2, 9) // max(w, d) for the cull
+    expect(labels[0]!.at.x).toBeCloseTo(2, 9)
+    expect(labels[0]!.at.y).toBeGreaterThan(1 + 0.3 - 1e-9) // beyond the back edge
   })
 })
 

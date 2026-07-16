@@ -106,6 +106,9 @@ export const en = {
   'options.wheelZoom': 'Zoom',
   'options.wheelPan': 'Pan (trackpad)',
   'options.showDimensions': 'Show dimensions',
+  'options.dimsWalls': 'Walls',
+  'options.dimsOpenings': '+ Openings',
+  'options.dimsAll': 'All',
 
   // ---- export dialog + flow ----
   'export.title': 'Export plan',
@@ -282,7 +285,7 @@ export const en = {
   'shortcuts.does.zoomInOut': 'Zoom in / out',
   'shortcuts.does.zoomToFit': 'Zoom to fit',
   'shortcuts.does.zoomToSelection': 'Zoom to selection',
-  'shortcuts.does.wallDimensions': 'Wall dimension labels',
+  'shortcuts.does.wallDimensions': 'Cycle dimension labels (walls / openings / all)',
   'shortcuts.does.thisSheet': 'This sheet',
   'shortcuts.does.newProject': 'New project',
   'shortcuts.does.open': 'Open…',

@@ -13,13 +13,20 @@ export type AccentId = 'blue' | 'violet' | 'green' | 'amber' | 'rose' | 'teal'
 /** What a PLAIN wheel does in the 2D editor — 'zoom' (mouse default) or
  * 'pan' (trackpad two-finger scroll; pinch/ctrl+wheel still zooms). */
 export type WheelMode = 'zoom' | 'pan'
+/**
+ * Permanent dimension-label ladder (0.7.0; each level includes the last):
+ * 'off' → none, 'walls' → wall lengths (the pre-0.7.0 boolean ON),
+ * 'openings' → + door/window widths, 'all' → + selected-furniture size.
+ * Room areas are NOT part of the ladder — they live in the room labels.
+ */
+export type DimensionLevel = 'off' | 'walls' | 'openings' | 'all'
 
 export interface AppSettings {
   theme: ThemePreference
   accent: AccentId
   units: UnitSystem
   wheelMode: WheelMode
-  showDimensions: boolean
+  dimensionLevel: DimensionLevel
   /** Snap master switch — device preference since schema v3 (doc-level snap
    * made every toggle an undo entry and dirtied the file). */
   snapEnabled: boolean
@@ -57,13 +64,15 @@ export const THEME_PREFERENCES: readonly ThemePreference[] = ['system', 'light',
 export const ACCENT_IDS: readonly AccentId[] = ['blue', 'violet', 'green', 'amber', 'rose', 'teal']
 const UNIT_SYSTEMS: readonly UnitSystem[] = ['m', 'cm', 'ftin']
 export const WHEEL_MODES: readonly WheelMode[] = ['zoom', 'pan']
+/** Ladder order — Shift+D cycles through this array. */
+export const DIMENSION_LEVELS: readonly DimensionLevel[] = ['off', 'walls', 'openings', 'all']
 
 const DEFAULTS: AppSettings = {
   theme: 'system',
   accent: 'blue',
   units: 'm',
   wheelMode: 'zoom',
-  showDimensions: false,
+  dimensionLevel: 'off',
   snapEnabled: true,
   showGrid: true,
   autosaveEnabled: false,
@@ -102,8 +111,13 @@ export function parseAppSettings(json: string | null): AppSettings {
       accent: pick(r.accent, ACCENT_IDS, DEFAULTS.accent),
       units: pick(r.units, UNIT_SYSTEMS, DEFAULTS.units),
       wheelMode: pick(r.wheelMode, WHEEL_MODES, DEFAULTS.wheelMode),
-      showDimensions:
-        typeof r.showDimensions === 'boolean' ? r.showDimensions : DEFAULTS.showDimensions,
+      // pre-0.7.0 envelopes stored the boolean `showDimensions`; honor it
+      // when the enum key is absent (true was exactly today's 'walls')
+      dimensionLevel: pick(
+        r.dimensionLevel,
+        DIMENSION_LEVELS,
+        r.showDimensions === true ? 'walls' : DEFAULTS.dimensionLevel,
+      ),
       snapEnabled: typeof r.snapEnabled === 'boolean' ? r.snapEnabled : DEFAULTS.snapEnabled,
       showGrid: typeof r.showGrid === 'boolean' ? r.showGrid : DEFAULTS.showGrid,
       autosaveEnabled:
@@ -148,7 +162,7 @@ const persist = (s: AppSettings): void => {
         accent: s.accent,
         units: s.units,
         wheelMode: s.wheelMode,
-        showDimensions: s.showDimensions,
+        dimensionLevel: s.dimensionLevel,
         snapEnabled: s.snapEnabled,
         showGrid: s.showGrid,
         autosaveEnabled: s.autosaveEnabled,
@@ -172,7 +186,7 @@ interface AppSettingsState extends AppSettings {
   setAccent: (accent: AccentId) => void
   setUnits: (units: UnitSystem) => void
   setWheelMode: (mode: WheelMode) => void
-  setShowDimensions: (show: boolean) => void
+  setDimensionLevel: (level: DimensionLevel) => void
   setSnapEnabled: (enabled: boolean) => void
   setShowGrid: (show: boolean) => void
   setAutosaveEnabled: (enabled: boolean) => void
@@ -196,7 +210,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setAccent: (accent) => apply({ accent }),
       setUnits: (units) => apply({ units }),
       setWheelMode: (wheelMode) => apply({ wheelMode }),
-      setShowDimensions: (showDimensions) => apply({ showDimensions }),
+      setDimensionLevel: (dimensionLevel) => apply({ dimensionLevel }),
       setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),
       setShowGrid: (showGrid) => apply({ showGrid }),
       setAutosaveEnabled: (autosaveEnabled) => apply({ autosaveEnabled }),
