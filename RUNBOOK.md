@@ -47,6 +47,7 @@ export + 3D screenshot, file association + single instance, Linux
 | Unit tests (599) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Visual baselines (local rig) | `npx playwright test --project=chromium e2e/visual.spec.ts` — add `--update-snapshots` to rebaseline, then EYEBALL the new PNGs |
+| Native smoke (Tier 1) | `npm run smoke:native` — needs a FRESH release binary (`npm run tauri build -- --no-bundle`), `~/.cargo/bin/tauri-driver`, and no running homeplanr instance |
 | Typecheck / lint | `npm run typecheck` / `npm run lint` |
 | Color-token lint | `npm run lint:colors` (raw colors outside the allowed dirs fail CI) |
 | Goldens (pre-schema-bump ONLY) | `npx vite-node scripts/makeGoldens.ts` — refuses to overwrite |
@@ -185,6 +186,9 @@ export + 3D screenshot, file association + single instance, Linux
 11. Visual baselines green (`e2e/visual.spec.ts`); after INTENTIONAL visual
     changes rebaseline with `--update-snapshots` and eyeball every changed
     PNG before committing.
+12. Native smoke green (`npm run smoke:native`) against a FRESH release
+    binary — verifies argv file-open, IPC title, plan render, no GL
+    banner, real WebKitGTK screenshot.
 
 ## Agent testing rig (0.5.0 — how the agent sees the app)
 
@@ -216,6 +220,18 @@ auto-started by the Playwright webServer). The loop for UI-visible work:
    pure color retune can pass against a stale baseline. After intentional
    color-only changes, DELETE the affected PNGs and re-run to force fresh
    baselines (`--update-snapshots` alone won't rewrite a passing shot).
+
+Tier 1 — native smoke (`npm run smoke:native`, scripts/nativeSmoke.mjs):
+drives the REAL release binary via `~/.cargo/bin/tauri-driver` →
+`/usr/bin/WebKitWebDriver` (W3C WebDriver; compat verified 2026-07-16:
+webkitgtk-6.0 driver ↔ webkit2gtk-4.1 app, same upstream 2.52.5). Covers
+what Tier 0 can't: real IPC (window title), the argv file-association
+cold-start, real WebKitGTK rendering + W3C screenshots (the ONLY
+screenshot route on locked-down Wayland). Zero npm deps. Preconditions in
+the script header; it exits 2 with instructions when they're missing.
+Debug binaries load from the vite devUrl (5173) — the smoke uses the
+RELEASE binary so the bundled dist is what's tested. Run it as part of
+the release gates, right after the local bundle build.
 
 ## Platform quirks (hard-won; don't re-learn)
 

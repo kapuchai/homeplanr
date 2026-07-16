@@ -18,7 +18,8 @@
     "lint": "oxlint",
     "lint:colors": "! git grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(' -- 'src/**/*.tsx' 'src/**/*.ts' ':!src/theme' ':!src/catalog' ':!src/**/*.test.ts' ':!src/test' ':!src/scene3d/proceduralTextures.ts'",
     "tauri": "tauri",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "smoke:native": "node scripts/nativeSmoke.mjs"
   },
   "dependencies": {
     "@react-three/drei": "10.7.7",
