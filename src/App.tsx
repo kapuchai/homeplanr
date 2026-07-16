@@ -9,6 +9,7 @@ import { safeRedo, safeUndo, useCanUndo, useCanRedo } from './store/transactions
 import { useAppSettings } from './store/appSettings'
 import {
   launchPersistence,
+  newFromTemplate,
   newProject,
   openProject,
   openRecent,
@@ -16,6 +17,7 @@ import {
   saveProjectAs,
   usePersistStore,
 } from './store/persistence/controller'
+import { TEMPLATES } from './app/templates'
 import { switchTool } from './editor2d/tools/toolRegistry'
 import { flushPendingNudge } from './editor2d/tools/keymap'
 import { CatalogPanel } from './app/CatalogPanel'
@@ -88,7 +90,12 @@ function FileMenu() {
   }
   const entries: MenuEntry[] = [
     { label: 'New', shortcut: 'Ctrl+N', onSelect: run(newProject) },
-    { label: 'Open…', shortcut: 'Ctrl+O', onSelect: run(openProject) },
+    ...TEMPLATES.map((t, i) => ({
+      label: `New: ${t.name}`,
+      ...(i === 0 ? { separatorBefore: true } : {}),
+      onSelect: run(() => newFromTemplate(t.name, t.raw)),
+    })),
+    { label: 'Open…', shortcut: 'Ctrl+O', separatorBefore: true, onSelect: run(openProject) },
     { label: 'Save', shortcut: 'Ctrl+S', onSelect: run(saveProject) },
     { label: 'Save As…', shortcut: 'Ctrl+Shift+S', onSelect: run(saveProjectAs) },
     {

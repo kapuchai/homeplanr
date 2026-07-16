@@ -22,6 +22,7 @@ import {
   type RecoveryBlob,
 } from './recovery'
 import { useConfirmStore } from '../../app/confirmStore'
+import { zoomToFitContent } from '../../editor2d/tools/keymap'
 import { useAppSettings } from '../appSettings'
 
 /**
@@ -289,10 +290,50 @@ export function newProject(): Promise<void> {
     usePersistStore.setState({
       currentFilePath: null,
       lastSavedDoc: useDocStore.getState().doc, // pristine, not dirty
+      lastSavedAt: null, // per-document stamp — a fresh doc was never saved
+      lastSaveWasAuto: false,
       autosaveError: false,
     })
     clearRecovery()
     recomputeDirty()
+  })
+}
+
+/**
+ * New document from a bundled template (M6, 0.4.0) — mirrors newProject's
+ * state matrix, but the doc comes from parseDocument(raw). Each
+ * instantiation gets a FRESH project id + the template display name and no
+ * file path, so it behaves exactly like a new untitled project (Save
+ * prompts Save-As). Deliberately NOT applyOpened: templates must re-id.
+ */
+export function newFromTemplate(name: string, raw: string): Promise<void> {
+  return serialized(async () => {
+    if (!(await whenTxIdle())) return reportBusy()
+    if ((await guardDirty()) === 'cancel') return
+    let parsed
+    try {
+      parsed = parseDocument(raw).doc
+    } catch (err) {
+      await state().adapter.message('Could not load template', String(err))
+      return
+    }
+    cancelFileAutosave() // a late autosave must not resurrect discarded work
+    parsed.id = newProjectId()
+    parsed.name = name
+    useDocStore.getState().replaceDocument(parsed)
+    clearHistory()
+    usePersistStore.setState({
+      currentFilePath: null,
+      lastSavedDoc: useDocStore.getState().doc, // stock content = not dirty
+      lastSavedAt: null, // never saved — the File menu must not lie
+      lastSaveWasAuto: false,
+      autosaveError: false,
+    })
+    clearRecovery()
+    recomputeDirty()
+    // templates always carry content at the origin — frame it (the user may
+    // have panned anywhere; Editor2D only fits on mount)
+    zoomToFitContent(useDocStore.getState().doc)
   })
 }
 
@@ -312,8 +353,12 @@ async function applyOpened(
       currentFilePath: path,
       // self-healed docs no longer match the file — mark dirty
       lastSavedDoc: healed ? NEVER_SAVED : useDocStore.getState().doc,
+      lastSavedAt: null, // per-document stamp — this doc wasn't saved yet
+      lastSaveWasAuto: false,
       autosaveError: false,
     })
+    // frame the opened plan — the viewport may be anywhere (mount-only fit)
+    zoomToFitContent(useDocStore.getState().doc)
     // preserveRecovery: only the Esc-DISMISSED launch prompt sets this —
     // the user deferred the decision, so the blob stays offerable on a
     // later launch (until the next edit's autosave, single-slot caveat)
