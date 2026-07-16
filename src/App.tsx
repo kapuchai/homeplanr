@@ -58,24 +58,16 @@ function CaretIcon() {
 }
 
 function GearIcon() {
-  // gear body + center hole + 8 CHUNKY teeth crossing the body edge — the
-  // 0.4.0 icon (small core, detached thin rays) read as a sun (0.5.0)
+  // FILLED cog silhouette, 8 teeth + evenodd center hole (user pick, 0.6.0).
+  // Strokes never read right at 16px: 0.4.0's thin rays looked like a sun,
+  // 0.5.0's chunky spokes like an asterisk. Vertices generated radially
+  // (tip r=7.2 spanning ±8.5°, root r=5.3 spanning ±15°) — regenerate with
+  // that math rather than nudging points by hand.
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="4.4" />
-      <circle cx="8" cy="8" r="1.6" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path
-        strokeWidth="2.2"
-        d="M8 1.3v2.3M8 12.4v2.3M14.7 8h-2.3M3.6 8H1.3M12.7 3.3 11.1 4.9M4.9 11.1l-1.6 1.6M12.7 12.7l-1.6-1.6M4.9 4.9 3.3 3.3"
+        fillRule="evenodd"
+        d="M13.12 6.63 L15.12 6.94 L15.12 9.06 L13.12 9.37 L12.59 10.65 L13.79 12.28 L12.28 13.79 L10.65 12.59 L9.37 13.12 L9.06 15.12 L6.94 15.12 L6.63 13.12 L5.35 12.59 L3.72 13.79 L2.21 12.28 L3.41 10.65 L2.88 9.37 L0.88 9.06 L0.88 6.94 L2.88 6.63 L3.41 5.35 L2.21 3.72 L3.72 2.21 L5.35 3.41 L6.63 2.88 L6.94 0.88 L9.06 0.88 L9.37 2.88 L10.65 3.41 L12.28 2.21 L13.79 3.72 L12.59 5.35 Z M10.2 8 a2.2 2.2 0 1 1 -4.4 0 a2.2 2.2 0 1 1 4.4 0 Z"
       />
     </svg>
   )
@@ -271,24 +263,8 @@ function Toolbar() {
         </button>
       </div>
       <div className="spacer" />
-      <button
-        type="button"
-        className="icon-btn"
-        title={t('toolbar.helpTitle')}
-        aria-label={t('shortcuts.title')}
-        onClick={() => useUiStore.getState().setHelpOpen(true)}
-      >
-        ?
-      </button>
-      <button
-        type="button"
-        className="icon-btn"
-        title={t('options.title')}
-        aria-label={t('options.title')}
-        onClick={() => useUiStore.getState().setOptionsOpen(true)}
-      >
-        <GearIcon />
-      </button>
+      {/* right cluster order (user pick, 0.6.0): [2D 3D] then ? and gear
+          at the outer edge */}
       <div className="segmented">
         <button
           type="button"
@@ -309,6 +285,24 @@ function Toolbar() {
           {t('toolbar.view3d')}
         </button>
       </div>
+      <button
+        type="button"
+        className="icon-btn"
+        title={t('toolbar.helpTitle')}
+        aria-label={t('shortcuts.title')}
+        onClick={() => useUiStore.getState().setHelpOpen(true)}
+      >
+        ?
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
+        title={t('options.title')}
+        aria-label={t('options.title')}
+        onClick={() => useUiStore.getState().setOptionsOpen(true)}
+      >
+        <GearIcon />
+      </button>
     </header>
   )
 }

@@ -261,7 +261,9 @@ the release gates, right after the local bundle build.
   Flatpak auto-rewrites the exported desktop Exec with `--file-forwarding
   … @@ %F @@` — double-click rides the portal with no manifest work.
   Quirk: org.flatpak.Builder's sandbox can't see host `/tmp` — run local
-  builds from a dir under $HOME (we use `src-tauri/target/flatpak-scratch`).
+  builds from a dir under $HOME, and NEVER inside the repo: the build-dir
+  rootfs has symlink loops that crash Vite's watcher (ELOOP). Use
+  `~/.cache/homeplanr-flatpak/`.
   Keep finish-args minimal (wayland/fallback-x11/ipc/dri, NO --filesystem).
   Flathub submission is post-release; see packaging/flatpak/README.md.
 

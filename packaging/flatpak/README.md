@@ -18,12 +18,18 @@ flathub org.flatpak.Builder org.gnome.Platform//49 org.gnome.Sdk//49`
 The committed manifest points at the published release asset. To verify
 against a locally built .deb instead (e.g. before the release exists):
 
+Run the build OUTSIDE the repo (e.g. `~/.cache/homeplanr-flatpak/`):
+org.flatpak.Builder's sandbox can't see host `/tmp`, and its build-dir
+rootfs contains symlink loops that break Vite's file watcher if left
+anywhere under the project.
+
 ```sh
 npm run tauri build     # produces src-tauri/target/release/bundle/deb/*.deb
-cd packaging/flatpak
+mkdir -p ~/.cache/homeplanr-flatpak && cd ~/.cache/homeplanr-flatpak
+cp <repo>/packaging/flatpak/com.kapuchai.homeplanr.metainfo.xml .
 # make a scratch manifest whose deb source is the local file:
-sed -e 's|^        url: .*|        path: ../../src-tauri/target/release/bundle/deb/homeplanr_<ver>_amd64.deb|' \
-    -e '/sha256: TODO/d' com.kapuchai.homeplanr.yml > local.yml
+sed -e 's|^        url: .*|        path: <repo>/src-tauri/target/release/bundle/deb/homeplanr_<ver>_amd64.deb|' \
+    -e '/sha256: TODO/d' <repo>/packaging/flatpak/com.kapuchai.homeplanr.yml > local.yml
 flatpak run org.flatpak.Builder --user --install --force-clean \
   build-dir local.yml
 flatpak run com.kapuchai.homeplanr
