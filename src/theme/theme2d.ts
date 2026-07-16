@@ -45,11 +45,18 @@ const LIGHT: BaseTheme2D = {
   roomFills: ['#F3EEE4', '#EAE7F2', '#E4EEE9', '#F2E9E4', '#E4EAF2', '#F0F2E4'],
 }
 
-/** Same six room hues as light, lifted over the dark paper. */
+/**
+ * Same six room hues as light, lifted over the dark paper. Retuned for the
+ * B9 0.5.0 contrast pass — theme2d.test.ts pins the floors (room fills vs
+ * paper, symbol detail vs body, pill border vs bg, grid alphas) so future
+ * shade tweaks fail tests before they fail eyes. Symbol/furniture identity
+ * stays aligned with light mode (user rule): hues and roles unchanged,
+ * only contrast lifts.
+ */
 const DARK: BaseTheme2D = {
   paper: '#1b1c1f',
-  gridMinor: 'rgba(255, 255, 255, 0.05)',
-  gridMajor: 'rgba(255, 255, 255, 0.11)',
+  gridMinor: 'rgba(255, 255, 255, 0.09)',
+  gridMajor: 'rgba(255, 255, 255, 0.17)',
   wall: '#cfd2d6',
   snap: '#34d399',
   guide: '#f472b6',
@@ -57,12 +64,12 @@ const DARK: BaseTheme2D = {
   text: '#e8eaed',
   textMuted: '#9aa0a8',
   pillBg: '#26282c',
-  pillBorder: '#3a3d42',
+  pillBorder: '#4d5157',
   symbolBody: '#26282c',
   symbolLine: '#9aa0a8',
-  symbolDetail: '#6f757d',
+  symbolDetail: '#868d96',
   handleFill: '#26282c',
-  roomFills: ['#2a2721', '#272430', '#232b26', '#2d2523', '#232836', '#2a2c21'],
+  roomFills: ['#453e2e', '#3d3852', '#33453a', '#4a3833', '#333c55', '#42452e'],
 }
 
 export function getTheme2d(resolved: 'light' | 'dark', accent: AccentId): Theme2D {

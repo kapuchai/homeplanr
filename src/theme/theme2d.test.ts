@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ACCENT_IDS } from '../store/appSettings'
 import { ACCENTS } from './accents'
+import { contrastRatio } from '../test/contrast'
 import { getTheme2d, type Theme2D } from './theme2d'
 import { getTheme3d } from './theme3d'
 import { initTheming, useThemeStore } from './themeStore'
@@ -75,6 +76,34 @@ describe('getTheme2d', () => {
         }
       }
     }
+  })
+
+  /**
+   * B9 (0.5.0) dark contrast floors — the user-reported dark pass found
+   * room fills ~1.1:1, an invisible minor grid, and ~2.4:1 symbol detail.
+   * These pins keep future shade tweaks from regressing below legibility.
+   */
+  it('dark floors: room fills, symbol detail, pill border, grid alphas', () => {
+    for (const fill of dark.roomFills) {
+      expect(contrastRatio(fill, dark.paper), fill).toBeGreaterThanOrEqual(1.5)
+    }
+    expect(contrastRatio(dark.symbolDetail, dark.symbolBody)).toBeGreaterThanOrEqual(3.5)
+    expect(contrastRatio(dark.pillBorder, dark.pillBg)).toBeGreaterThanOrEqual(1.8)
+    const alpha = (rgba: string): number => Number(/([\d.]+)\s*\)$/.exec(rgba)![1])
+    expect(alpha(dark.gridMinor)).toBeGreaterThanOrEqual(0.08)
+    expect(alpha(dark.gridMajor)).toBeGreaterThanOrEqual(0.15)
+  })
+
+  it('dark room fills keep their light-mode hue identity (warm/violet/green/red/blue/olive)', () => {
+    // same channel-dominance ORDER as the light set — identity, not shade
+    const dominance = (hex: string): string => {
+      const n = parseInt(hex.slice(1), 16)
+      const [r, g, b] = [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+      return [r! >= g! ? 'r' : 'g', g! >= b! ? 'g' : 'b'].join('')
+    }
+    light.roomFills.forEach((fill, i) => {
+      expect(dominance(dark.roomFills[i]!), `fill ${i}`).toBe(dominance(fill))
+    })
   })
 })
 

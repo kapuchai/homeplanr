@@ -212,6 +212,10 @@ auto-started by the Playwright webServer). The loop for UI-visible work:
    an edit + reload triggers the recovery prompt (`dismissRecovery`).
 5. WebGL specs (walk, the 3D baseline) run isolated under full-suite load
    (see quirks).
+6. Pixelmatch tolerates subtle TINT shifts (per-pixel threshold 0.2) — a
+   pure color retune can pass against a stale baseline. After intentional
+   color-only changes, DELETE the affected PNGs and re-run to force fresh
+   baselines (`--update-snapshots` alone won't rewrite a passing shot).
 
 ## Platform quirks (hard-won; don't re-learn)
 
