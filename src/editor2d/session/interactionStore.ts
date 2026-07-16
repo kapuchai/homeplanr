@@ -56,7 +56,22 @@ export interface MarqueePreview {
   b: Vec2
 }
 
-export type ToolPreview = WallDrawPreview | GhostPreview | MarqueePreview | null
+export interface AreaDrawPreview {
+  kind: 'areaDraw'
+  /** Committed trace vertices (tool state — nothing in the doc yet). */
+  points: Vec2[]
+  /** Rubber-band end (snapped), null while off-canvas. */
+  cursor: Vec2 | null
+  /** Cursor is close enough to the first vertex to close the loop. */
+  closeHint: boolean
+}
+
+export type ToolPreview =
+  | WallDrawPreview
+  | GhostPreview
+  | MarqueePreview
+  | AreaDrawPreview
+  | null
 
 export interface InteractionState {
   preview: ToolPreview

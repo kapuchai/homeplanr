@@ -32,6 +32,7 @@ const annotationBounds = (ann: ProjectDocument['annotations'][AnnotationId] & ob
       { x: ann.b.x + nx, y: ann.b.y + ny },
     ]
   }
+  if (ann.kind === 'area') return ann.points.map((p) => ({ x: p.x, y: p.y }))
   const size = ann.fontSize ?? DEFAULTS.labelFontSize
   const r = Math.max(size, (ann.text.length * size * 0.62) / 2)
   return [

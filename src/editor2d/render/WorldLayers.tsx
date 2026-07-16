@@ -364,6 +364,19 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
           />
         )
       }
+      if (ann.kind === 'area') {
+        return (
+          <path
+            key={`${id}-${color}`}
+            d={`M ${ann.points.map((p) => `${p.x} ${p.y}`).join(' L ')} Z`}
+            fill="none"
+            stroke={color}
+            strokeWidth={width + 1}
+            strokeOpacity={0.7}
+            vectorEffect="non-scaling-stroke"
+          />
+        )
+      }
       const box = labelBox(ann)
       const deg = ((ann.rotation ?? 0) * 180) / Math.PI
       return (

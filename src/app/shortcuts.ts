@@ -24,6 +24,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: 'D', does: t('shortcuts.does.placeDoor') },
       { keys: 'N', does: t('shortcuts.does.placeWindow') },
       { keys: 'M', does: t('shortcuts.does.tapeMeasure') },
+      { keys: 'A', does: t('shortcuts.does.areaTool') },
       { keys: 'T', does: t('shortcuts.does.textLabel') },
       { keys: 'Esc', does: t('shortcuts.does.cancel') },
     ],

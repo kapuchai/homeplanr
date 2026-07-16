@@ -74,6 +74,58 @@ export function InteractionOverlay() {
       )
     }
   }
+  if (preview?.kind === 'areaDraw') {
+    const pts = preview.points
+    if (pts.length) {
+      const chain = pts.map((p) => `${p.x} ${p.y}`).join(' L ')
+      els.push(
+        <g key="ad" stroke={theme.accent} fill="none">
+          <path d={`M ${chain}`} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+          {preview.cursor && (
+            <line
+              x1={pts[pts.length - 1]!.x}
+              y1={pts[pts.length - 1]!.y}
+              x2={preview.cursor.x}
+              y2={preview.cursor.y}
+              strokeWidth={1}
+              strokeDasharray="5 4"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {preview.closeHint && (
+            <line
+              x1={pts[pts.length - 1]!.x}
+              y1={pts[pts.length - 1]!.y}
+              x2={pts[0]!.x}
+              y2={pts[0]!.y}
+              strokeWidth={1}
+              strokeDasharray="2 3"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+        </g>,
+      )
+      // vertex dots; the first grows into the close target when in range
+      els.push(
+        <g key="ad-verts" fill={theme.accent}>
+          {pts.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={px(i === 0 && preview.closeHint ? 6 : 3)} />
+          ))}
+        </g>,
+      )
+    }
+    if (preview.cursor) {
+      els.push(
+        <circle
+          key="ad-cursor"
+          cx={preview.cursor.x}
+          cy={preview.cursor.y}
+          r={px(4)}
+          fill={theme.accent}
+        />,
+      )
+    }
+  }
   if (preview?.kind === 'ghost') {
     els.push(
       <path

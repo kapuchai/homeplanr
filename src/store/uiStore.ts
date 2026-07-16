@@ -15,6 +15,7 @@ export type ToolId =
   | 'place-furniture'
   | 'measure'
   | 'annotate-text'
+  | 'draw-area'
 export type ViewMode = '2d' | '3d'
 
 export interface ToolParams {

@@ -256,6 +256,10 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
       switchTool('annotate-text')
       return
     }
+    if (key.toLowerCase() === 'a') {
+      switchTool('draw-area')
+      return
+    }
     if (key.toLowerCase() === 's') {
       // snap toggle — device pref since v3, so this never dirties the file
       const settings = useAppSettings.getState()

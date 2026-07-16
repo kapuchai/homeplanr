@@ -5,6 +5,7 @@ import { useAppSettings } from '../store/appSettings'
 import { formatArea, formatLength, fromDisplayLength, lengthUnitLabel, toDisplayLength } from '../format/units'
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
+import { area } from '../geometry/polygon'
 import { FLOOR_MATERIALS, WALL_PAINTS } from '../catalog/palette'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
@@ -444,6 +445,28 @@ export function PropertiesPanel() {
             onCommit={(v) => a.updateAnnotation(annotation.id, { offset: v })}
           />
           <p className="hint">{t('props.hint.dimension')}</p>
+        </aside>
+      )
+    }
+    if (annotation.kind === 'area') {
+      const pts = annotation.points
+      const perimeter = pts.reduce((s, p, i) => s + dist(p, pts[(i + 1) % pts.length]!), 0)
+      return (
+        <aside className="props-panel" key={annotation.id}>
+          <h3>{t('props.area')}</h3>
+          <Row>
+            <span>{t('props.areaValue')}</span>
+            <span className="readonly">{formatArea(area(pts), units)}</span>
+          </Row>
+          <Row>
+            <span>{t('props.perimeter')}</span>
+            <span className="readonly">{formatLength(perimeter, units)}</span>
+          </Row>
+          <Row>
+            <span>{t('props.vertices')}</span>
+            <span className="readonly">{pts.length}</span>
+          </Row>
+          <p className="hint">{t('props.hint.area')}</p>
         </aside>
       )
     }

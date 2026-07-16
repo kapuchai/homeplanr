@@ -61,6 +61,8 @@ export const en = {
   'tool.windowTitle': 'Place window (N)',
   'tool.measure': 'Measure',
   'tool.measureTitle': 'Measure (M)',
+  'tool.area': 'Area',
+  'tool.areaTitle': 'Area — trace a polygon to measure it (A)',
   'tool.text': 'Text',
   'tool.textTitle': 'Text label (T)',
   'tool.disabledIn3d': 'Available in the 2D view',
@@ -185,6 +187,9 @@ export const en = {
   'props.countItems': '{count} items',
   'props.countItem': '{count} item',
   'props.dimension': 'Dimension',
+  'props.areaValue': 'Area',
+  'props.perimeter': 'Perimeter',
+  'props.vertices': 'Vertices',
   'props.text': 'Text',
   'props.wall': 'Wall',
   'props.door': 'Door',
@@ -237,6 +242,8 @@ export const en = {
   'props.hint.multiMixed': 'Drag moves items · Del deletes · Esc deselects',
   'props.hint.dimension':
     'Drag slides the line · endpoints are fixed — delete and re-measure to change them',
+  'props.hint.area':
+    'Drag the outline moves it · vertices are fixed — delete and re-trace to change them',
   'props.hint.text': 'Clearing the text deletes the label',
   'props.hint.project':
     'W draw · D door · N window · M measure · V select · Del delete · Ctrl+Z undo · Space pan · Shift+1 fit',
@@ -260,6 +267,7 @@ export const en = {
   'shortcuts.does.placeDoor': 'Place door',
   'shortcuts.does.placeWindow': 'Place window',
   'shortcuts.does.tapeMeasure': 'Tape measure',
+  'shortcuts.does.areaTool': 'Area trace',
   'shortcuts.does.textLabel': 'Text label',
   'shortcuts.does.cancel': 'Cancel gesture → select tool → deselect',
   'shortcuts.does.marquee': 'Marquee select (empty canvas or room floor)',
@@ -345,6 +353,8 @@ export const en = {
   'hint.placeOpening': 'Click a wall to place the {kind} · stays armed for more · Esc to finish',
   'hint.placeFurniture': 'Click to place · R rotates the ghost · Esc to finish',
   'hint.measure': 'Click two points to measure · Enter keeps it as a dimension · Esc clears',
+  'hint.drawArea':
+    'Click corners to trace an area · click the first point or Enter closes · Backspace steps back',
   'hint.measureHidden':
     'Kept measurements are hidden (Shift+A shows them) · Enter keeps & shows · Esc clears',
   'hint.annotateText': 'Click to place a text label · type its text in the panel · Esc exits',

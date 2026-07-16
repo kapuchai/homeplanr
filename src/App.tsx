@@ -211,6 +211,7 @@ function Toolbar() {
         {/* switchTool (never setActiveTool): the outgoing tool must deactivate */}
         {toolBtn(t('tool.select'), activeTool === 'select', () => switchTool('select'), t('tool.selectTitle'))}
         {toolBtn(t('tool.measure'), activeTool === 'measure', () => switchTool('measure'), t('tool.measureTitle'))}
+        {toolBtn(t('tool.area'), activeTool === 'draw-area', () => switchTool('draw-area'), t('tool.areaTitle'))}
         {toolBtn(t('tool.text'), activeTool === 'annotate-text', () => switchTool('annotate-text'), t('tool.textTitle'))}
       </div>
       <div className="segmented">

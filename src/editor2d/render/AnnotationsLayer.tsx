@@ -1,12 +1,13 @@
 import { useViewportStore } from '../viewport/viewportStore'
 import { useAppSettings } from '../../store/appSettings'
 import { useThemeStore } from '../../theme/themeStore'
-import { formatLength } from '../../format/units'
+import { formatArea, formatLength } from '../../format/units'
 import { add, dist, normalize, perp, scale, sub } from '../../geometry/vec'
+import { area, centroid } from '../../geometry/polygon'
 import type { ProjectDocument } from '../../model/types'
 import { DEFAULTS } from '../../model/types'
 import { Pill } from './Pill'
-import { DIMENSION_MIN_PX, LABEL_MIN_PX } from '../hit/hitTest'
+import { AREA_MIN_PX, DIMENSION_MIN_PX, LABEL_MIN_PX } from '../hit/hitTest'
 
 /**
  * User annotations (v3): persistent dimensions + free text labels.
@@ -56,6 +57,30 @@ function Annotations({ doc }: { doc: ProjectDocument }) {
           <line {...vex} x1={b2.x - tick.x} y1={b2.y - tick.y} x2={b2.x + tick.x} y2={b2.y + tick.y} />
         </g>,
         <Pill key={`${ann.id}-pill`} at={mid} text={formatLength(len, units)} k={k} tone="measure" />,
+      )
+    } else if (ann.kind === 'area') {
+      const a = area(ann.points)
+      if (Math.sqrt(a) * k < AREA_MIN_PX) continue // hitTest culls the same set
+      const d = `M ${ann.points.map((p) => `${p.x} ${p.y}`).join(' L ')} Z`
+      els.push(
+        <path
+          key={ann.id}
+          d={d}
+          fill={theme.textMuted}
+          fillOpacity={0.08}
+          stroke={theme.textMuted}
+          strokeWidth={1}
+          strokeDasharray="4 3"
+          vectorEffect="non-scaling-stroke"
+        />,
+        // area text DERIVED at render (shoelace + current units) — never stored
+        <Pill
+          key={`${ann.id}-pill`}
+          at={centroid(ann.points)}
+          text={formatArea(a, units)}
+          k={k}
+          tone="measure"
+        />,
       )
     } else {
       const size = ann.fontSize ?? DEFAULTS.labelFontSize

@@ -39,6 +39,7 @@ export type ToolId =
   | 'place-furniture'
   | 'measure'
   | 'annotate-text'
+  | 'draw-area'
 
 export interface Tool {
   id: ToolId

@@ -1,7 +1,11 @@
 import { DEFAULTS as MODEL_DEFAULTS, type ProjectDocument } from '../model/types'
 import type { DerivedGeometry } from '../store/derived'
 import type { Bounds } from '../geometry/polygon'
-import { polygonBounds } from '../geometry/polygon'
+import {
+  area as polygonArea,
+  centroid as polygonCentroid,
+  polygonBounds,
+} from '../geometry/polygon'
 import { docContentBounds } from '../editor2d/render/bounds'
 import {
   furnitureTransform,
@@ -266,6 +270,16 @@ export function renderPlanSvg(
           `</g>`,
       )
       parts.push(...dim)
+    } else if (ann.kind === 'area') {
+      // area text derived here exactly like the editor layer (shoelace +
+      // current units — never stored)
+      const c = polygonCentroid(ann.points)
+      parts.push(
+        `<path d="M ${ann.points.map((p) => `${p.x} ${p.y}`).join(' L ')} Z" fill="${theme.textMuted}" fill-opacity="0.08" stroke="${theme.textMuted}" stroke-width="${HAIRLINE}" stroke-dasharray="0.04 0.03"/>`,
+        `<g transform="translate(${c.x} ${c.y}) scale(1 -1)">` +
+          `<text text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${DIM_SIZE}" fill="${theme.text}" stroke="${theme.paper}" stroke-width="0.03" paint-order="stroke">${esc(formatArea(polygonArea(ann.points), units))}</text>` +
+          `</g>`,
+      )
     } else {
       const size = ann.fontSize ?? MODEL_DEFAULTS.labelFontSize
       const deg = ((ann.rotation ?? 0) * 180) / Math.PI

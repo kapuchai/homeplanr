@@ -16,6 +16,8 @@ import type { EditorPointerEvent } from './toolTypes'
 import { emptyDocument } from '../../model/types'
 import { newProjectId, type FurnitureId } from '../../model/ids'
 import { vec, type Vec2 } from '../../geometry/vec'
+import { area } from '../../geometry/polygon'
+import { useAppSettings } from '../../store/appSettings'
 
 /**
  * Tool state machines driven by scripted event sequences against the REAL
@@ -1365,6 +1367,85 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
   })
 })
 
+describe('area tool (0.7.0): trace, close, drag', () => {
+  const anns = () => Object.values(useDocStore.getState().doc.annotations)
+
+  it('click-chain + first-vertex click closes: ONE area annotation, one undo entry, selected', () => {
+    registry.switchTo(ctx, 'draw-area')
+    const base = past()
+    click(vec(0, 0))
+    click(vec(3, 0))
+    click(vec(3, 2))
+    click(vec(0, 2))
+    expect(anns()).toHaveLength(0) // trace is tool state, not doc state
+    expect(past()).toBe(base)
+    click(vec(0.05, 0.02)) // within the 10px close radius of the first vertex
+    expect(anns()).toHaveLength(1)
+    const ann = anns()[0]!
+    expect(ann.kind).toBe('area')
+    expect(ann.kind === 'area' && ann.points).toHaveLength(4)
+    expect(past()).toBe(base + 1)
+    expect(useUiStore.getState().selection).toEqual([ann.id])
+  })
+
+  it('Enter closes; Backspace pops a vertex; Esc clears the trace', () => {
+    registry.switchTo(ctx, 'draw-area')
+    click(vec(0, 0))
+    click(vec(2, 0))
+    click(vec(2, 2))
+    click(vec(0, 2))
+    expect(tool().onKeyDown?.('Backspace', ctx)).toBe(true) // drops (0,2)
+    expect(tool().onKeyDown?.('Enter', ctx)).toBe(true)
+    const ann = anns()[0]!
+    expect(ann.kind === 'area' && ann.points).toHaveLength(3)
+
+    // fresh trace: Esc clears without touching the doc
+    click(vec(5, 5))
+    click(vec(6, 5))
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(anns()).toHaveLength(1) // still just the first one
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(false) // empty → bubbles
+  })
+
+  it('degenerate traces are rejected but consumed; auto re-enables hidden annotations', () => {
+    registry.switchTo(ctx, 'draw-area')
+    const base = past()
+    click(vec(0, 0))
+    click(vec(1, 0))
+    click(vec(2, 0)) // collinear
+    expect(tool().onKeyDown?.('Enter', ctx)).toBe(true)
+    expect(anns()).toHaveLength(0)
+    expect(past()).toBe(base) // rejected mutation records nothing
+
+    useAppSettings.getState().setShowAnnotations(false)
+    click(vec(0, 0))
+    click(vec(2, 0))
+    click(vec(2, 2))
+    expect(tool().onKeyDown?.('Enter', ctx)).toBe(true)
+    expect(anns()).toHaveLength(1)
+    expect(useAppSettings.getState().showAnnotations).toBe(true) // self-healing
+  })
+
+  it('select-tool drag translates the polygon rigidly (edge grab, one entry)', () => {
+    registry.switchTo(ctx, 'draw-area')
+    click(vec(0, 0))
+    click(vec(2, 0))
+    click(vec(2, 2))
+    click(vec(0, 2))
+    expect(tool().onKeyDown?.('Enter', ctx)).toBe(true)
+    const ann = anns()[0]!
+    registry.switchTo(ctx, 'select')
+    const base = past()
+    drag(vec(1, 0), vec(1.5, 1)) // grab the bottom edge midpoint
+    const moved = useDocStore.getState().doc.annotations[ann.id]!
+    expect(moved.kind === 'area' && moved.points[0]!.x).toBeCloseTo(0.5, 9)
+    expect(moved.kind === 'area' && moved.points[0]!.y).toBeCloseTo(1, 9)
+    // rigid: area unchanged (2×2 square)
+    expect(moved.kind === 'area' && area(moved.points)).toBeCloseTo(4, 9)
+    expect(past()).toBe(base + 1)
+  })
+})
+
 describe('M8 (0.3.0): snap/grid hotkeys, help overlay, shortcut sheet', () => {
   it('S toggles snapping and G toggles the grid — device prefs, no undo entries', async () => {
     const { useAppSettings } = await import('../../store/appSettings')
@@ -1401,7 +1482,7 @@ describe('M8 (0.3.0): snap/grid hotkeys, help overlay, shortcut sheet', () => {
       ),
     )
     for (const k of [
-      'V', 'W', 'D', 'N', 'M', 'T', 'S', 'G',
+      'V', 'W', 'D', 'N', 'M', 'T', 'A', 'S', 'G',
       'Ctrl+A', 'Ctrl+D', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Z', 'Ctrl+Y',
       'Ctrl+N', 'Ctrl+O', 'Ctrl+S',
       'Shift+1', 'Shift+2', 'Shift+D', 'Shift+A', 'Shift+R',

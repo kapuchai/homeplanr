@@ -55,6 +55,8 @@ export function StatusHint() {
   } else if (tool === 'measure') {
     // hidden-layer variant: explains where persisted measures went
     text = showAnnotations ? t('hint.measure') : t('hint.measureHidden')
+  } else if (tool === 'draw-area') {
+    text = t('hint.drawArea')
   } else if (tool === 'annotate-text') {
     text = t('hint.annotateText')
   } else if (selection.length > 1) {

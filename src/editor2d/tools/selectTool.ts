@@ -105,6 +105,14 @@ type DragState =
       /** Grab compensation: where in the tolerance band the press landed. */
       off0: number
     }
+  | {
+      kind: 'annotation-area'
+      tx: TxToken
+      id: AnnotationId
+      /** Rigid translate: every start point moves by (world − startWorld). */
+      startWorld: Vec2
+      startPoints: { x: number; y: number }[]
+    }
 
 export function createSelectTool(): Tool {
   let state: DragState = { kind: 'idle' }
@@ -339,6 +347,16 @@ export function createSelectTool(): Tool {
                 id: hit.id,
                 grabOffset: sub({ x: ann.x, y: ann.y }, state.world),
               }
+            } else if (ann.kind === 'area') {
+              // rigid translate — the polygon's shape (and thus its area
+              // readout) must never change from a drag
+              state = {
+                kind: 'annotation-area',
+                tx: beginTx(),
+                id: hit.id,
+                startWorld: { ...state.world },
+                startPoints: ann.points.map((p) => ({ x: p.x, y: p.y })),
+              }
             } else {
               // dimensions slide along their normal ONLY — a rigid translate
               // would silently falsify what the dimension measures
@@ -567,6 +585,14 @@ export function createSelectTool(): Tool {
           })
           return
         }
+
+        case 'annotation-area': {
+          const d = sub(e.world, state.startWorld)
+          ctx.actions().updateAnnotation(state.id, {
+            points: state.startPoints.map((p) => ({ x: p.x + d.x, y: p.y + d.y })),
+          })
+          return
+        }
       }
     },
 
@@ -654,7 +680,8 @@ export function createSelectTool(): Tool {
           return
         }
         case 'annotation-label':
-        case 'annotation-dim': {
+        case 'annotation-dim':
+        case 'annotation-area': {
           commitTx(state.tx) // annotations skip the pipeline — nothing to re-run
           reset(ctx)
           return

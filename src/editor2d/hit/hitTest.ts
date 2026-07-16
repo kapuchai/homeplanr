@@ -4,7 +4,13 @@ import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
 import { dist, sub } from '../../geometry/vec'
 import { distToSegment, segSegIntersection } from '../../geometry/segment'
-import { pointInOBB, pointInPolygon, pointInPolygonWithHoles } from '../../geometry/polygon'
+import {
+  area,
+  centroid,
+  pointInOBB,
+  pointInPolygon,
+  pointInPolygonWithHoles,
+} from '../../geometry/polygon'
 
 /**
  * Geometric hit-testing (never DOM-based). Priority order (plan-pinned):
@@ -32,11 +38,15 @@ export interface HitOptions {
 }
 
 const ANNOTATION_TOLERANCE_PX = 5
+/** Rough half-extent of the centroid area pill — a coarse click target. */
+const AREA_PILL_RADIUS_PX = 20
 /** Visibility floors, shared with AnnotationsLayer: what the layer culls at
  * the current zoom must not be hittable either — an invisible annotation
  * stealing clicks from the wall under it reads as a broken click. */
 export const DIMENSION_MIN_PX = 24
 export const LABEL_MIN_PX = 6
+/** Area polygons cull on k·√area — the same floor the layer uses. */
+export const AREA_MIN_PX = 24
 const OPENING_INFLATE_PX = 4
 const FURNITURE_INFLATE_PX = 3
 const NODE_RADIUS_PX = 8
@@ -82,6 +92,17 @@ export function hitTestAll(
       if (distToSegment(world, p, q) <= annTol) {
         hits.push({ kind: 'annotation', id: ann.id })
       }
+    } else if (ann.kind === 'area') {
+      if (Math.sqrt(area(ann.points)) < AREA_MIN_PX * pxToWorld) continue // layer culls it
+      // the outline (near an edge) or the centroid readout pill hits; the
+      // interior does NOT — an area traced over a room must not shadow the
+      // furniture/room under it
+      const pts = ann.points
+      const onEdge = pts.some(
+        (p, i) => distToSegment(world, p, pts[(i + 1) % pts.length]!) <= annTol,
+      )
+      const onPill = dist(world, centroid(pts)) <= AREA_PILL_RADIUS_PX * pxToWorld
+      if (onEdge || onPill) hits.push({ kind: 'annotation', id: ann.id })
     } else {
       const size = ann.fontSize ?? DEFAULTS.labelFontSize
       if (size < LABEL_MIN_PX * pxToWorld) continue // layer culls it
@@ -231,6 +252,11 @@ export function hitTestRect(
       const { p, q } = dimensionSpan(ann)
       if (pxToWorld !== undefined && dist(p, q) < DIMENSION_MIN_PX * pxToWorld) continue
       if (segIntersectsRect(p, q, min, max)) hits.push({ kind: 'annotation', id: ann.id })
+    } else if (ann.kind === 'area') {
+      if (pxToWorld !== undefined && Math.sqrt(area(ann.points)) < AREA_MIN_PX * pxToWorld) {
+        continue
+      }
+      if (polyIntersectsRect(ann.points, min, max)) hits.push({ kind: 'annotation', id: ann.id })
     } else {
       if (
         pxToWorld !== undefined &&
