@@ -7,7 +7,13 @@ import type { CatalogItem, SymbolPrim, SymbolRole } from './types'
  * exact geometry the 3D view renders, so the two can never drift and every
  * item automatically "looks right" (a toilet reads as tank + bowl, etc.).
  *
- * body role: the footprint rect (paper mask over room fills);
+ * silhouette + body roles: the footprint layer — one strong-stroke prim and
+ * one paper-fill prim per unique part footprint (0.7.0: the old single bbox
+ * mask lied about L-shapes and circles). Renderers draw them inside ONE
+ * flattened-opacity group, fills after strokes: every stroke segment
+ * interior to the part union is covered by a fill, so the strong border
+ * survives only along the union boundary — a poor man's polygon union with
+ * zero geometry code.
  * detail role: each part's plan outline as a hairline, lower parts first.
  * Per-part `symbol` hints (builder.ts) adjust the projection: 'omit' skips
  * a part, 'outline' promotes it to the outline role. Near-duplicate prims
@@ -107,19 +113,16 @@ export function symbolFor(item: CatalogItem): SymbolPrim[] {
     else if (kept.role === 'detail' && prim.role === 'outline') byKey.set(key, prim)
   }
 
-  const prims: SymbolPrim[] = [
-    // footprint mask
-    {
-      kind: 'rect',
-      x: -item.dims.w / 2,
-      y: -item.dims.d / 2,
-      w: item.dims.w,
-      h: item.dims.d,
-      rx: 0.015,
-      role: 'body',
-    },
-    ...byKey.values(),
-  ]
+  // footprint layer: silhouette stroke + paper fill per unique shape, reusing
+  // the deduped stroke-prim geometry (roles overridden)
+  const silhouettes: SymbolPrim[] = []
+  const bodies: SymbolPrim[] = []
+  for (const p of byKey.values()) {
+    silhouettes.push({ ...p, role: 'silhouette' })
+    bodies.push({ ...p, role: 'body' })
+  }
+
+  const prims: SymbolPrim[] = [...silhouettes, ...bodies, ...byKey.values()]
   cache.set(item.id, prims)
   return prims
 }

@@ -31,7 +31,14 @@ export type CatalogCategory =
   | 'bathroom'
   | 'office'
 
-export type SymbolRole = 'body' | 'outline' | 'detail'
+/**
+ * silhouette + body form the item's footprint layer (0.7.0): one stroke and
+ * one fill prim per unique part footprint, rendered inside a single
+ * flattened-opacity group — the fills cover every stroke segment interior to
+ * the part union, so the strong border survives only along the union
+ * boundary. outline/detail are the per-part hairlines drawn on top.
+ */
+export type SymbolRole = 'silhouette' | 'body' | 'outline' | 'detail'
 
 /** Declarative top-view symbol primitives, item-local meters. */
 export type SymbolPrim =

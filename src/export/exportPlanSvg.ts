@@ -72,12 +72,18 @@ const lineEl = (l: Line, stroke: string, width: number): string =>
 
 /** Serialize one catalog symbol prim with SymbolRenderer's role styling. */
 function primEl(p: SymbolPrim, theme: Theme2D): string {
+  // silhouette: 2× hairline under the body fills — inside the flattened
+  // footprint group the fills cover everything interior to the part union,
+  // leaving a hairline border along the union boundary (see SymbolRenderer,
+  // the styling twin this must stay in agreement with)
   const style =
-    p.role === 'body'
-      ? `fill="${theme.symbolBody}" fill-opacity="0.92" stroke="${theme.symbolLine}" stroke-width="${HAIRLINE}"`
-      : p.role === 'outline'
-        ? `fill="none" stroke="${theme.symbolLine}" stroke-width="${HAIRLINE}"`
-        : `fill="none" stroke="${theme.symbolDetail}" stroke-width="${DETAIL}"`
+    p.role === 'silhouette'
+      ? `fill="none" stroke="${theme.symbolLine}" stroke-width="${HAIRLINE * 2}"`
+      : p.role === 'body'
+        ? `fill="${theme.symbolBody}" stroke="none"`
+        : p.role === 'outline'
+          ? `fill="none" stroke="${theme.symbolLine}" stroke-width="${HAIRLINE}"`
+          : `fill="none" stroke="${theme.symbolDetail}" stroke-width="${DETAIL}"`
   switch (p.kind) {
     case 'rect':
       return `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"${p.rx !== undefined ? ` rx="${p.rx}"` : ''} ${style}/>`
@@ -203,7 +209,15 @@ export function renderPlanSvg(
   // editor (WorldLayers), and the placement ghost pixel-identical
   for (const f of Object.values(doc.furniture)) {
     const item = CATALOG[f.catalogItemId]
-    const prims = item ? symbolFor(item).map((p) => primEl(p, theme)).join('') : ''
+    const allPrims = item ? symbolFor(item) : []
+    // footprint layer flattened as ONE group (mirrors SymbolRenderer): part
+    // fills never double-darken, silhouette strokes survive only on the
+    // union boundary
+    const footprint = allPrims.filter((p) => p.role === 'silhouette' || p.role === 'body')
+    const strokes = allPrims.filter((p) => p.role === 'outline' || p.role === 'detail')
+    const prims =
+      `<g opacity="0.92">${footprint.map((p) => primEl(p, theme)).join('')}</g>` +
+      strokes.map((p) => primEl(p, theme)).join('')
     const inner = item
       ? `<g transform="scale(${f.size.w / item.dims.w} ${f.size.d / item.dims.d})">${prims}</g>`
       : `<rect x="${-f.size.w / 2}" y="${-f.size.d / 2}" width="${f.size.w}" height="${f.size.d}" fill="${theme.symbolBody}" fill-opacity="0.9" stroke="${theme.invalid}" stroke-width="${HAIRLINE}" stroke-dasharray="0.04 0.03"/>`
