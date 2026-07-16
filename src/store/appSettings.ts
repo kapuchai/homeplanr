@@ -10,11 +10,15 @@ import type { UnitSystem } from '../format/units'
  */
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type AccentId = 'blue' | 'violet' | 'green' | 'amber' | 'rose' | 'teal'
+/** What a PLAIN wheel does in the 2D editor — 'zoom' (mouse default) or
+ * 'pan' (trackpad two-finger scroll; pinch/ctrl+wheel still zooms). */
+export type WheelMode = 'zoom' | 'pan'
 
 export interface AppSettings {
   theme: ThemePreference
   accent: AccentId
   units: UnitSystem
+  wheelMode: WheelMode
   showDimensions: boolean
   /** Snap master switch — device preference since schema v3 (doc-level snap
    * made every toggle an undo entry and dirtied the file). */
@@ -43,11 +47,13 @@ export const APP_SETTINGS_KEY = 'homeplanr:v1:app-settings'
 export const THEME_PREFERENCES: readonly ThemePreference[] = ['system', 'light', 'dark']
 export const ACCENT_IDS: readonly AccentId[] = ['blue', 'violet', 'green', 'amber', 'rose', 'teal']
 const UNIT_SYSTEMS: readonly UnitSystem[] = ['m', 'cm', 'ftin']
+export const WHEEL_MODES: readonly WheelMode[] = ['zoom', 'pan']
 
 const DEFAULTS: AppSettings = {
   theme: 'system',
   accent: 'blue',
   units: 'm',
+  wheelMode: 'zoom',
   showDimensions: false,
   snapEnabled: true,
   showGrid: true,
@@ -80,6 +86,7 @@ export function parseAppSettings(json: string | null): AppSettings {
       theme: pick(r.theme, THEME_PREFERENCES, DEFAULTS.theme),
       accent: pick(r.accent, ACCENT_IDS, DEFAULTS.accent),
       units: pick(r.units, UNIT_SYSTEMS, DEFAULTS.units),
+      wheelMode: pick(r.wheelMode, WHEEL_MODES, DEFAULTS.wheelMode),
       showDimensions:
         typeof r.showDimensions === 'boolean' ? r.showDimensions : DEFAULTS.showDimensions,
       snapEnabled: typeof r.snapEnabled === 'boolean' ? r.snapEnabled : DEFAULTS.snapEnabled,
@@ -122,6 +129,7 @@ const persist = (s: AppSettings): void => {
         theme: s.theme,
         accent: s.accent,
         units: s.units,
+        wheelMode: s.wheelMode,
         showDimensions: s.showDimensions,
         snapEnabled: s.snapEnabled,
         showGrid: s.showGrid,
@@ -142,6 +150,7 @@ interface AppSettingsState extends AppSettings {
   setTheme: (theme: ThemePreference) => void
   setAccent: (accent: AccentId) => void
   setUnits: (units: UnitSystem) => void
+  setWheelMode: (mode: WheelMode) => void
   setShowDimensions: (show: boolean) => void
   setSnapEnabled: (enabled: boolean) => void
   setShowGrid: (show: boolean) => void
@@ -164,6 +173,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setTheme: (theme) => apply({ theme }),
       setAccent: (accent) => apply({ accent }),
       setUnits: (units) => apply({ units }),
+      setWheelMode: (wheelMode) => apply({ wheelMode }),
       setShowDimensions: (showDimensions) => apply({ showDimensions }),
       setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),
       setShowGrid: (showGrid) => apply({ showGrid }),

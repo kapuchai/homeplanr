@@ -10,6 +10,7 @@ const DEFAULTS: AppSettings = {
   theme: 'system',
   accent: 'blue',
   units: 'm',
+  wheelMode: 'zoom',
   showDimensions: false,
   snapEnabled: true,
   showGrid: true,
@@ -36,6 +37,7 @@ describe('parseAppSettings', () => {
       theme: 'dark',
       accent: 'teal',
       units: 'ftin',
+      wheelMode: 'pan',
       showDimensions: true,
       snapEnabled: false,
       showGrid: false,
@@ -57,6 +59,7 @@ describe('parseAppSettings', () => {
           theme: 'light',
           accent: 'hotpink',
           units: 'cm',
+          wheelMode: 'scroll',
           showDimensions: 1,
           snapEnabled: 'off',
         }),
@@ -65,6 +68,7 @@ describe('parseAppSettings', () => {
       theme: 'light',
       accent: 'blue',
       units: 'cm',
+      wheelMode: 'zoom',
       showDimensions: false,
       snapEnabled: true,
       showGrid: true,
@@ -120,6 +124,7 @@ describe('useAppSettings persistence', () => {
       theme: s.theme,
       accent: s.accent,
       units: s.units,
+      wheelMode: s.wheelMode,
       showDimensions: s.showDimensions,
       snapEnabled: s.snapEnabled,
       showGrid: s.showGrid,
@@ -137,6 +142,7 @@ describe('useAppSettings persistence', () => {
     s.setTheme('dark')
     s.setAccent('rose')
     s.setUnits('cm')
+    s.setWheelMode('pan')
     s.setShowDimensions(true)
     s.setSnapEnabled(false)
     s.setShowGrid(false)
@@ -155,6 +161,7 @@ describe('useAppSettings persistence', () => {
       theme: 'dark',
       accent: 'rose',
       units: 'cm',
+      wheelMode: 'pan',
       showDimensions: true,
       snapEnabled: false,
       showGrid: false,

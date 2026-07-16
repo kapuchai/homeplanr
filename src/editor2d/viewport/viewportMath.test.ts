@@ -4,6 +4,7 @@ import {
   gridTier,
   pxToWorld,
   screenToWorld,
+  resolveWheel,
   wheelZoomFactor,
   worldToScreen,
   zoomAt,
@@ -11,6 +12,7 @@ import {
   K_MAX,
   K_MIN,
   type Viewport,
+  type WheelInput,
 } from './viewportMath'
 import { vec } from '../../geometry/vec'
 
@@ -97,5 +99,63 @@ describe('wheelZoomFactor', () => {
   it('ctrl (pinch) uses a finer, still-clamped response', () => {
     expect(wheelZoomFactor(-20, 0, true)).toBeCloseTo(Math.exp(0.1), 9)
     expect(wheelZoomFactor(-9999, 0, true)).toBe(1.25)
+  })
+})
+
+describe('resolveWheel (B2 wheel matrix)', () => {
+  const ev = (over: Partial<WheelInput> = {}): WheelInput => ({
+    deltaX: 0,
+    deltaY: 100,
+    deltaMode: 0,
+    ctrlKey: false,
+    shiftKey: false,
+    ...over,
+  })
+
+  it("plain wheel zooms in 'zoom' mode and pans both axes in 'pan' mode", () => {
+    expect(resolveWheel(ev(), 'zoom', false)).toEqual({
+      kind: 'zoom',
+      factor: wheelZoomFactor(100, 0, false),
+    })
+    expect(resolveWheel(ev({ deltaX: 30 }), 'pan', false)).toEqual({
+      kind: 'pan',
+      dx: -30,
+      dy: -100, // scrollbar convention: wheel down slides content up
+    })
+  })
+
+  it('ctrl+wheel is ALWAYS pinch-zoom, in both modes', () => {
+    const pinch = { kind: 'zoom', factor: wheelZoomFactor(100, 0, true) }
+    expect(resolveWheel(ev({ ctrlKey: true }), 'zoom', false)).toEqual(pinch)
+    expect(resolveWheel(ev({ ctrlKey: true }), 'pan', false)).toEqual(pinch)
+    // ctrl beats even Space (pinch mid-pan stays zoom)
+    expect(resolveWheel(ev({ ctrlKey: true }), 'zoom', true)).toEqual(pinch)
+  })
+
+  it('Shift+wheel is ALWAYS horizontal pan (folds both deltas), in both modes', () => {
+    const h = { kind: 'pan', dx: -130, dy: 0 }
+    expect(resolveWheel(ev({ shiftKey: true, deltaX: 30 }), 'zoom', false)).toEqual(h)
+    expect(resolveWheel(ev({ shiftKey: true, deltaX: 30 }), 'pan', false)).toEqual(h)
+  })
+
+  it('Space+wheel pans both axes even in zoom mode', () => {
+    expect(resolveWheel(ev({ deltaX: 30 }), 'zoom', true)).toEqual({
+      kind: 'pan',
+      dx: -30,
+      dy: -100,
+    })
+  })
+
+  it('deltaMode scales pan deltas (line ≈16px, page ≈100px)', () => {
+    expect(resolveWheel(ev({ deltaY: 3, deltaMode: 1 }), 'pan', false)).toEqual({
+      kind: 'pan',
+      dx: 0,
+      dy: -48,
+    })
+    expect(resolveWheel(ev({ deltaY: 1, deltaMode: 2 }), 'pan', false)).toEqual({
+      kind: 'pan',
+      dx: 0,
+      dy: -100,
+    })
   })
 })

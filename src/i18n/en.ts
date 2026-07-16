@@ -102,6 +102,9 @@ export const en = {
   'options.section.files': 'Files',
   'options.autosave': 'Autosave',
   'options.section.view': 'View',
+  'options.wheel': 'Mouse wheel',
+  'options.wheelZoom': 'Zoom',
+  'options.wheelPan': 'Pan (trackpad)',
   'options.showDimensions': 'Show dimensions',
 
   // ---- export dialog + flow ----

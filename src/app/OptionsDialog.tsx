@@ -122,6 +122,27 @@ export function OptionsDialog() {
         <section className="options-section">
           <h4>{t('options.section.view')}</h4>
           <div className="options-row">
+            <span>{t('options.wheel')}</span>
+            <div className="segmented small">
+              <button
+                type="button"
+                aria-pressed={settings.wheelMode === 'zoom'}
+                className={settings.wheelMode === 'zoom' ? 'active' : ''}
+                onClick={() => settings.setWheelMode('zoom')}
+              >
+                {t('options.wheelZoom')}
+              </button>
+              <button
+                type="button"
+                aria-pressed={settings.wheelMode === 'pan'}
+                className={settings.wheelMode === 'pan' ? 'active' : ''}
+                onClick={() => settings.setWheelMode('pan')}
+              >
+                {t('options.wheelPan')}
+              </button>
+            </div>
+          </div>
+          <div className="options-row">
             <span>{t('options.showDimensions')}</span>
             <div className="segmented small">
               <button

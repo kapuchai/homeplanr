@@ -94,3 +94,36 @@ export function wheelZoomFactor(deltaY: number, deltaMode: number, ctrlKey: bool
   const factor = Math.exp(-px * speed)
   return Math.min(1.25, Math.max(1 / 1.25, factor))
 }
+
+export type WheelAction = { kind: 'zoom'; factor: number } | { kind: 'pan'; dx: number; dy: number }
+
+export interface WheelInput {
+  deltaX: number
+  deltaY: number
+  deltaMode: number
+  ctrlKey: boolean
+  shiftKey: boolean
+}
+
+/**
+ * The whole wheel matrix in one rule (B2, 0.5.0). Modifiers beat mode:
+ * ctrl+wheel is ALWAYS pinch-zoom (browsers deliver touchpad pinch that
+ * way), Shift+wheel is ALWAYS horizontal pan, Space+wheel ALWAYS pans both
+ * axes. The wheelMode preference only decides the PLAIN wheel: 'zoom'
+ * (mouse default) or 'pan' (trackpad two-finger scroll). Pan deltas follow
+ * scrollbar convention — wheel down slides content up.
+ */
+export function resolveWheel(
+  e: WheelInput,
+  wheelMode: 'zoom' | 'pan',
+  spaceHeld: boolean,
+): WheelAction {
+  const px = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1
+  const flip = (delta: number) => -delta * px || 0 // ‖0: never emit -0
+  if (e.ctrlKey) return { kind: 'zoom', factor: wheelZoomFactor(e.deltaY, e.deltaMode, true) }
+  if (e.shiftKey) return { kind: 'pan', dx: flip(e.deltaY + e.deltaX), dy: 0 }
+  if (spaceHeld || wheelMode === 'pan') {
+    return { kind: 'pan', dx: flip(e.deltaX), dy: flip(e.deltaY) }
+  }
+  return { kind: 'zoom', factor: wheelZoomFactor(e.deltaY, e.deltaMode, false) }
+}

@@ -3,7 +3,8 @@ import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { useInteractionStore } from './session/interactionStore'
 import { useViewportStore } from './viewport/viewportStore'
-import { screenToWorld, wheelZoomFactor } from './viewport/viewportMath'
+import { resolveWheel, screenToWorld } from './viewport/viewportMath'
+import { useAppSettings } from '../store/appSettings'
 import { useViewportTransform } from './viewport/useViewportTransform'
 import { GridLayer } from './viewport/GridLayer'
 import { WorldLayers } from './render/WorldLayers'
@@ -66,12 +67,13 @@ export function Editor2D() {
       const rect = el.getBoundingClientRect()
       const cursor = { x: e.clientX - rect.left, y: e.clientY - rect.top }
       const vp = useViewportStore.getState()
-      if (e.shiftKey && !e.ctrlKey) {
-        const px = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1
-        vp.panBy(-(e.deltaY + e.deltaX) * px, 0)
-        return
-      }
-      vp.zoomAtPoint(cursor, wheelZoomFactor(e.deltaY, e.deltaMode, e.ctrlKey))
+      const action = resolveWheel(
+        e,
+        useAppSettings.getState().wheelMode,
+        useUiStore.getState().spaceHeld,
+      )
+      if (action.kind === 'pan') vp.panBy(action.dx, action.dy)
+      else vp.zoomAtPoint(cursor, action.factor)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
 
