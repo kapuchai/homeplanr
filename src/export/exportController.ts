@@ -15,6 +15,7 @@ import {
   type ExportPlanOptions,
 } from './exportPlanSvg'
 import { layoutPaper, scaleLabel, type Orientation, type PaperSize } from './paper'
+import { t } from '../i18n'
 
 /**
  * Export flow (File menu → ExportDialog): render the plan SVG, then save
@@ -36,17 +37,17 @@ async function rasterizePng(svg: string, w: number, h: number): Promise<Uint8Arr
   const img = new Image()
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve()
-    img.onerror = () => reject(new Error('Could not rasterize the plan.'))
+    img.onerror = () => reject(new Error(t('export.error.rasterize')))
     img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
   })
   const canvas = document.createElement('canvas')
   canvas.width = w * RASTER_SCALE
   canvas.height = h * RASTER_SCALE
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas 2D context unavailable.')
+  if (!ctx) throw new Error(t('export.error.canvasContext'))
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
   const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encoding failed.'))), 'image/png')
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t('export.error.pngEncoding')))), 'image/png')
   })
   return new Uint8Array(await blob.arrayBuffer())
 }
@@ -61,14 +62,14 @@ export async function exportImage(
   const derived = getDerived(doc)
   const svg = renderPlanSvg(doc, derived, opts)
   if (!svg) {
-    await adapter.message('Nothing to export', 'Draw some walls or place furniture first.')
+    await adapter.message(t('export.nothing.title'), t('export.nothing.message'))
     return
   }
   const name = sanitizeName(doc.name)
   try {
     if (format === 'svg') {
       await adapter.saveBinaryDialog(new TextEncoder().encode(svg), `${name}.svg`, {
-        name: 'SVG image',
+        name: t('export.filter.svg'),
         extensions: ['svg'],
       })
       return
@@ -90,11 +91,11 @@ export async function exportImage(
     }
     const bytes = await rasterizePng(svg, w, h)
     await adapter.saveBinaryDialog(bytes, `${name}.png`, {
-      name: 'PNG image',
+      name: t('export.filter.png'),
       extensions: ['png'],
     })
   } catch (err) {
-    await adapter.message('Export failed', String(err))
+    await adapter.message(t('export.failed.title'), String(err))
   }
 }
 
@@ -117,7 +118,7 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
   const derived = getDerived(doc)
   const svg = renderPlanSvg(doc, derived, opts)
   if (!svg) {
-    await adapter.message('Nothing to export', 'Draw some walls or place furniture first.')
+    await adapter.message(t('export.nothing.title'), t('export.nothing.message'))
     return
   }
   const name = sanitizeName(doc.name)
@@ -135,7 +136,7 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
       ...params,
       ...(opts.scaleDenominator ? { scaleDenominator: opts.scaleDenominator } : {}),
     })
-    if (!layout) throw new Error('Empty page layout.')
+    if (!layout) throw new Error(t('export.error.emptyLayout'))
 
     // a fixed scale can overflow the page — never clip silently
     if (!layout.fits) {
@@ -143,13 +144,18 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
       const choice = await useConfirmStore
         .getState()
         .prompt(
-          'Plan does not fit the page',
-          `At ${scaleLabel(layout.scaleDenominator)} the plan overflows ${opts.paper.toUpperCase()} — ` +
-            'only the top-left region would print.',
+          t('export.overflow.title'),
+          t('export.overflow.message', {
+            scale: scaleLabel(layout.scaleDenominator),
+            paper: opts.paper.toUpperCase(),
+          }),
           [
-            { value: 'fit', label: `Fit to page (${scaleLabel(fitLayout.scaleDenominator)})` },
-            { value: 'clip', label: 'Export clipped' },
-            { value: 'cancel', label: 'Cancel' },
+            {
+              value: 'fit',
+              label: t('export.overflow.fit', { scale: scaleLabel(fitLayout.scaleDenominator) }),
+            },
+            { value: 'clip', label: t('export.overflow.clip') },
+            { value: 'cancel', label: t('common.cancel') },
           ],
           { escValue: 'cancel' },
         )
@@ -183,10 +189,10 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
 
     const bytes = new Uint8Array(pdf.output('arraybuffer'))
     await adapter.saveBinaryDialog(bytes, `${name}.pdf`, {
-      name: 'PDF document',
+      name: t('export.filter.pdf'),
       extensions: ['pdf'],
     })
   } catch (err) {
-    await adapter.message('Export failed', String(err))
+    await adapter.message(t('export.failed.title'), String(err))
   }
 }

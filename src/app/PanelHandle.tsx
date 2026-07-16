@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { PANEL_LIMITS, useAppSettings } from '../store/appSettings'
+import { t } from '../i18n'
 
 /**
  * Vertical splitter between a side panel and the editor (M4, 0.4.0).
@@ -59,7 +60,7 @@ export function PanelHandle({ panel }: { panel: 'catalog' | 'props' }) {
     setPanelWidth(panel, next)
   }
 
-  const label = panel === 'catalog' ? 'catalog panel' : 'properties panel'
+  const label = panel === 'catalog' ? t('panel.catalog') : t('panel.props')
   // chevron points toward the panel it would collapse; flips when collapsed
   const towardPanel = panel === 'catalog' ? '‹' : '›'
   const awayFromPanel = panel === 'catalog' ? '›' : '‹'
@@ -69,7 +70,7 @@ export function PanelHandle({ panel }: { panel: 'catalog' | 'props' }) {
       className={`panel-handle${dragging ? ' dragging' : ''}${collapsed ? ' collapsed' : ''}`}
       role="separator"
       aria-orientation="vertical"
-      aria-label={`Resize ${label}`}
+      aria-label={t('panel.resize', { label })}
       aria-valuenow={collapsed ? lim.min : width}
       aria-valuemin={lim.min}
       aria-valuemax={lim.max}
@@ -86,7 +87,7 @@ export function PanelHandle({ panel }: { panel: 'catalog' | 'props' }) {
       <button
         type="button"
         className="panel-collapse"
-        title={collapsed ? `Show ${label}` : `Hide ${label}`}
+        title={collapsed ? t('panel.show', { label }) : t('panel.hide', { label })}
         aria-expanded={!collapsed}
         onPointerDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}

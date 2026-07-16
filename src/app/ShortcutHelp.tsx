@@ -1,5 +1,6 @@
 import { useUiStore } from '../store/uiStore'
 import { Modal } from './Modal'
+import { t } from '../i18n'
 import { SHORTCUT_SECTIONS } from './shortcuts'
 
 /** '?' overlay: the full shortcut sheet, rendered from the shared table. */
@@ -8,9 +9,9 @@ export function ShortcutHelp() {
   const setOpen = useUiStore((s) => s.setHelpOpen)
   if (!open) return null
   return (
-    <Modal label="Keyboard shortcuts" onClose={() => setOpen(false)}>
+    <Modal label={t('shortcuts.title')} onClose={() => setOpen(false)}>
       <>
-        <h3>Keyboard shortcuts</h3>
+        <h3>{t('shortcuts.title')}</h3>
         <div className="shortcut-grid">
           {SHORTCUT_SECTIONS.map((sec) => (
             <section key={sec.title} className="options-section">
@@ -26,7 +27,7 @@ export function ShortcutHelp() {
         </div>
         <div className="modal-buttons">
           <button type="button" className="primary" onClick={() => setOpen(false)}>
-            Close
+            {t('common.close')}
           </button>
         </div>
       </>

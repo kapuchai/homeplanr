@@ -12,6 +12,7 @@ import { LABEL_PLACEHOLDER } from '../editor2d/tools/annotateTextTool'
 import { DEFAULTS } from '../model/types'
 import type { WallFinishId } from '../model/types'
 import type { AnnotationId, FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
+import { t, type MessageKey } from '../i18n'
 
 /**
  * Right properties panel. Inputs are DRAFT-BUFFERED (plan-pinned): typing
@@ -145,11 +146,11 @@ function Row({ children }: { children: React.ReactNode }) {
   return <div className="prop-row">{children}</div>
 }
 
-const WALL_FINISHES: readonly [WallFinishId, string][] = [
-  ['paint', 'Paint'],
-  ['brick', 'Brick'],
-  ['concrete', 'Concrete'],
-  ['tile', 'Tile'],
+const WALL_FINISHES: readonly [WallFinishId, MessageKey][] = [
+  ['paint', 'props.finishPaint'],
+  ['brick', 'props.finishBrick'],
+  ['concrete', 'props.finishConcrete'],
+  ['tile', 'props.finishTile'],
 ]
 
 /**
@@ -184,8 +185,8 @@ function PaintSwatchRow({
       <div className="swatches">
         <button
           type="button"
-          title="Default"
-          aria-label="Default"
+          title={t('props.paintDefault')}
+          aria-label={t('props.paintDefault')}
           aria-pressed={current === undefined}
           className={`swatch swatch-none${current === undefined ? ' active' : ''}`}
           onClick={() => onPick(undefined)}
@@ -238,19 +239,19 @@ function MultiPanel({ selection }: { selection: string[] }) {
     const sharedFinish = shared('finish')
     return (
       <aside className="props-panel">
-        <h3>{wallIds.length} walls</h3>
+        <h3>{t('props.countWalls', { count: wallIds.length })}</h3>
         <LengthField
-          label="Thickness"
+          label={t('props.thickness')}
           value={first.thickness}
           onCommit={(v) => batch(() => wallIds.forEach((id) => a.updateWall(id, { thickness: v })))}
         />
         <LengthField
-          label="Height"
+          label={t('props.height')}
           value={first.height}
           onCommit={(v) => batch(() => wallIds.forEach((id) => a.updateWall(id, { height: v })))}
         />
         <Row>
-          <span>Finish</span>
+          <span>{t('props.finish')}</span>
           <div className="segmented small finish-seg">
             {WALL_FINISHES.map(([f, name]) => (
               <button
@@ -259,24 +260,24 @@ function MultiPanel({ selection }: { selection: string[] }) {
                 className={(sharedFinish ?? '') === f || (sharedFinish === undefined && f === 'paint') ? 'active' : ''}
                 onClick={() => batch(() => wallIds.forEach((id) => a.updateWall(id, { finish: f })))}
               >
-                {name}
+                {t(name)}
               </button>
             ))}
           </div>
         </Row>
         <PaintSwatchRow
-          label="Paint · front"
+          label={t('props.paintFront')}
           current={shared('paintFront')}
           hoverSide="front"
           onPick={(pid) => batch(() => wallIds.forEach((id) => a.updateWall(id, { paintFront: pid })))}
         />
         <PaintSwatchRow
-          label="Paint · back"
+          label={t('props.paintBack')}
           current={shared('paintBack')}
           hoverSide="back"
           onPick={(pid) => batch(() => wallIds.forEach((id) => a.updateWall(id, { paintBack: pid })))}
         />
-        <p className="hint">Values apply to every selected wall · Del deletes</p>
+        <p className="hint">{t('props.hint.multiWalls')}</p>
       </aside>
     )
   }
@@ -285,9 +286,9 @@ function MultiPanel({ selection }: { selection: string[] }) {
     const first = doc.furniture[furnitureIds[0]!]!
     return (
       <aside className="props-panel">
-        <h3>{furnitureIds.length} items</h3>
+        <h3>{t('props.countItems', { count: furnitureIds.length })}</h3>
         <NumField
-          label="Rotation"
+          label={t('props.rotation')}
           value={first.rotation}
           unit="°"
           step={5}
@@ -298,14 +299,14 @@ function MultiPanel({ selection }: { selection: string[] }) {
           }
         />
         <LengthField
-          label="Elevation"
+          label={t('props.elevation')}
           value={first.elevation}
           onCommit={(v) =>
             batch(() => furnitureIds.forEach((id) => a.transformFurniture(id, { elevation: v })))
           }
         />
         <Row>
-          <span>Mirror</span>
+          <span>{t('props.mirror')}</span>
           <div className="segmented small">
             <button
               type="button"
@@ -317,11 +318,11 @@ function MultiPanel({ selection }: { selection: string[] }) {
                 )
               }
             >
-              Flip each
+              {t('props.flipEach')}
             </button>
           </div>
         </Row>
-        <p className="hint">Drag moves all · R rotates each · Ctrl+D duplicates · Del deletes</p>
+        <p className="hint">{t('props.hint.multiItems')}</p>
       </aside>
     )
   }
@@ -330,32 +331,39 @@ function MultiPanel({ selection }: { selection: string[] }) {
     const first = doc.openings[openingIds[0]!]!
     return (
       <aside className="props-panel">
-        <h3>{openingIds.length} openings</h3>
+        <h3>{t('props.countOpenings', { count: openingIds.length })}</h3>
         <LengthField
-          label="Width"
+          label={t('props.width')}
           value={first.width}
           onCommit={(v) => batch(() => openingIds.forEach((id) => a.updateOpening(id, { width: v })))}
         />
         <LengthField
-          label="Height"
+          label={t('props.height')}
           value={first.height}
           onCommit={(v) => batch(() => openingIds.forEach((id) => a.updateOpening(id, { height: v })))}
         />
-        <p className="hint">Each opening re-clamps into its wall · Del deletes</p>
+        <p className="hint">{t('props.hint.multiOpenings')}</p>
       </aside>
     )
   }
 
   const parts = [
-    wallIds.length && `${wallIds.length} wall${wallIds.length > 1 ? 's' : ''}`,
-    openingIds.length && `${openingIds.length} opening${openingIds.length > 1 ? 's' : ''}`,
-    furnitureIds.length && `${furnitureIds.length} item${furnitureIds.length > 1 ? 's' : ''}`,
+    wallIds.length &&
+      t(wallIds.length > 1 ? 'props.countWalls' : 'props.countWall', { count: wallIds.length }),
+    openingIds.length &&
+      t(openingIds.length > 1 ? 'props.countOpenings' : 'props.countOpening', {
+        count: openingIds.length,
+      }),
+    furnitureIds.length &&
+      t(furnitureIds.length > 1 ? 'props.countItems' : 'props.countItem', {
+        count: furnitureIds.length,
+      }),
   ].filter(Boolean)
   return (
     <aside className="props-panel">
-      <h3>{selection.length} selected</h3>
+      <h3>{t('props.multiSelected', { count: selection.length })}</h3>
       {parts.length > 0 && <p className="hint">{parts.join(' · ')}</p>}
-      <p className="hint">Drag moves items · Del deletes · Esc deselects</p>
+      <p className="hint">{t('props.hint.multiMixed')}</p>
     </aside>
   )
 }
@@ -384,19 +392,17 @@ export function PropertiesPanel() {
       const len = dist(annotation.a, annotation.b)
       return (
         <aside className="props-panel" key={annotation.id}>
-          <h3>Dimension</h3>
+          <h3>{t('props.dimension')}</h3>
           <Row>
-            <span>Length</span>
+            <span>{t('props.length')}</span>
             <span className="readonly">{formatLength(len, units)}</span>
           </Row>
           <LengthField
-            label="Offset"
+            label={t('props.offset')}
             value={annotation.offset}
             onCommit={(v) => a.updateAnnotation(annotation.id, { offset: v })}
           />
-          <p className="hint">
-            Drag slides the line · endpoints are fixed — delete and re-measure to change them
-          </p>
+          <p className="hint">{t('props.hint.dimension')}</p>
         </aside>
       )
     }
@@ -404,15 +410,15 @@ export function PropertiesPanel() {
       // key: label→label selection changes REMOUNT the panel — autoFocus
       // only fires on mount, and the click→type flow depends on it
       <aside className="props-panel" key={annotation.id}>
-        <h3>Text</h3>
+        <h3>{t('props.text')}</h3>
         <TextField
-          label="Text"
+          label={t('props.text')}
           value={annotation.text}
           autoFocus={annotation.text === LABEL_PLACEHOLDER}
           onCommit={(v) => a.updateAnnotation(annotation.id, { text: v })}
         />
         <NumField
-          label="Rotation"
+          label={t('props.rotation')}
           value={annotation.rotation ?? 0}
           unit="°"
           step={15}
@@ -421,11 +427,11 @@ export function PropertiesPanel() {
           onCommit={(v) => a.updateAnnotation(annotation.id, { rotation: v })}
         />
         <LengthField
-          label="Size"
+          label={t('props.size')}
           value={annotation.fontSize ?? DEFAULTS.labelFontSize}
           onCommit={(v) => a.updateAnnotation(annotation.id, { fontSize: v })}
         />
-        <p className="hint">Clearing the text deletes the label</p>
+        <p className="hint">{t('props.hint.text')}</p>
       </aside>
     )
   }
@@ -436,20 +442,20 @@ export function PropertiesPanel() {
     const length = dist(na, nb)
     return (
       <aside className="props-panel">
-        <h3>Wall</h3>
-        <LengthField label="Length" value={length} onCommit={(v) => a.setWallLength(wall.id, v)} />
+        <h3>{t('props.wall')}</h3>
+        <LengthField label={t('props.length')} value={length} onCommit={(v) => a.setWallLength(wall.id, v)} />
         <LengthField
-          label="Thickness"
+          label={t('props.thickness')}
           value={wall.thickness}
           onCommit={(v) => a.updateWall(wall.id, { thickness: v })}
         />
         <LengthField
-          label="Height"
+          label={t('props.height')}
           value={wall.height}
           onCommit={(v) => a.updateWall(wall.id, { height: v })}
         />
         <Row>
-          <span>Finish</span>
+          <span>{t('props.finish')}</span>
           <div className="segmented small finish-seg">
             {WALL_FINISHES.map(([f, name]) => (
               <button
@@ -458,19 +464,19 @@ export function PropertiesPanel() {
                 className={(wall.finish ?? 'paint') === f ? 'active' : ''}
                 onClick={() => a.updateWall(wall.id, { finish: f })}
               >
-                {name}
+                {t(name)}
               </button>
             ))}
           </div>
         </Row>
         <PaintSwatchRow
-          label="Paint · front"
+          label={t('props.paintFront')}
           current={wall.paintFront}
           hoverSide="front"
           onPick={(id) => a.updateWall(wall.id, { paintFront: id })}
         />
         <PaintSwatchRow
-          label="Paint · back"
+          label={t('props.paintBack')}
           current={wall.paintBack}
           hoverSide="back"
           onPick={(id) => a.updateWall(wall.id, { paintBack: id })}
@@ -487,20 +493,20 @@ export function PropertiesPanel() {
     const u = opening.t * L
     return (
       <aside className="props-panel">
-        <h3>{opening.kind === 'door' ? 'Door' : 'Window'}</h3>
+        <h3>{t(opening.kind === 'door' ? 'props.door' : 'props.window')}</h3>
         <LengthField
-          label="Width"
+          label={t('props.width')}
           value={opening.width}
           onCommit={(v) => a.updateOpening(opening.id, { width: v })}
         />
         <LengthField
-          label="Height"
+          label={t('props.height')}
           value={opening.height}
           onCommit={(v) => a.updateOpening(opening.id, { height: v })}
         />
         {opening.kind === 'window' && (
           <LengthField
-            label="Sill height"
+            label={t('props.sillHeight')}
             value={opening.sillHeight}
             onCommit={(v) => a.updateOpening(opening.id, { sillHeight: v })}
           />
@@ -508,40 +514,40 @@ export function PropertiesPanel() {
         {opening.kind === 'door' && (
           <>
             <Row>
-              <span>Hinge</span>
+              <span>{t('props.hinge')}</span>
               <div className="segmented small">
                 <button
                   type="button"
                   className={opening.hinge === 'a' ? 'active' : ''}
                   onClick={() => a.updateOpening(opening.id, { hinge: 'a' })}
                 >
-                  A-side
+                  {t('props.hingeA')}
                 </button>
                 <button
                   type="button"
                   className={opening.hinge === 'b' ? 'active' : ''}
                   onClick={() => a.updateOpening(opening.id, { hinge: 'b' })}
                 >
-                  B-side
+                  {t('props.hingeB')}
                 </button>
               </div>
             </Row>
             <Row>
-              <span>Swing</span>
+              <span>{t('props.swing')}</span>
               <div className="segmented small">
                 <button
                   type="button"
                   className={opening.swing === 'front' ? 'active' : ''}
                   onClick={() => a.updateOpening(opening.id, { swing: 'front' })}
                 >
-                  Front
+                  {t('props.swingFront')}
                 </button>
                 <button
                   type="button"
                   className={opening.swing === 'back' ? 'active' : ''}
                   onClick={() => a.updateOpening(opening.id, { swing: 'back' })}
                 >
-                  Back
+                  {t('props.swingBack')}
                 </button>
               </div>
             </Row>
@@ -550,12 +556,12 @@ export function PropertiesPanel() {
         {L > 0 && (
           <>
             <LengthField
-              label="From end A"
+              label={t('props.fromEndA')}
               value={u - opening.width / 2}
               onCommit={(v) => a.updateOpening(opening.id, { t: (v + opening.width / 2) / L })}
             />
             <LengthField
-              label="From end B"
+              label={t('props.fromEndB')}
               value={L - u - opening.width / 2}
               onCommit={(v) =>
                 a.updateOpening(opening.id, { t: (L - v - opening.width / 2) / L })
@@ -573,15 +579,15 @@ export function PropertiesPanel() {
       <aside className="props-panel">
         <h3>{item?.name ?? furniture.catalogItemId}</h3>
         <TextField
-          label="Name"
+          label={t('props.name')}
           value={furniture.name ?? ''}
           {...(item ? { placeholder: item.name } : {})}
           onCommit={(v) => a.renameFurniture(furniture.id, v)}
         />
-        <LengthField label="X" value={furniture.x} onCommit={(v) => a.transformFurniture(furniture.id, { x: v })} />
-        <LengthField label="Y" value={furniture.y} onCommit={(v) => a.transformFurniture(furniture.id, { y: v })} />
+        <LengthField label={t('props.x')} value={furniture.x} onCommit={(v) => a.transformFurniture(furniture.id, { x: v })} />
+        <LengthField label={t('props.y')} value={furniture.y} onCommit={(v) => a.transformFurniture(furniture.id, { y: v })} />
         <NumField
-          label="Rotation"
+          label={t('props.rotation')}
           value={furniture.rotation}
           unit="°"
           step={5}
@@ -590,7 +596,7 @@ export function PropertiesPanel() {
           onCommit={(v) => a.transformFurniture(furniture.id, { rotation: v })}
         />
         <Row>
-          <span>Mirror</span>
+          <span>{t('props.mirror')}</span>
           <div className="segmented small">
             <button
               type="button"
@@ -599,15 +605,15 @@ export function PropertiesPanel() {
                 a.transformFurniture(furniture.id, { mirrored: !furniture.mirrored })
               }
             >
-              Flip
+              {t('props.flip')}
             </button>
           </div>
         </Row>
-        <LengthField label="Width" value={furniture.size.w} onCommit={(v) => a.resizeFurniture(furniture.id, { w: v })} />
-        <LengthField label="Depth" value={furniture.size.d} onCommit={(v) => a.resizeFurniture(furniture.id, { d: v })} />
-        <LengthField label="Height" value={furniture.size.h} onCommit={(v) => a.resizeFurniture(furniture.id, { h: v })} />
+        <LengthField label={t('props.width')} value={furniture.size.w} onCommit={(v) => a.resizeFurniture(furniture.id, { w: v })} />
+        <LengthField label={t('props.depth')} value={furniture.size.d} onCommit={(v) => a.resizeFurniture(furniture.id, { d: v })} />
+        <LengthField label={t('props.height')} value={furniture.size.h} onCommit={(v) => a.resizeFurniture(furniture.id, { h: v })} />
         <LengthField
-          label="Elevation"
+          label={t('props.elevation')}
           value={furniture.elevation}
           onCommit={(v) => a.transformFurniture(furniture.id, { elevation: v })}
         />
@@ -620,15 +626,15 @@ export function PropertiesPanel() {
     const dr = derived.rooms[room.id]
     return (
       <aside className="props-panel">
-        <h3>Room</h3>
+        <h3>{t('props.room')}</h3>
         <TextField
-          label="Name"
+          label={t('props.name')}
           value={room.name ?? ''}
-          placeholder="Room"
+          placeholder={t('props.roomNamePlaceholder')}
           onCommit={(v) => a.renameRoom(room.id, v)}
         />
         <Row>
-          <span>Floor</span>
+          <span>{t('props.floor')}</span>
           <div className="swatches">
             {FLOOR_MATERIALS.map((f) => (
               <button
@@ -645,13 +651,13 @@ export function PropertiesPanel() {
           </div>
         </Row>
         <PaintSwatchRow
-          label="Wall paint"
+          label={t('props.wallPaint')}
           current={null}
           onPick={(id) => a.paintRoomWalls(room.id, id)}
         />
         {dr && (
           <Row>
-            <span>Area</span>
+            <span>{t('props.area')}</span>
             <span className="readonly">{formatArea(dr.areaM2, units)}</span>
           </Row>
         )}
@@ -663,10 +669,10 @@ export function PropertiesPanel() {
   const s = doc.settings
   return (
     <aside className="props-panel">
-      <h3>Project</h3>
-      <LengthField label="Grid size" value={s.gridSize} onCommit={(v) => a.updateSettings({ gridSize: v })} />
+      <h3>{t('props.project')}</h3>
+      <LengthField label={t('props.gridSize')} value={s.gridSize} onCommit={(v) => a.updateSettings({ gridSize: v })} />
       <Row>
-        <span>Snapping</span>
+        <span>{t('props.snapping')}</span>
         {/* device preference since v3 — toggling never dirties the file */}
         <div className="segmented small">
           <button
@@ -674,31 +680,28 @@ export function PropertiesPanel() {
             className={snapEnabled ? 'active' : ''}
             onClick={() => setSnapEnabled(true)}
           >
-            On
+            {t('common.on')}
           </button>
           <button
             type="button"
             className={!snapEnabled ? 'active' : ''}
             onClick={() => setSnapEnabled(false)}
           >
-            Off
+            {t('common.off')}
           </button>
         </div>
       </Row>
       <LengthField
-        label="New wall thickness"
+        label={t('props.newWallThickness')}
         value={s.defaultWallThickness}
         onCommit={(v) => a.updateSettings({ defaultWallThickness: v })}
       />
       <LengthField
-        label="New wall height"
+        label={t('props.newWallHeight')}
         value={s.defaultWallHeight}
         onCommit={(v) => a.updateSettings({ defaultWallHeight: v })}
       />
-      <p className="hint">
-        W draw · D door · N window · M measure · V select · Del delete · Ctrl+Z undo · Space pan ·
-        Shift+1 fit
-      </p>
+      <p className="hint">{t('props.hint.project')}</p>
     </aside>
   )
 }

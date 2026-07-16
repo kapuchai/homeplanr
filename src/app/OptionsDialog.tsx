@@ -8,6 +8,7 @@ import {
 } from '../store/appSettings'
 import { ACCENTS } from '../theme/accents'
 import { useThemeStore } from '../theme/themeStore'
+import { t } from '../i18n'
 import type { UnitSystem } from '../format/units'
 
 /**
@@ -16,15 +17,15 @@ import type { UnitSystem } from '../format/units'
  * Escape / focus trapping / restore come from the shared Modal shell.
  */
 const THEME_LABELS: Record<ThemePreference, string> = {
-  system: 'System',
-  light: 'Light',
-  dark: 'Dark',
+  system: t('options.themeSystem'),
+  light: t('options.themeLight'),
+  dark: t('options.themeDark'),
 }
 
 const UNIT_CHOICES: { value: UnitSystem; label: string }[] = [
-  { value: 'm', label: 'm' },
-  { value: 'cm', label: 'cm' },
-  { value: 'ftin', label: 'ft-in' },
+  { value: 'm', label: t('options.unitM') },
+  { value: 'cm', label: t('options.unitCm') },
+  { value: 'ftin', label: t('options.unitFtin') },
 ]
 
 export function OptionsDialog() {
@@ -36,29 +37,29 @@ export function OptionsDialog() {
 
   if (!open) return null
   return (
-    <Modal label="Options" onClose={() => setOpen(false)}>
+    <Modal label={t('options.title')} onClose={() => setOpen(false)}>
       <>
-        <h3>Options</h3>
+        <h3>{t('options.title')}</h3>
         <section className="options-section">
-          <h4>Appearance</h4>
+          <h4>{t('options.section.appearance')}</h4>
           <div className="options-row">
-            <span>Theme</span>
+            <span>{t('options.theme')}</span>
             <div className="segmented small">
-              {THEME_PREFERENCES.map((t) => (
+              {THEME_PREFERENCES.map((pref) => (
                 <button
-                  key={t}
+                  key={pref}
                   type="button"
-                  aria-pressed={settings.theme === t}
-                  className={settings.theme === t ? 'active' : ''}
-                  onClick={() => settings.setTheme(t)}
+                  aria-pressed={settings.theme === pref}
+                  className={settings.theme === pref ? 'active' : ''}
+                  onClick={() => settings.setTheme(pref)}
                 >
-                  {THEME_LABELS[t]}
+                  {THEME_LABELS[pref]}
                 </button>
               ))}
             </div>
           </div>
           <div className="options-row">
-            <span>Accent</span>
+            <span>{t('options.accent')}</span>
             <div className="swatches">
               {ACCENT_IDS.map((a) => (
                 <button
@@ -76,9 +77,9 @@ export function OptionsDialog() {
           </div>
         </section>
         <section className="options-section">
-          <h4>Units</h4>
+          <h4>{t('options.section.units')}</h4>
           <div className="options-row">
-            <span>Measurements</span>
+            <span>{t('options.measurements')}</span>
             <div className="segmented small">
               {UNIT_CHOICES.map((u) => (
                 <button
@@ -95,9 +96,9 @@ export function OptionsDialog() {
           </div>
         </section>
         <section className="options-section">
-          <h4>Files</h4>
+          <h4>{t('options.section.files')}</h4>
           <div className="options-row">
-            <span>Autosave</span>
+            <span>{t('options.autosave')}</span>
             <div className="segmented small">
               <button
                 type="button"
@@ -105,7 +106,7 @@ export function OptionsDialog() {
                 className={settings.autosaveEnabled ? 'active' : ''}
                 onClick={() => settings.setAutosaveEnabled(true)}
               >
-                On
+                {t('common.on')}
               </button>
               <button
                 type="button"
@@ -113,36 +114,36 @@ export function OptionsDialog() {
                 className={!settings.autosaveEnabled ? 'active' : ''}
                 onClick={() => settings.setAutosaveEnabled(false)}
               >
-                Off
+                {t('common.off')}
               </button>
             </div>
           </div>
         </section>
         <section className="options-section">
-          <h4>View</h4>
+          <h4>{t('options.section.view')}</h4>
           <div className="options-row">
-            <span>Show dimensions</span>
+            <span>{t('options.showDimensions')}</span>
             <div className="segmented small">
               <button
                 type="button"
                 className={settings.showDimensions ? 'active' : ''}
                 onClick={() => settings.setShowDimensions(true)}
               >
-                On
+                {t('common.on')}
               </button>
               <button
                 type="button"
                 className={!settings.showDimensions ? 'active' : ''}
                 onClick={() => settings.setShowDimensions(false)}
               >
-                Off
+                {t('common.off')}
               </button>
             </div>
           </div>
         </section>
         <div className="modal-buttons">
           <button type="button" className="primary" onClick={() => setOpen(false)}>
-            Close
+            {t('common.close')}
           </button>
         </div>
       </>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { usePersistStore } from '../store/persistence/controller'
+import { t } from '../i18n'
 
 /** Bottom-left status line: contextual tips per tool/selection state. */
 export function StatusHint() {
@@ -27,15 +28,16 @@ export function StatusHint() {
   }, [lastSavedAt, lastSaveWasAuto])
 
   if (autosaveError) {
-    return <div className="status-hint">Autosave failed — Ctrl+S to retry, or check the file location</div>
+    return <div className="status-hint">{t('status.autosaveFailed')}</div>
   }
   if (savedFlash && lastSavedAt !== null) {
     return (
       <div className="status-hint">
-        Saved ·{' '}
-        {new Date(lastSavedAt).toLocaleTimeString(undefined, {
-          hour: '2-digit',
-          minute: '2-digit',
+        {t('status.saved', {
+          time: new Date(lastSavedAt).toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
         })}
       </div>
     )
@@ -43,24 +45,23 @@ export function StatusHint() {
 
   let text: string
   if (tool === 'draw-wall') {
-    text = 'Click to place wall points · Enter/double-click to finish · Backspace steps back · Esc drops the preview'
+    text = t('hint.drawWall')
   } else if (tool === 'place-opening') {
-    text = `Click a wall to place the ${openingKind} · stays armed for more · Esc to finish`
+    text = t('hint.placeOpening', { kind: openingKind })
   } else if (tool === 'place-furniture') {
-    text = 'Click to place · R rotates the ghost · Esc to finish'
+    text = t('hint.placeFurniture')
   } else if (tool === 'measure') {
-    text = 'Click two points to measure · Enter keeps it as a dimension · Esc clears'
+    text = t('hint.measure')
   } else if (tool === 'annotate-text') {
-    text = 'Click to place a text label · type its text in the panel · Esc exits'
+    text = t('hint.annotateText')
   } else if (selection.length > 1) {
-    text = `${selection.length} selected · drag moves all · R rotates · Ctrl+D duplicates · Del deletes`
+    text = t('hint.multiSelect', { count: selection.length })
   } else if (selection.length === 1) {
-    text = 'Drag to move · R rotates · Ctrl+D duplicates · Del deletes · Esc deselects (also inside rooms)'
+    text = t('hint.singleSelect')
   } else if (empty) {
-    text = 'Press W and click to draw your first wall'
+    text = t('hint.empty')
   } else {
-    text =
-      'V select · W wall · D door · N window · M measure · T text · drag selects · right-drag pans · Shift+1 fit'
+    text = t('hint.idle')
   }
 
   return <div className="status-hint">{text}</div>
@@ -75,10 +76,9 @@ export function EmptyState() {
   return (
     <div className="empty-state" aria-hidden>
       <div>
-        <strong>Draw your first room</strong>
+        <strong>{t('status.emptyTitle')}</strong>
         <p>
-          Press <kbd>W</kbd>, click to place wall corners, and close the loop back at the start.
-          Then drag furniture in from the left.
+          {t('status.emptyBodyBefore')} <kbd>W</kbd>{t('status.emptyBodyAfter')}
         </p>
       </div>
     </div>

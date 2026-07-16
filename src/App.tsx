@@ -18,6 +18,7 @@ import {
   usePersistStore,
 } from './store/persistence/controller'
 import { TEMPLATES } from './app/templates'
+import { t } from './i18n'
 import { switchTool } from './editor2d/tools/toolRegistry'
 import { flushPendingNudge } from './editor2d/tools/keymap'
 import { CatalogPanel } from './app/CatalogPanel'
@@ -89,17 +90,17 @@ function FileMenu() {
     void fn()
   }
   const entries: MenuEntry[] = [
-    { label: 'New', shortcut: 'Ctrl+N', onSelect: run(newProject) },
-    ...TEMPLATES.map((t, i) => ({
-      label: `New: ${t.name}`,
+    { label: t('menu.new'), shortcut: 'Ctrl+N', onSelect: run(newProject) },
+    ...TEMPLATES.map((tpl, i) => ({
+      label: t('menu.newTemplate', { name: tpl.name }),
       ...(i === 0 ? { separatorBefore: true } : {}),
-      onSelect: run(() => newFromTemplate(t.name, t.raw)),
+      onSelect: run(() => newFromTemplate(tpl.name, tpl.raw)),
     })),
-    { label: 'Open…', shortcut: 'Ctrl+O', separatorBefore: true, onSelect: run(openProject) },
-    { label: 'Save', shortcut: 'Ctrl+S', onSelect: run(saveProject) },
-    { label: 'Save As…', shortcut: 'Ctrl+Shift+S', onSelect: run(saveProjectAs) },
+    { label: t('menu.open'), shortcut: 'Ctrl+O', separatorBefore: true, onSelect: run(openProject) },
+    { label: t('menu.save'), shortcut: 'Ctrl+S', onSelect: run(saveProject) },
+    { label: t('menu.saveAs'), shortcut: 'Ctrl+Shift+S', onSelect: run(saveProjectAs) },
     {
-      label: 'Export…',
+      label: t('menu.export'),
       separatorBefore: true,
       onSelect: run(() => useUiStore.getState().setExportOpen(true)),
     },
@@ -114,7 +115,9 @@ function FileMenu() {
     ...(lastSavedAt !== null
       ? [
           {
-            label: `Last saved ${new Date(lastSavedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`,
+            label: t('menu.lastSaved', {
+              time: new Date(lastSavedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+            }),
             disabled: true,
             separatorBefore: true,
             onSelect: () => {},
@@ -131,7 +134,7 @@ function FileMenu() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        File <CaretIcon />
+        {t('menu.file')} <CaretIcon />
       </button>
       {open && (
         <>
@@ -155,8 +158,8 @@ function ProjectName() {
     <span className="project-name">
       <input
         value={draft}
-        aria-label="Project name"
-        title="Project name — click to rename"
+        aria-label={t('toolbar.projectNameAria')}
+        title={t('toolbar.projectNameTitle')}
         onFocus={() => setFocused(true)}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
@@ -167,7 +170,7 @@ function ProjectName() {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         }}
       />
-      {dirty && <span className="dirty-dot" title="Unsaved changes">•</span>}
+      {dirty && <span className="dirty-dot" title={t('toolbar.unsavedChanges')}>•</span>}
     </span>
   )
 }
@@ -194,7 +197,7 @@ function Toolbar() {
       aria-pressed={active}
       disabled={!is2d}
       onClick={onClick}
-      title={is2d ? title : 'Available in the 2D view'}
+      title={is2d ? title : t('tool.disabledIn3d')}
     >
       {label}
     </button>
@@ -202,33 +205,33 @@ function Toolbar() {
 
   return (
     <header className="toolbar">
-      <span className="brand">homeplanr</span>
+      <span className="brand">{t('toolbar.brand')}</span>
       <FileMenu />
       <ProjectName />
       <div className="segmented" style={{ marginLeft: 12 }}>
         {/* switchTool (never setActiveTool): the outgoing tool must deactivate */}
-        {toolBtn('Select', activeTool === 'select', () => switchTool('select'), 'Select (V)')}
-        {toolBtn('Wall', activeTool === 'draw-wall', () => switchTool('draw-wall'), 'Draw walls (W)')}
+        {toolBtn(t('tool.select'), activeTool === 'select', () => switchTool('select'), t('tool.selectTitle'))}
+        {toolBtn(t('tool.wall'), activeTool === 'draw-wall', () => switchTool('draw-wall'), t('tool.wallTitle'))}
         {toolBtn(
-          'Door',
+          t('tool.door'),
           activeTool === 'place-opening' && openingKind === 'door',
           () => {
             setToolParams({ openingKind: 'door' })
             switchTool('place-opening')
           },
-          'Place door (D)',
+          t('tool.doorTitle'),
         )}
         {toolBtn(
-          'Window',
+          t('tool.window'),
           activeTool === 'place-opening' && openingKind === 'window',
           () => {
             setToolParams({ openingKind: 'window' })
             switchTool('place-opening')
           },
-          'Place window (N)',
+          t('tool.windowTitle'),
         )}
-        {toolBtn('Measure', activeTool === 'measure', () => switchTool('measure'), 'Measure (M)')}
-        {toolBtn('Text', activeTool === 'annotate-text', () => switchTool('annotate-text'), 'Text label (T)')}
+        {toolBtn(t('tool.measure'), activeTool === 'measure', () => switchTool('measure'), t('tool.measureTitle'))}
+        {toolBtn(t('tool.text'), activeTool === 'annotate-text', () => switchTool('annotate-text'), t('tool.textTitle'))}
       </div>
       <div className="segmented">
         <button
@@ -240,8 +243,8 @@ function Toolbar() {
             flushPendingNudge()
             safeUndo()
           }}
-          title="Undo (Ctrl+Z)"
-          aria-label="Undo"
+          title={t('toolbar.undoTitle')}
+          aria-label={t('toolbar.undo')}
         >
           <UndoIcon />
         </button>
@@ -252,8 +255,8 @@ function Toolbar() {
             flushPendingNudge()
             safeRedo()
           }}
-          title="Redo (Ctrl+Shift+Z)"
-          aria-label="Redo"
+          title={t('toolbar.redoTitle')}
+          aria-label={t('toolbar.redo')}
         >
           <RedoIcon />
         </button>
@@ -262,8 +265,8 @@ function Toolbar() {
       <button
         type="button"
         className="icon-btn"
-        title="Keyboard shortcuts (?)"
-        aria-label="Keyboard shortcuts"
+        title={t('toolbar.helpTitle')}
+        aria-label={t('shortcuts.title')}
         onClick={() => useUiStore.getState().setHelpOpen(true)}
       >
         ?
@@ -271,8 +274,8 @@ function Toolbar() {
       <button
         type="button"
         className="icon-btn"
-        title="Options"
-        aria-label="Options"
+        title={t('options.title')}
+        aria-label={t('options.title')}
         onClick={() => useUiStore.getState().setOptionsOpen(true)}
       >
         <GearIcon />
@@ -282,19 +285,19 @@ function Toolbar() {
           type="button"
           className={is2d ? 'active' : ''}
           aria-pressed={is2d}
-          title="2D plan view"
+          title={t('toolbar.view2dTitle')}
           onClick={() => setViewMode('2d')}
         >
-          2D
+          {t('toolbar.view2d')}
         </button>
         <button
           type="button"
           className={!is2d ? 'active' : ''}
           aria-pressed={!is2d}
-          title="3D view"
+          title={t('toolbar.view3dTitle')}
           onClick={() => setViewMode('3d')}
         >
-          3D
+          {t('toolbar.view3d')}
         </button>
       </div>
     </header>

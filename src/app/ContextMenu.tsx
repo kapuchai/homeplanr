@@ -18,6 +18,7 @@ import {
   zoomToSelection,
 } from '../editor2d/commands'
 import { hasClipboard } from '../editor2d/clipboard'
+import { t } from '../i18n'
 import { MenuList, type MenuEntry } from './MenuList'
 import type { FurnitureId, RoomId, WallId } from '../model/ids'
 
@@ -75,33 +76,33 @@ export function ContextMenu() {
   if (selFurniture.length) {
     const n = selFurniture.length > 1 ? ` ${selFurniture.length}` : ''
     entries.push(
-      { label: `Duplicate${n}`, shortcut: 'Ctrl+D', onSelect: () => duplicateSelection(ctx) },
-      { label: `Rotate${n} 90°`, shortcut: 'R', onSelect: () => rotateSelection(ctx, 1) },
-      { label: `Flip${n}`, shortcut: 'F', onSelect: () => flipSelection(ctx) },
-      { label: `Copy${n}`, shortcut: 'Ctrl+C', onSelect: () => copySelection(ctx) },
+      { label: t('context.duplicate', { n }), shortcut: 'Ctrl+D', onSelect: () => duplicateSelection(ctx) },
+      { label: t('context.rotate', { n }), shortcut: 'R', onSelect: () => rotateSelection(ctx, 1) },
+      { label: t('context.flip', { n }), shortcut: 'F', onSelect: () => flipSelection(ctx) },
+      { label: t('context.copy', { n }), shortcut: 'Ctrl+C', onSelect: () => copySelection(ctx) },
     )
   }
   if (selFurniture.length >= 2) {
     entries.push(
       {
-        label: 'Align left',
+        label: t('context.alignLeft'),
         separatorBefore: true,
         onSelect: () => alignSelection(ctx, 'left'),
       },
-      { label: 'Align right', onSelect: () => alignSelection(ctx, 'right') },
-      { label: 'Align top', onSelect: () => alignSelection(ctx, 'top') },
-      { label: 'Align bottom', onSelect: () => alignSelection(ctx, 'bottom') },
+      { label: t('context.alignRight'), onSelect: () => alignSelection(ctx, 'right') },
+      { label: t('context.alignTop'), onSelect: () => alignSelection(ctx, 'top') },
+      { label: t('context.alignBottom'), onSelect: () => alignSelection(ctx, 'bottom') },
     )
     if (selFurniture.length >= 3) {
       entries.push(
-        { label: 'Distribute horizontally', onSelect: () => distributeSelection(ctx, 'x') },
-        { label: 'Distribute vertically', onSelect: () => distributeSelection(ctx, 'y') },
+        { label: t('context.distributeHorizontally'), onSelect: () => distributeSelection(ctx, 'x') },
+        { label: t('context.distributeVertically'), onSelect: () => distributeSelection(ctx, 'y') },
       )
     }
   }
   if (selWalls.length === 1 && selection.length === 1) {
     entries.push({
-      label: 'Split wall here',
+      label: t('context.splitWall'),
       onSelect: () => splitWallAt(ctx, selWalls[0]! as WallId, menu.world),
     })
   }
@@ -109,18 +110,18 @@ export function ContextMenu() {
     selection.length === 1 && doc.rooms[selection[0]! as RoomId] ? selection[0]! : null
   if (selRoom) {
     entries.push({
-      label: 'Duplicate room',
+      label: t('context.duplicateRoom'),
       onSelect: () => duplicateRoom(ctx, selRoom),
     })
     entries.push({
-      label: 'Copy room',
+      label: t('context.copyRoom'),
       shortcut: 'Ctrl+C',
       onSelect: () => copySelection(ctx),
     })
     // right-click auto-selects the room under the cursor, which used to
     // hide the document-level fallback — paste-at-point must stay reachable
     entries.push({
-      label: 'Paste here',
+      label: t('context.pasteHere'),
       shortcut: 'Ctrl+V',
       disabled: !hasClipboard(),
       onSelect: () => pasteClipboard(ctx, menu.world),
@@ -128,14 +129,17 @@ export function ContextMenu() {
   }
   if (selection.length && !selRoomsOnly) {
     entries.push({
-      label: 'Zoom to selection',
+      label: t('context.zoomToSelection'),
       shortcut: 'Shift+2',
       onSelect: () => zoomToSelection(ctx),
     })
   }
   if (deletable.length) {
     entries.push({
-      label: `Delete${deletable.length > 1 ? ` ${deletable.length} items` : ''}`,
+      label:
+        deletable.length > 1
+          ? t('context.deleteN', { count: deletable.length })
+          : t('context.delete'),
       shortcut: 'Del',
       danger: true,
       separatorBefore: entries.length > 0,
@@ -146,13 +150,13 @@ export function ContextMenu() {
     // empty canvas (or room-only selection): document-level actions
     entries.push(
       {
-        label: 'Paste here',
+        label: t('context.pasteHere'),
         shortcut: 'Ctrl+V',
         disabled: !hasClipboard(),
         onSelect: () => pasteClipboard(ctx, menu.world),
       },
-      { label: 'Select all', shortcut: 'Ctrl+A', onSelect: () => selectAll(ctx) },
-      { label: 'Zoom to fit', shortcut: 'Shift+1', onSelect: () => zoomToFitAll(ctx) },
+      { label: t('context.selectAll'), shortcut: 'Ctrl+A', onSelect: () => selectAll(ctx) },
+      { label: t('context.zoomToFit'), shortcut: 'Shift+1', onSelect: () => zoomToFitAll(ctx) },
     )
   }
 

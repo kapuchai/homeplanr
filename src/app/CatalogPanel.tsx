@@ -11,6 +11,7 @@ import { useInteractionStore } from '../editor2d/session/interactionStore'
 import { useViewportStore } from '../editor2d/viewport/viewportStore'
 import { screenToWorld } from '../editor2d/viewport/viewportMath'
 import type { Vec2 } from '../geometry/vec'
+import { t } from '../i18n'
 
 /** The editor canvas — NEVER a bare `svg` selector (catalog thumbnails are
  * SVGs inside .content too; that ambiguity broke drag-drop in the M3b gate). */
@@ -132,7 +133,11 @@ function ItemCard({ item }: { item: CatalogItem }) {
     <button
       type="button"
       className={`catalog-card${armed ? ' armed' : ''}`}
-      title={`${item.name} — ${Math.round(item.dims.w * 100)}×${Math.round(item.dims.d * 100)} cm`}
+      title={t('catalog.cardTitle', {
+        name: item.name,
+        w: Math.round(item.dims.w * 100),
+        d: Math.round(item.dims.d * 100),
+      })}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -172,8 +177,8 @@ export function CatalogPanel() {
       <input
         type="search"
         className="catalog-search"
-        placeholder="Search catalog…"
-        aria-label="Search catalog"
+        placeholder={t('catalog.searchPlaceholder')}
+        aria-label={t('catalog.searchAria')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
@@ -191,7 +196,7 @@ export function CatalogPanel() {
             ))}
           </div>
         ) : (
-          <p className="hint catalog-empty">Nothing matches “{query.trim()}”</p>
+          <p className="hint catalog-empty">{t('catalog.noMatch', { query: query.trim() })}</p>
         )
       ) : (
         CATEGORY_ORDER.map((cat) => {

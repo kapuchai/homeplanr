@@ -24,6 +24,7 @@ import {
 import { useConfirmStore } from '../../app/confirmStore'
 import { zoomToFitContent } from '../../editor2d/tools/keymap'
 import { useAppSettings } from '../appSettings'
+import { t } from '../../i18n'
 
 /**
  * Persistence controller — owns currentFilePath/lastSavedDoc and applies
@@ -250,7 +251,7 @@ async function whenTxIdle(timeoutMs = 2000): Promise<boolean> {
 }
 
 async function reportBusy(): Promise<void> {
-  await state().adapter.message('Busy', 'A drag is in progress — finish it and try again.')
+  await state().adapter.message(t('persist.busy.title'), t('persist.busy.message'))
 }
 
 // ---------- guard ----------
@@ -263,12 +264,12 @@ export async function guardDirty(): Promise<GuardChoice> {
   for (;;) {
     if (!state().dirty) return 'discard' // clean: nothing to guard
     const choice = await useConfirmStore.getState().prompt<GuardChoice>(
-      'Unsaved changes',
-      `“${doc().name}” has unsaved changes.`,
+      t('persist.unsavedChanges.title'),
+      t('persist.unsavedChanges.message', { name: doc().name }),
       [
-        { label: 'Save', value: 'save', variant: 'primary' },
-        { label: 'Discard', value: 'discard', variant: 'danger' },
-        { label: 'Cancel', value: 'cancel', variant: 'plain' },
+        { label: t('persist.unsavedChanges.save'), value: 'save', variant: 'primary' },
+        { label: t('persist.unsavedChanges.discard'), value: 'discard', variant: 'danger' },
+        { label: t('common.cancel'), value: 'cancel', variant: 'plain' },
       ],
     )
     if (choice !== 'save') return choice
@@ -284,6 +285,8 @@ export function newProject(): Promise<void> {
     if (!(await whenTxIdle())) return reportBusy()
     if ((await guardDirty()) === 'cancel') return
     cancelFileAutosave() // a late autosave must not resurrect discarded work
+    // 'Untitled' is a FILE-FORMAT SENTINEL (compared at applyOpened, defaulted
+    // in serialize/docStore) — it must NOT route through the locale table
     const fresh = emptyDocument(newProjectId(), 'Untitled', new Date().toISOString())
     useDocStore.getState().replaceDocument(fresh)
     clearHistory()
@@ -314,7 +317,7 @@ export function newFromTemplate(name: string, raw: string): Promise<void> {
     try {
       parsed = parseDocument(raw).doc
     } catch (err) {
-      await state().adapter.message('Could not load template', String(err))
+      await state().adapter.message(t('persist.templateError.title'), String(err))
       return
     }
     cancelFileAutosave() // a late autosave must not resurrect discarded work
@@ -367,18 +370,22 @@ async function applyOpened(
     if (path) pushRecent(path, parsed.name)
     if (healed) {
       await adapter.message(
-        'Repaired file',
-        `The file needed repairs while opening${warnings.length ? `: ${warnings.slice(0, 3).join('; ')}${warnings.length > 3 ? '…' : ''}` : '.'} Review and save to keep the repaired version.`,
+        t('persist.repaired.title'),
+        t('persist.repaired.message', {
+          details: warnings.length
+            ? `: ${warnings.slice(0, 3).join('; ')}${warnings.length > 3 ? '…' : ''}`
+            : '.',
+        }),
       )
     }
     return true
   } catch (err) {
     if (err instanceof ForwardVersionError) {
-      await adapter.message('Newer file', err.message)
+      await adapter.message(t('persist.newerFile.title'), err.message)
     } else if (err instanceof InvalidDocumentError) {
-      await adapter.message('Could not open', err.message)
+      await adapter.message(t('persist.couldNotOpen.title'), err.message)
     } else {
-      await adapter.message('Could not open', String(err))
+      await adapter.message(t('persist.couldNotOpen.title'), String(err))
     }
     return false
   }
@@ -395,7 +402,7 @@ export function openProject(): Promise<void> {
       if (!result) return // cancelled
       await applyOpened(result.json, result.path, result.name)
     } catch (err) {
-      await adapter.message('Could not open', String(err))
+      await adapter.message(t('persist.couldNotOpen.title'), String(err))
     }
   })
 }
@@ -416,7 +423,7 @@ export async function openPath(
     return await applyOpened(json, path, undefined, opts)
   } catch (err) {
     dropRecent(path) // unreadable/missing — prune the entry
-    await adapter.message('Could not open', `${path}\n\n${String(err)}`)
+    await adapter.message(t('persist.couldNotOpen.title'), `${path}\n\n${String(err)}`)
     return false
   }
 }
@@ -470,7 +477,7 @@ export async function saveProject(): Promise<boolean> {
       if (state().dirty) scheduleRecoveryAutosave()
       return true
     } catch (err) {
-      await adapter.message('Save failed', String(err))
+      await adapter.message(t('persist.saveFailed.title'), String(err))
       return false // dirty/title/recovery untouched
     }
   })
@@ -502,7 +509,7 @@ export async function saveProjectAs(): Promise<boolean> {
       if (state().dirty) scheduleRecoveryAutosave()
       return true
     } catch (err) {
-      await adapter.message('Save failed', String(err))
+      await adapter.message(t('persist.saveFailed.title'), String(err))
       return false
     }
   })
@@ -532,16 +539,19 @@ export async function offerRecovery(
   // Restore means for it — their open-intent must not vanish untold
   const competing =
     opts?.competingPath && opts.competingPath !== blob.filePath
-      ? ` Restore keeps “${opts.competingPath.split(/[/\\]/).pop()}” unopened — open it from the File menu afterwards.`
+      ? t('persist.recovery.competing', {
+          name: opts.competingPath.split(/[/\\]/).pop() ?? '',
+        })
       : ''
   const choice = await useConfirmStore.getState().prompt(
-    'Restore unsaved work?',
+    t('persist.recovery.title'),
     (decision.action === 'offer-unsaved'
-      ? `“${blob.doc.name}” has unsaved changes from a previous session.`
-      : `“${blob.doc.name}” has changes newer than ${decision.filePath}.`) + competing,
+      ? t('persist.recovery.messageUnsaved', { name: blob.doc.name })
+      : t('persist.recovery.messageNewer', { name: blob.doc.name, path: decision.filePath })) +
+      competing,
     [
-      { label: 'Restore', value: 'restore', variant: 'primary' },
-      { label: 'Discard', value: 'discard', variant: 'danger' },
+      { label: t('persist.recovery.restore'), value: 'restore', variant: 'primary' },
+      { label: t('persist.recovery.discard'), value: 'discard', variant: 'danger' },
     ],
     { escValue: 'dismiss' },
   )

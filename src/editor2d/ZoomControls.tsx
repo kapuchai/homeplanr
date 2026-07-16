@@ -3,6 +3,7 @@ import { useAppSettings } from '../store/appSettings'
 import { useViewportStore } from './viewport/viewportStore'
 import { K_DEFAULT, KEY_ZOOM_FACTOR } from './viewport/viewportMath'
 import { zoomToFitContent } from './tools/keymap'
+import { t } from '../i18n'
 
 /**
  * Bottom-right zoom cluster: [−] [NN%] [+] [Fit] [Dim]. Every button swallows
@@ -21,8 +22,8 @@ export function ZoomControls() {
   return (
     <div className="canvas-controls segmented small">
       <button
-        aria-label="Zoom out"
-        title="Zoom out (−)"
+        aria-label={t('zoom.out')}
+        title={t('zoom.outTitle')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => zoomAtCenter(1 / KEY_ZOOM_FACTOR)}
       >
@@ -30,53 +31,53 @@ export function ZoomControls() {
       </button>
       <button
         className="zoom-level"
-        title="Reset zoom"
+        title={t('zoom.reset')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => zoomAtCenter(K_DEFAULT / useViewportStore.getState().k)}
       >
         {Math.round((k / K_DEFAULT) * 100)}%
       </button>
       <button
-        aria-label="Zoom in"
-        title="Zoom in (+)"
+        aria-label={t('zoom.in')}
+        title={t('zoom.inTitle')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => zoomAtCenter(KEY_ZOOM_FACTOR)}
       >
         +
       </button>
       <button
-        title="Zoom to fit (Shift+1)"
+        title={t('zoom.fitTitle')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => zoomToFitContent(useDocStore.getState().doc)}
       >
-        Fit
+        {t('zoom.fit')}
       </button>
       <button
         className={showDimensions ? 'active' : ''}
         aria-pressed={showDimensions}
-        title="Wall dimensions (Shift+D)"
+        title={t('zoom.dimTitle')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => useAppSettings.getState().setShowDimensions(!showDimensions)}
       >
-        Dim
+        {t('zoom.dim')}
       </button>
       <button
         className={snapEnabled ? 'active' : ''}
         aria-pressed={snapEnabled}
-        title="Snapping (S · hold Ctrl to suspend)"
+        title={t('zoom.snapTitle')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => useAppSettings.getState().setSnapEnabled(!snapEnabled)}
       >
-        Snap
+        {t('zoom.snap')}
       </button>
       <button
         className={showGrid ? 'active' : ''}
         aria-pressed={showGrid}
-        title="Grid (G)"
+        title={t('zoom.gridTitle')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => useAppSettings.getState().setShowGrid(!showGrid)}
       >
-        Grid
+        {t('zoom.grid')}
       </button>
     </div>
   )

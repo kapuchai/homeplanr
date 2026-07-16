@@ -42,6 +42,7 @@ import { realizeItem } from '../catalog/realize'
 import type { WallSolid, PatchSolid } from '../geometry/wallSolids'
 import type { FurnitureInstance, ProjectDocument, Wall } from '../model/types'
 import type { MaterialId } from '../catalog/types'
+import { t } from '../i18n'
 
 /**
  * The full 3D view (M4). Plan-pinned behaviors:
@@ -411,7 +412,7 @@ export function PlannerCanvas() {
     const plan = worldToPlan([e.point.x, e.point.y, e.point.z])
     const ok = validateTeleport(getCollisionSet(doc, derived), plan)
     if (ok) walk.requestWalkTo(ok)
-    else walk.setHint('That spot is blocked') // walls or furniture
+    else walk.setHint(t('view3d.blocked')) // walls or furniture
   }
 
   const applyPreset = (kind: CameraPresetKind) => {
@@ -422,21 +423,21 @@ export function PlannerCanvas() {
   const hint =
     walkHint ??
     (walkMode === 'arming'
-      ? 'Click a floor to start walking · Esc exits'
+      ? t('view3d.hintArming')
       : walkMode === 'walking'
-        ? 'WASD/arrows move · Shift sprints · drag looks · click floor teleports · Esc exits'
+        ? t('view3d.hintWalking')
         : orbitHintSeen
           ? null
-          : 'Drag orbits · wheel zooms')
+          : t('view3d.hintOrbit'))
 
   if (glError) {
     return (
       <div className="gl-banner">
-        <h3>3D view unavailable</h3>
+        <h3>{t('view3d.glUnavailableTitle')}</h3>
         <p>{glError}</p>
         <p className="hint">
-          The 2D editor keeps working. If this persists on Linux, try launching with
-          <code> WEBKIT_DISABLE_DMABUF_RENDERER=1</code> or
+          {t('view3d.glHintBefore')}
+          <code> WEBKIT_DISABLE_DMABUF_RENDERER=1</code> {t('view3d.glHintOr')}
           <code> WEBKIT_DISABLE_COMPOSITING_MODE=1</code>.
         </p>
         <button
@@ -447,7 +448,7 @@ export function PlannerCanvas() {
             setEpoch((n) => n + 1)
           }}
         >
-          Restart 3D view
+          {t('view3d.restart')}
         </button>
       </div>
     )
@@ -475,7 +476,7 @@ export function PlannerCanvas() {
           gl.toneMapping = ACESFilmicToneMapping
         }}
       >
-        <ContextGuard onLost={() => setGlError('The WebGL context was lost (GPU reset or driver issue).')} />
+        <ContextGuard onLost={() => setGlError(t('view3d.glContextLost'))} />
         <InvalidateBridge />
         <ThemeBridge3D />
         <CaptureBridge apiRef={captureApi} />
@@ -517,29 +518,29 @@ export function PlannerCanvas() {
       <div className="view3d-controls segmented small">
         {(
           [
-            ['top', 'Top', 'Look straight down (plan orientation)'],
-            ['front', 'Front', 'Look from the front, near floor level'],
-            ['iso', 'Iso', 'Isometric three-quarter view'],
-            ['reset', 'Reset', 'Refit the whole scene'],
+            ['top', 'view3d.presetTop', 'view3d.presetTopTitle'],
+            ['front', 'view3d.presetFront', 'view3d.presetFrontTitle'],
+            ['iso', 'view3d.presetIso', 'view3d.presetIsoTitle'],
+            ['reset', 'view3d.presetReset', 'view3d.presetResetTitle'],
           ] as const
         ).map(([kind, label, title]) => (
           <button
             key={kind}
             type="button"
-            title={title}
+            title={t(title)}
             disabled={walkMode === 'walking'}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => applyPreset(kind)}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
         <button
           type="button"
-          aria-label="Walk"
+          aria-label={t('view3d.walk')}
           aria-pressed={walkMode !== 'off'}
           className={walkMode !== 'off' ? 'active' : ''}
-          title="Walk around (click a floor to start)"
+          title={t('view3d.walkTitle')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             const walk = useWalkStore.getState()
@@ -547,18 +548,18 @@ export function PlannerCanvas() {
             else walk.exit()
           }}
         >
-          Walk
+          {t('view3d.walk')}
         </button>
         <button
           type="button"
-          title="Save the current 3D view as a PNG"
+          title={t('view3d.saveImageTitle')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             const api = captureApi.current
             if (api) void captureAndSave(api, useDocStore.getState().doc.name)
           }}
         >
-          Save image
+          {t('view3d.saveImage')}
         </button>
       </div>
       {hint && <div className="status-hint">{hint}</div>}
@@ -582,7 +583,7 @@ class GlErrorBoundary extends Component<
     return { failed: true }
   }
   override componentDidCatch(error: Error) {
-    this.props.onError(error.message || 'The WebGL context could not be created.')
+    this.props.onError(error.message || t('view3d.glCreateFailed'))
   }
   override render() {
     return this.state.failed ? null : this.props.children

@@ -4,6 +4,7 @@ import { Modal } from './Modal'
 import { exportImage, exportPdf } from '../export/exportController'
 import type { Orientation, PaperSize } from '../export/paper'
 import { EXPORT_MARGIN_M } from '../export/exportPlanSvg'
+import { t } from '../i18n'
 
 /**
  * Export options modal (M5, 0.4.0) — format, scale preset, grid, margin,
@@ -22,16 +23,16 @@ const FORMATS: { value: Format; label: string }[] = [
 ]
 
 const SCALES: { value: ScaleChoice; label: string }[] = [
-  { value: 'fit', label: 'Fit' },
-  { value: 50, label: '1:50' },
-  { value: 100, label: '1:100' },
-  { value: 200, label: '1:200' },
+  { value: 'fit', label: t('export.scaleFit') },
+  { value: 50, label: t('export.scale50') },
+  { value: 100, label: t('export.scale100') },
+  { value: 200, label: t('export.scale200') },
 ]
 
 const PAPERS: { value: PaperSize; label: string }[] = [
-  { value: 'a4', label: 'A4' },
-  { value: 'a3', label: 'A3' },
-  { value: 'letter', label: 'Letter' },
+  { value: 'a4', label: t('export.paperA4') },
+  { value: 'a3', label: t('export.paperA3') },
+  { value: 'letter', label: t('export.paperLetter') },
 ]
 
 export function ExportDialog() {
@@ -90,31 +91,31 @@ function ExportDialogInner() {
   )
 
   return (
-    <Modal label="Export plan" onClose={() => setOpen(false)}>
+    <Modal label={t('export.title')} onClose={() => setOpen(false)}>
       <>
-        <h3>Export plan</h3>
+        <h3>{t('export.title')}</h3>
         <section className="options-section">
           <div className="options-row">
-            <span>Format</span>
+            <span>{t('export.format')}</span>
             {seg(FORMATS, format, setFormat)}
           </div>
           <div className="options-row">
-            <span>Scale</span>
+            <span>{t('export.scale')}</span>
             {seg(SCALES, scale, setScale)}
           </div>
           <div className="options-row">
-            <span>Grid</span>
+            <span>{t('export.grid')}</span>
             {seg(
               [
-                { value: true, label: 'On' },
-                { value: false, label: 'Off' },
+                { value: true, label: t('common.on') },
+                { value: false, label: t('common.off') },
               ],
               includeGrid,
               setIncludeGrid,
             )}
           </div>
           <div className="options-row">
-            <span>Margin (m)</span>
+            <span>{t('export.margin')}</span>
             <input
               type="number"
               className="export-margin"
@@ -122,35 +123,35 @@ function ExportDialogInner() {
               max={5}
               step={0.1}
               value={marginText}
-              aria-label="Margin in meters"
+              aria-label={t('export.marginAria')}
               onChange={(e) => setMarginText(e.target.value)}
             />
           </div>
         </section>
         {format === 'pdf' && (
           <section className="options-section">
-            <h4>Paper</h4>
+            <h4>{t('export.section.paper')}</h4>
             <div className="options-row">
-              <span>Size</span>
+              <span>{t('export.size')}</span>
               {seg(PAPERS, paper, setPaper)}
             </div>
             <div className="options-row">
-              <span>Orientation</span>
+              <span>{t('export.orientation')}</span>
               {seg(
                 [
-                  { value: 'landscape' as Orientation, label: 'Landscape' },
-                  { value: 'portrait' as Orientation, label: 'Portrait' },
+                  { value: 'landscape' as Orientation, label: t('export.landscape') },
+                  { value: 'portrait' as Orientation, label: t('export.portrait') },
                 ],
                 orientation,
                 setOrientation,
               )}
             </div>
             <div className="options-row">
-              <span>Title block</span>
+              <span>{t('export.titleBlock')}</span>
               {seg(
                 [
-                  { value: true, label: 'On' },
-                  { value: false, label: 'Off' },
+                  { value: true, label: t('common.on') },
+                  { value: false, label: t('common.off') },
                 ],
                 titleBlock,
                 setTitleBlock,
@@ -160,10 +161,10 @@ function ExportDialogInner() {
         )}
         <div className="modal-buttons">
           <button type="button" onClick={() => setOpen(false)}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button type="button" className="primary" onClick={run}>
-            Export…
+            {t('export.run')}
           </button>
         </div>
       </>
