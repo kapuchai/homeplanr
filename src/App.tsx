@@ -1,12 +1,11 @@
 // App shell (M3b): toolbar w/ File menu + tools + undo/redo + 2D/3D toggle,
 // catalog + properties panels, confirm modal, and real file persistence.
 import { useEffect, useRef, useState } from 'react'
-import { useStore } from 'zustand'
 import { Editor2D } from './editor2d/Editor2D'
 import { PlannerCanvas } from './scene3d/PlannerCanvas'
-import { useDocStore, docTemporal } from './store/docStore'
+import { useDocStore } from './store/docStore'
 import { useUiStore, initSelectionPruning } from './store/uiStore'
-import { safeRedo, safeUndo } from './store/transactions'
+import { safeRedo, safeUndo, useCanUndo, useCanRedo } from './store/transactions'
 import {
   launchPersistence,
   newProject,
@@ -167,8 +166,8 @@ function Toolbar() {
   const activeTool = useUiStore((s) => s.activeTool)
   const setToolParams = useUiStore((s) => s.setToolParams)
   const openingKind = useUiStore((s) => s.toolParams.openingKind)
-  const canUndo = useStore(docTemporal, (s) => s.pastStates.length > 0)
-  const canRedo = useStore(docTemporal, (s) => s.futureStates.length > 0)
+  const canUndo = useCanUndo()
+  const canRedo = useCanRedo()
   const is2d = viewMode === '2d'
 
   const toolBtn = (

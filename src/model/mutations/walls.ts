@@ -208,6 +208,9 @@ export function updateWall(
  * ID policy (pinned): the a-side keeps the original WallId (openings keep
  * wallId, t rescaled ×1/s); the b-side gets a fresh id (openings re-hosted,
  * t → (t−s)/(1−s)); straddlers are deleted.
+ * Fragments of a demoted wall inherit demotion (ids minted here are ADDED to
+ * the set) — otherwise a pasted wall's split fragment would re-enter the
+ * weld/dedupe tiebreaks as "kept" and could beat genuinely existing walls.
  * Returns the new middle node. Does NOT run the pipeline (internal helper
  * used by normalizeGraph; public callers use splitWall below).
  */
@@ -216,6 +219,7 @@ export function splitWallRaw(
   wallId: WallId,
   s: number,
   atNode?: NodeId,
+  demoted?: Set<string>,
 ): NodeId | null {
   const w = doc.walls[wallId]
   if (!w || s <= 0 || s >= 1) return null
@@ -228,10 +232,22 @@ export function splitWallRaw(
   if (!mid) {
     mid = newNodeId()
     doc.nodes[mid] = { id: mid, x: A.x + (B.x - A.x) * s, y: A.y + (B.y - A.y) * s }
+    if (demoted?.has(wallId)) demoted.add(mid)
   }
 
   const bSide = newWallId()
-  doc.walls[bSide] = { id: bSide, a: mid, b: w.b, thickness: w.thickness, height: w.height }
+  doc.walls[bSide] = {
+    id: bSide,
+    a: mid,
+    b: w.b,
+    thickness: w.thickness,
+    height: w.height,
+    // both halves are the same physical wall — sides keep their look
+    ...(w.paintFront ? { paintFront: w.paintFront } : {}),
+    ...(w.paintBack ? { paintBack: w.paintBack } : {}),
+    ...(w.finish ? { finish: w.finish } : {}),
+  }
+  if (demoted?.has(wallId)) demoted.add(bSide)
   w.b = mid // a-side keeps the original id
 
   // Re-anchor openings.
@@ -321,7 +337,12 @@ export function mergeNodes(
 }
 
 /** Rewire all walls from `from` to `to`, dropping degenerates + dupes. */
-function rewireNode(doc: ProjectDocument, from: NodeId, to: NodeId): void {
+function rewireNode(
+  doc: ProjectDocument,
+  from: NodeId,
+  to: NodeId,
+  demoted?: ReadonlySet<string>,
+): void {
   for (const w of Object.values(doc.walls)) {
     if (w.a === from) w.a = to
     if (w.b === from) w.b = to
@@ -333,21 +354,36 @@ function rewireNode(doc: ProjectDocument, from: NodeId, to: NodeId): void {
     }
   }
   delete doc.nodes[from]
-  dedupeWalls(doc)
+  dedupeWalls(doc, demoted)
 }
 
-/** Remove duplicate node-pair walls (keep lexicographically-smallest id). */
-function dedupeWalls(doc: ProjectDocument): void {
+/** Remove duplicate node-pair walls. Survivor = smallest id, except a
+ * demoted (pasted) wall never survives against a kept one. */
+function dedupeWalls(doc: ProjectDocument, demoted?: ReadonlySet<string>): void {
+  const rank = (w: Wall) => (demoted?.has(w.id) ? 1 : 0)
   const byPair = new Map<string, Wall>()
-  for (const w of Object.values(doc.walls).sort((x, y) => (x.id < y.id ? -1 : 1))) {
+  for (const w of Object.values(doc.walls).sort(
+    (x, y) => rank(x) - rank(y) || (x.id < y.id ? -1 : 1),
+  )) {
     const key = w.a < w.b ? `${w.a}|${w.b}` : `${w.b}|${w.a}`
     const kept = byPair.get(key)
     if (!kept) {
       byPair.set(key, w)
     } else {
-      // move openings onto the surviving wall (same endpoints ⇒ same length)
+      // move openings onto the surviving wall (same endpoints ⇒ same length);
+      // an opposite-orientation duplicate mirrors the wall-local frame, so
+      // t, hinge, and swing (front ≡ +perp(a→b)) all flip with it
+      const reversed = w.a === kept.b
       for (const op of Object.values(doc.openings)) {
-        if (op.wallId === w.id) op.wallId = kept.id
+        if (op.wallId !== w.id) continue
+        op.wallId = kept.id
+        if (reversed) {
+          op.t = 1 - op.t
+          if (op.kind === 'door') {
+            op.hinge = op.hinge === 'a' ? 'b' : 'a'
+            op.swing = op.swing === 'front' ? 'back' : 'front'
+          }
+        }
       }
       delete doc.walls[w.id]
     }
@@ -368,13 +404,17 @@ function gcOrphanNodes(doc: ProjectDocument): void {
 /**
  * Graph normalization to a planar straight-line graph (bounded fixed point):
  * 1. weld nodes within MERGE_EPS (survivor = lexicographically-smallest id,
- *    keeps ITS position — no averaging);
+ *    keeps ITS position — no averaging; a demoted id never survives against
+ *    a kept one — paste determinism, see pipeline.ts PipelineOpts);
  * 2. endpoint-on-segment → T-split (weld tolerance MERGE_EPS);
  * 3. proper segment crossings → X-split both walls at a new node;
  * 4. dedupe duplicate-pair walls, GC orphan nodes;
  * repeated until stable or NORMALIZE_MAX_PASSES (best-effort + dev warning).
  */
-export function normalizeGraph(doc: ProjectDocument): void {
+export function normalizeGraph(doc: ProjectDocument, demoted?: ReadonlySet<string>): void {
+  // Working copy — splits mint fresh ids mid-normalization, and fragments of
+  // demoted walls must stay demoted (splitWallRaw adds them here).
+  const demo = demoted ? new Set(demoted) : undefined
   for (let pass = 0; pass < NORMALIZE_MAX_PASSES; pass++) {
     let changed = false
 
@@ -387,7 +427,13 @@ export function normalizeGraph(doc: ProjectDocument): void {
         const b = doc.nodes[nodeIds[j]!]
         if (!b) continue
         if (dist(a, b) < MERGE_EPS) {
-          rewireNode(doc, b.id, a.id) // a is lexicographically smaller
+          // a (lexicographically smaller) survives — unless it is demoted
+          // and b is kept, in which case b wins and keeps ITS position
+          if (demo?.has(a.id) && !demo.has(b.id)) {
+            rewireNode(doc, a.id, b.id, demo)
+          } else {
+            rewireNode(doc, b.id, a.id, demo)
+          }
           changed = true
           continue outer
         }
@@ -424,7 +470,7 @@ export function normalizeGraph(doc: ProjectDocument): void {
         if (!cw) break
         const t = (h.t - consumed) / (1 - consumed)
         const beforeB: NodeId = cw.b
-        const mid = splitWallRaw(doc, curId, t, h.nodeId)
+        const mid = splitWallRaw(doc, curId, t, h.nodeId, demo)
         if (mid) {
           changed = true
           // continue splitting on the b-side (the fresh wall)
@@ -440,11 +486,11 @@ export function normalizeGraph(doc: ProjectDocument): void {
     // 3. proper X-crossings — exhaust within the pass (each split reduces
     // the remaining crossing count, so this inner loop terminates)
     for (;;) {
-      if (!splitOneCrossing(doc)) break
+      if (!splitOneCrossing(doc, demo)) break
       changed = true
     }
 
-    dedupeWalls(doc)
+    dedupeWalls(doc, demo)
     gcOrphanNodes(doc)
     if (!changed) return
   }
@@ -454,7 +500,7 @@ export function normalizeGraph(doc: ProjectDocument): void {
 }
 
 /** Find and split the first proper interior wall×wall crossing. */
-function splitOneCrossing(doc: ProjectDocument): boolean {
+function splitOneCrossing(doc: ProjectDocument, demoted?: Set<string>): boolean {
   const list = (Object.keys(doc.walls) as WallId[]).sort()
   for (let i = 0; i < list.length; i++) {
     const w1 = doc.walls[list[i]!]
@@ -476,8 +522,8 @@ function splitOneCrossing(doc: ProjectDocument): boolean {
       ) {
         continue
       }
-      const mid = splitWallRaw(doc, w1.id, r.t)
-      if (mid) splitWallRaw(doc, w2.id, r.u, mid)
+      const mid = splitWallRaw(doc, w1.id, r.t, undefined, demoted)
+      if (mid) splitWallRaw(doc, w2.id, r.u, mid, demoted)
       return true
     }
   }

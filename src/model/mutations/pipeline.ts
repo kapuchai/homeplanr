@@ -17,10 +17,24 @@ import { reconcileRooms } from './rooms'
  */
 export type MutationMode = 'live' | 'commit'
 
-export function runPipeline(doc: ProjectDocument, mode: MutationMode): void {
+export interface PipelineOpts {
+  /**
+   * Ids that LOSE every tie during normalization (paste demotion): a demoted
+   * node/wall never survives a weld/dedupe against a kept one, and demoted
+   * openings are re-slotted around kept openings (never evict them). Absent
+   * everywhere except pasteSubgraph — behavior is bit-identical without it.
+   */
+  demoted?: ReadonlySet<string>
+}
+
+export function runPipeline(
+  doc: ProjectDocument,
+  mode: MutationMode,
+  opts: PipelineOpts = {},
+): void {
   if (mode === 'commit') {
-    normalizeGraph(doc)
-    revalidateOpenings(doc, 'commit')
+    normalizeGraph(doc, opts.demoted)
+    revalidateOpenings(doc, 'commit', opts.demoted)
     reconcileRooms(doc)
   } else {
     revalidateOpenings(doc, 'live')

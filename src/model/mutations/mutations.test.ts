@@ -12,6 +12,7 @@ import {
   updateWall,
 } from './walls'
 import { addOpening, updateOpening } from './openings'
+import { runPipeline } from './pipeline'
 import { paintRoomWalls, renameRoom } from './rooms'
 import { addDimension, addLabel, updateAnnotation } from './annotations'
 import { pasteSubgraph } from './paste'
@@ -652,6 +653,273 @@ describe('M9 (0.3.0): graph paste — the pipeline IS the merge semantics', () =
     const doors = Object.values(d.openings)
     expect(doors).toHaveLength(1)
     expect(doors[0]!.kind).toBe('door')
+  })
+})
+
+describe('0.4.0 M1: paste demotion — existing geometry always wins', () => {
+  it('node weld: a demoted id loses even when lexicographically smaller (survivor keeps ITS position)', () => {
+    const build = () => {
+      const d = doc()
+      const idA = 'n_aaa' as NodeId // lexicographically FIRST — old rule made it survive
+      const idZ = 'n_zzz' as NodeId
+      const idB = 'n_bbb' as NodeId
+      const idC = 'n_ccc' as NodeId
+      d.nodes[idA] = { id: idA, x: 0, y: 0 }
+      d.nodes[idZ] = { id: idZ, x: 0, y: MERGE_EPS / 2 }
+      d.nodes[idB] = { id: idB, x: 3, y: 0 }
+      d.nodes[idC] = { id: idC, x: 0, y: 3 }
+      d.walls['w_1' as WallId] = { id: 'w_1' as WallId, a: idZ, b: idB, thickness: 0.15, height: 2.5 }
+      d.walls['w_2' as WallId] = { id: 'w_2' as WallId, a: idA, b: idC, thickness: 0.15, height: 2.5 }
+      return { d, idA, idZ }
+    }
+    // control: without demotion the lexicographic rule keeps n_aaa
+    const control = build()
+    normalizeGraph(control.d)
+    expect(control.d.nodes[control.idA]).toBeDefined()
+    expect(control.d.nodes[control.idZ]).toBeUndefined()
+    // demoted: n_aaa (the "pasted" node) loses; n_zzz keeps ITS position
+    const { d, idA, idZ } = build()
+    normalizeGraph(d, new Set([idA]))
+    expect(d.nodes[idA]).toBeUndefined()
+    expect(d.nodes[idZ]).toBeDefined()
+    expect(d.nodes[idZ]!.y).toBe(MERGE_EPS / 2)
+    for (const w of Object.values(d.walls)) {
+      expect([w.a, w.b]).not.toContain(idA)
+    }
+    checkInvariants(d)
+  })
+
+  it('wall dedupe: a demoted duplicate loses despite the smaller id; its openings re-point', () => {
+    const d = doc()
+    const nA = 'n_a' as NodeId
+    const nB = 'n_b' as NodeId
+    d.nodes[nA] = { id: nA, x: 0, y: 0 }
+    d.nodes[nB] = { id: nB, x: 4, y: 0 }
+    const kept = 'w_zzz' as WallId
+    const pasted = 'w_aaa' as WallId // smaller id — old rule made IT survive
+    d.walls[kept] = { id: kept, a: nA, b: nB, thickness: 0.15, height: 2.5 }
+    d.walls[pasted] = { id: pasted, a: nA, b: nB, thickness: 0.15, height: 2.5 }
+    const opId = 'op_1' as OpeningId
+    d.openings[opId] = {
+      id: opId, wallId: pasted, kind: 'door', t: 0.5, width: 0.9, height: 2,
+      hinge: 'a', swing: 'front',
+    }
+    normalizeGraph(d, new Set([pasted]))
+    expect(d.walls[kept]).toBeDefined()
+    expect(d.walls[pasted]).toBeUndefined()
+    expect(d.openings[opId]!.wallId).toBe(kept)
+  })
+
+  it('a demoted opening keeps its EXACT spot when it is free', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(6, 0))
+    const existing = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.25 })!
+    const tBefore = d.openings[existing]!.t
+    const pasted = 'op_pasted' as OpeningId
+    d.openings[pasted] = {
+      id: pasted, wallId: r.wallId!, kind: 'door', t: 0.75, width: 0.9, height: 2,
+      hinge: 'a', swing: 'front',
+    }
+    runPipeline(d, 'commit', { demoted: new Set([pasted]) })
+    expect(d.openings[existing]!.t).toBe(tBefore)
+    expect(d.openings[pasted]).toBeDefined()
+    expect(d.openings[pasted]!.t).toBe(0.75) // exact — no drift through the fit
+  })
+
+  it('a demoted opening overlapping a kept one is DROPPED — never shifted, never evicting', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(6, 0))
+    const existing = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.5 })!
+    const tBefore = d.openings[existing]!.t
+    const pasted = 'op_pasted' as OpeningId
+    d.openings[pasted] = {
+      // 0.3m off-center: overlaps the existing 0.9m door but plenty of wall
+      // is free — a shift-to-gap rule would leave a phantom door here
+      id: pasted, wallId: r.wallId!, kind: 'door', t: 0.55, width: 0.9, height: 2,
+      hinge: 'a', swing: 'front',
+    }
+    runPipeline(d, 'commit', { demoted: new Set([pasted]) })
+    expect(d.openings[existing]).toBeDefined()
+    expect(d.openings[existing]!.t).toBe(tBefore)
+    expect(d.openings[pasted]).toBeUndefined()
+    expect(Object.keys(d.openings)).toHaveLength(1)
+  })
+
+  it('split fragments of a demoted wall inherit demotion (partial-overlay paste)', () => {
+    // existing wall (0,0)-(4,0); "pasted" demoted wall (-2,0)-(4,0) overlays
+    // it: after welds, the kept node at (0,0) T-splits the pasted wall and
+    // its b-side fragment exactly duplicates the existing wall. Without
+    // demotion inheritance the survivor was a lexicographic coin flip.
+    const build = (keptWallId: string) => {
+      const d = doc()
+      const e1 = 'n_e1' as NodeId
+      const e2 = 'n_e2' as NodeId
+      const p1 = 'n_p1' as NodeId
+      const p2 = 'n_p2' as NodeId
+      d.nodes[e1] = { id: e1, x: 0, y: 0 }
+      d.nodes[e2] = { id: e2, x: 4, y: 0 }
+      d.nodes[p1] = { id: p1, x: -2, y: 0 }
+      d.nodes[p2] = { id: p2, x: 4, y: 0 }
+      const kept = keptWallId as WallId
+      const pasted = 'w_pasted' as WallId
+      d.walls[kept] = { id: kept, a: e1, b: e2, thickness: 0.15, height: 2.5 }
+      d.walls[pasted] = { id: pasted, a: p1, b: p2, thickness: 0.15, height: 2.5 }
+      normalizeGraph(d, new Set([p1, p2, pasted]))
+      return d
+    }
+    // 'w_zzzzzzzzzz' sorts AFTER any fresh split fragment id — the old
+    // lexicographic rule would delete it every time
+    const d = build('w_zzzzzzzzzz')
+    expect(d.walls['w_zzzzzzzzzz' as WallId]).toBeDefined()
+    expect(Object.keys(d.walls)).toHaveLength(2) // (-2,0)-(0,0) + the kept wall
+    checkInvariants(d)
+  })
+
+  it('reversed-orientation dedupe mirrors t/hinge/swing — overlay duplicate drops, free spot flips', () => {
+    const build = () => {
+      const d = doc()
+      const nA = 'n_a' as NodeId
+      const nB = 'n_b' as NodeId
+      d.nodes[nA] = { id: nA, x: 0, y: 0 }
+      d.nodes[nB] = { id: nB, x: 6, y: 0 }
+      const kept = 'w_kept' as WallId
+      const pasted = 'w_pasted' as WallId
+      d.walls[kept] = { id: kept, a: nA, b: nB, thickness: 0.15, height: 2.5 }
+      d.walls[pasted] = { id: pasted, a: nB, b: nA, thickness: 0.15, height: 2.5 } // REVERSED
+      const existing = 'op_kept' as OpeningId
+      d.openings[existing] = {
+        id: existing, wallId: kept, kind: 'door', t: 0.25, width: 0.9, height: 2,
+        hinge: 'a', swing: 'front',
+      }
+      return { d, kept, pasted, existing }
+    }
+    // (a) pasted door at t=0.75 on the REVERSED wall = world position of the
+    // existing door → after mirroring it collides and DROPS (no phantom)
+    {
+      const { d, pasted, existing } = build()
+      const dup = 'op_dup' as OpeningId
+      d.openings[dup] = {
+        id: dup, wallId: pasted, kind: 'door', t: 0.75, width: 0.9, height: 2,
+        hinge: 'a', swing: 'front',
+      }
+      runPipeline(d, 'commit', { demoted: new Set([pasted, dup]) })
+      expect(Object.keys(d.openings)).toEqual([existing])
+      expect(d.openings[existing]!.t).toBe(0.25)
+    }
+    // (b) pasted door at t=0.25 on the REVERSED wall = world 0.75 (free) →
+    // kept, with t mirrored and hinge/swing flipped to preserve world pose
+    {
+      const { d, pasted } = build()
+      const other = 'op_other' as OpeningId
+      d.openings[other] = {
+        id: other, wallId: pasted, kind: 'door', t: 0.25, width: 0.9, height: 2,
+        hinge: 'a', swing: 'front',
+      }
+      runPipeline(d, 'commit', { demoted: new Set([pasted, other]) })
+      const op = d.openings[other]!
+      expect(op).toBeDefined()
+      expect(op.wallId).toBe('w_kept')
+      expect(op.t).toBeCloseTo(0.75, 12)
+      expect(op.kind === 'door' && op.hinge).toBe('b')
+      expect(op.kind === 'door' && op.swing).toBe('back')
+    }
+  })
+
+  it('a demoted opening squeezed by a few cm still fits (weld-sized tolerance)', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(6, 0))
+    addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.5 }) // occupies [2.55, 3.45]
+    const pasted = 'op_pasted' as OpeningId
+    // requested [3.48, 4.38] — 2cm short of clearing the margin after the
+    // existing door; the nearest fit shifts it ~3cm right, well under the
+    // 0.1m tolerance (weld displacement scale), so it must survive
+    d.openings[pasted] = {
+      id: pasted, wallId: r.wallId!, kind: 'door', t: 3.93 / 6, width: 0.9, height: 2,
+      hinge: 'a', swing: 'front',
+    }
+    runPipeline(d, 'commit', { demoted: new Set([pasted]) })
+    expect(d.openings[pasted]).toBeDefined()
+    expect(Object.keys(d.openings)).toHaveLength(2)
+    const u = d.openings[pasted]!.t * 6
+    expect(Math.abs(u - 3.93)).toBeLessThanOrEqual(0.1)
+    // no overlap with the existing door
+    expect(u - 0.45).toBeGreaterThanOrEqual(3.45 - 1e-9)
+  })
+
+  it('splitting a painted wall keeps paint and finish on BOTH halves', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(4, 0))
+    updateWall(d, r.wallId!, { paintFront: 'sage', paintBack: 'charcoal', finish: 'brick' })
+    splitWall(d, r.wallId!, 0.5)
+    const halves = Object.values(d.walls)
+    expect(halves).toHaveLength(2)
+    for (const w of halves) {
+      expect(w.paintFront).toBe('sage')
+      expect(w.paintBack).toBe('charcoal')
+      expect(w.finish).toBe('brick')
+    }
+  })
+
+  it('EXACT-OVERLAY paste is a no-op: existing wall/room/opening identity and meta all survive', () => {
+    // target document: 4×3 room named Kitchen with a door on the south wall
+    const d = doc()
+    addWallChain(d, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const room = firstRoom(d)
+    renameRoom(d, room.id, 'Kitchen')
+    const south = Object.values(d.walls).find((w) => {
+      const a = d.nodes[w.a]!
+      const b = d.nodes[w.b]!
+      return a.y === 0 && b.y === 0
+    })!
+    const doorId = addOpening(d, { kind: 'door', wallId: south.id, t: 0.5 })!
+    const wallIdsBefore = Object.keys(d.walls).sort()
+    const nodeIdsBefore = Object.keys(d.nodes).sort()
+    const roomIdBefore = room.id
+    const doorTBefore = d.openings[doorId]!.t
+
+    // source payload: the SAME room shape + door, named differently
+    const src = doc()
+    addWallChain(src, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
+    const srcRoom = firstRoom(src)
+    renameRoom(src, srcRoom.id, 'Snug')
+    const srcSouth = Object.values(src.walls).find((w) => {
+      const a = src.nodes[w.a]!
+      const b = src.nodes[w.b]!
+      return a.y === 0 && b.y === 0
+    })!
+    addOpening(src, { kind: 'door', wallId: srcSouth.id, t: 0.5 })
+    const srcNodes = Object.values(src.nodes)
+    const anchor = {
+      x: srcNodes.reduce((s, n) => s + n.x, 0) / srcNodes.length,
+      y: srcNodes.reduce((s, n) => s + n.y, 0) / srcNodes.length,
+    }
+    const payload = {
+      nodes: srcNodes.map((n) => ({ key: n.id, dx: n.x - anchor.x, dy: n.y - anchor.y })),
+      walls: Object.values(src.walls).map((w) => ({
+        key: w.id, aKey: w.a, bKey: w.b, thickness: w.thickness, height: w.height,
+      })),
+      openings: Object.values(src.openings).map((o) => ({
+        wallKey: o.wallId,
+        kind: 'door' as const,
+        t: o.t,
+        width: o.width,
+        height: o.height,
+        hinge: 'a' as const,
+        swing: 'front' as const,
+      })),
+      roomMeta: [{ wallKeys: [...srcRoom.wallCycle], name: 'Snug' }],
+    }
+
+    const survivors = pasteSubgraph(d, payload, { x: 2, y: 1.5 })
+
+    expect(survivors).toHaveLength(0) // every pasted wall was consumed
+    expect(Object.keys(d.walls).sort()).toEqual(wallIdsBefore)
+    expect(Object.keys(d.nodes).sort()).toEqual(nodeIdsBefore)
+    expect(Object.keys(d.rooms)).toEqual([roomIdBefore])
+    expect(d.rooms[roomIdBefore]!.name).toBe('Kitchen') // pasted meta did NOT hijack
+    expect(Object.keys(d.openings)).toEqual([doorId]) // duplicate door dropped
+    expect(d.openings[doorId]!.t).toBe(doorTBefore)
+    checkInvariants(d)
   })
 })
 

@@ -20,6 +20,13 @@ import { runPipeline } from './pipeline'
  * mints rooms for new cycles. Room meta (name/floor) transfers afterwards
  * by wall-fingerprint match — skipped silently when welding changed the
  * topology.
+ *
+ * Determinism (0.4.0): every minted id goes into the pipeline's `demoted`
+ * set, so EXISTING geometry always survives welds/dedups (ids are random
+ * nanoids — without demotion the survivor was a coin flip) and pasted
+ * openings keep their spot only where it is free (exact-fit-or-drop —
+ * never evicting, never relocating). An exact-overlay paste therefore
+ * preserves existing wall/room identity (names, floors) and is a no-op.
  */
 export interface GraphPayload {
   nodes: { key: string; dx: number; dy: number }[]
@@ -51,10 +58,12 @@ export function pasteSubgraph(
   payload: GraphPayload,
   target: Vec2,
 ): WallId[] {
+  const demoted = new Set<string>()
   const nodeIds = new Map<string, NodeId>()
   for (const n of payload.nodes) {
     const id = newNodeId()
     nodeIds.set(n.key, id)
+    demoted.add(id)
     doc.nodes[id] = { id, x: target.x + n.dx, y: target.y + n.dy }
   }
 
@@ -65,6 +74,7 @@ export function pasteSubgraph(
     if (!a || !b || a === b) continue
     const id = newWallId()
     wallIds.set(w.key, id)
+    demoted.add(id)
     doc.walls[id] = {
       id,
       a,
@@ -81,6 +91,7 @@ export function pasteSubgraph(
     const wallId = wallIds.get(op.wallKey)
     if (!wallId) continue
     const id = newOpeningId()
+    demoted.add(id)
     if (op.kind === 'door') {
       doc.openings[id] = {
         id,
@@ -105,7 +116,7 @@ export function pasteSubgraph(
     }
   }
 
-  runPipeline(doc, 'commit')
+  runPipeline(doc, 'commit', { demoted })
 
   // best-effort room meta transfer: exact fingerprint over the MAPPED walls
   const fingerprint = (ids: readonly WallId[]) => [...ids].sort().join('|')

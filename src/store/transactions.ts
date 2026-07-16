@@ -1,3 +1,4 @@
+import { useStore } from 'zustand'
 import { docTemporal, useDocStore } from './docStore'
 import type { ProjectDocument } from '../model/types'
 
@@ -103,3 +104,10 @@ export function clearHistory(): void {
 
 export const canUndo = (): boolean => docTemporal.getState().pastStates.length > 0
 export const canRedo = (): boolean => docTemporal.getState().futureStates.length > 0
+
+/** Reactive variants for components (the toolbar) — subscribe here, never
+ * to docTemporal directly. */
+export const useCanUndo = (): boolean =>
+  useStore(docTemporal, (s) => s.pastStates.length > 0)
+export const useCanRedo = (): boolean =>
+  useStore(docTemporal, (s) => s.futureStates.length > 0)
