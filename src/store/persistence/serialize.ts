@@ -18,6 +18,8 @@ import {
 import { normalizeGraph } from '../../model/mutations/walls'
 import { revalidateOpenings } from '../../model/mutations/openings'
 import { reconcileRooms } from '../../model/mutations/rooms'
+import { MIN_AREA_M2 } from '../../model/mutations/annotations'
+import { area as polygonArea } from '../../geometry/polygon'
 
 /**
  * Document (de)serialization — the .homeplanr file format is the JSON of
@@ -368,7 +370,9 @@ export function validateParsedObject(raw: unknown): ParseResult {
             : {}),
         }
       } else if (isObj(v) && v.kind === 'area') {
-        // v4: junk vertices drop; the polygon survives iff ≥ 3 remain
+        // v4: junk vertices drop; the polygon survives iff ≥ 3 remain AND it
+        // isn't degenerate (the addArea guard — a collinear polygon would be
+        // culled everywhere, an invisible unclickable ghost)
         const points = Array.isArray(v.points)
           ? (v.points as unknown[])
               .filter((p): p is { x: number; y: number } =>
@@ -376,7 +380,7 @@ export function validateParsedObject(raw: unknown): ParseResult {
               )
               .map((p) => ({ x: p.x, y: p.y }))
           : []
-        if (points.length < 3) {
+        if (points.length < 3 || polygonArea(points) < MIN_AREA_M2) {
           warnings.push(`Removed invalid annotation ${key}`)
           continue
         }

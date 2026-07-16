@@ -292,13 +292,20 @@ describe('v4: area annotations + roomType / price / notes / materialOverrides', 
       },
       a_degenerate: { kind: 'area', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] },
       a_pointless: { kind: 'area' },
+      // 3 finite but collinear points: zero area ⇒ culled everywhere ⇒ an
+      // invisible unclickable ghost — the validator applies the addArea guard
+      a_collinear: {
+        kind: 'area',
+        points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }],
+      },
     }
     const v = validateParsedObject(base)
     const mixed = v.doc.annotations['a_mixed' as never]!
     expect(mixed.kind === 'area' && mixed.points).toHaveLength(3) // junk vertices dropped
     expect(v.doc.annotations['a_degenerate' as never]).toBeUndefined()
     expect(v.doc.annotations['a_pointless' as never]).toBeUndefined()
-    expect(v.warnings).toHaveLength(2)
+    expect(v.doc.annotations['a_collinear' as never]).toBeUndefined()
+    expect(v.warnings).toHaveLength(3)
   })
 
   it('addArea rejects degenerate traces (< 3 points, near-zero area)', () => {

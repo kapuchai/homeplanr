@@ -51,7 +51,12 @@ export function createMeasureTool(): Tool {
   const pill = (a: Vec2, b: Vec2, ctx: ToolContext): DimensionPill | null => {
     const len = dist(a, b)
     if (len < 0.01) return null
-    const off = scale(perp(normalize(sub(b, a))), PILL_OFFSET_PX * ctx.pxToWorld())
+    // offset scales with the chrome scale so the box keeps its proportions
+    // off the tape line (the Pill renders uiScale-sized)
+    const off = scale(
+      perp(normalize(sub(b, a))),
+      PILL_OFFSET_PX * useAppSettings.getState().uiScale * ctx.pxToWorld(),
+    )
     return {
       at: add(lerp(a, b, 0.5), off),
       text: formatLength(len, useAppSettings.getState().units),

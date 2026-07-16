@@ -13,6 +13,7 @@ import {
 import { closestPointOnSegment } from '../geometry/segment'
 import { getDerived } from '../store/derived'
 import { polygonBounds } from '../geometry/polygon'
+import { useAppSettings } from '../store/appSettings'
 import { docContentBounds, selectionContentBounds } from './render/bounds'
 import { useViewportStore } from './viewport/viewportStore'
 import type { AnnotationId, FurnitureId, NodeId, OpeningId, WallId } from '../model/ids'
@@ -169,7 +170,9 @@ export function selectAll(ctx: ToolContext): void {
       ...Object.keys(d.walls),
       ...Object.keys(d.openings),
       ...Object.keys(d.furniture),
-      ...Object.keys(d.annotations),
+      // hidden annotations are unselectable EVERYWHERE (the M4 parity rule) —
+      // Ctrl+A must not arm Delete against entities the user cannot see
+      ...(useAppSettings.getState().showAnnotations ? Object.keys(d.annotations) : []),
     ])
 }
 

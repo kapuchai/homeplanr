@@ -1365,6 +1365,16 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     handleKey(key('Delete'), ctx, registry)
     expect(useDocStore.getState().doc.annotations[id]).toBeUndefined()
   })
+
+  it('Ctrl+A skips HIDDEN annotations (0.7.0 parity — no invisible Delete targets)', () => {
+    const dim = useDocStore.getState().addDimension(vec(0, 5), vec(4, 5), 0)!
+    const sofa = addSofa(2, 2)
+    useAppSettings.getState().setShowAnnotations(false)
+    handleKey(key('a', { ctrlKey: true }), ctx, registry)
+    expect(useUiStore.getState().selection).toEqual([sofa])
+    expect(useDocStore.getState().doc.annotations[dim]).toBeDefined() // untouched
+    useAppSettings.getState().setShowAnnotations(true)
+  })
 })
 
 describe('area tool (0.7.0): trace, close, drag', () => {
