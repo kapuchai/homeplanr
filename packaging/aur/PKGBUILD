@@ -4,7 +4,7 @@
 # PUBLISHED GitHub release (draft assets are not downloadable), then
 # `makepkg --printsrcinfo > .SRCINFO`. See README.md next to this file.
 pkgname=homeplanr-bin
-pkgver=0.5.0
+pkgver=0.6.0
 pkgrel=1
 pkgdesc="Home planning app — draw floor plans in 2D, furnish them, and view in 3D"
 arch=('x86_64')

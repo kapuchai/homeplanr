@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-07-16
+
+### Added
+
+- **Arch Linux (AUR) packaging** — a `homeplanr-bin` PKGBUILD repacks the
+  official `.deb` release; verified locally with full desktop integration
+  (app icon, `.homeplanr` double-click, single-instance). Publication to
+  the AUR itself will follow in a later release
+- **Flatpak packaging** — a `com.kapuchai.homeplanr` manifest (GNOME 49
+  runtime, minimal sandbox permissions; file access via desktop portals)
+  builds and runs locally, including file association double-click and
+  crash recovery inside the sandbox. Flathub submission to follow
+
+### Changed
+
+- **New app icon** — a blueprint-style tile (dark navy, drafting grid,
+  white floor-plan glyph with a dimension line), redrawn at every size
+  from small taskbar icons up; small sizes use a bolder simplified
+  variant so the icon stays legible
+- **Settings icon redrawn** — a solid gear silhouette replaces the
+  spoked-circle icon
+- **Toolbar right side reordered** — the 2D/3D switch now sits before the
+  Help (?) and Settings buttons, which anchor the outer edge
+
+### Removed
+
+- **Planned in-app Russian translation dropped** — the interface stays
+  English; the translation and runtime language switch were removed from
+  the roadmap by user decision
+
 ## [0.5.0] - 2026-07-16
 
 ### Added

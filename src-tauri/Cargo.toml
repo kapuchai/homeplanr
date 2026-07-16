@@ -1,6 +1,6 @@
 [package]
 name = "homeplanr"
-version = "0.5.0"
+version = "0.6.0"
 description = "Home planning app — draw floor plans in 2D, furnish them, and view in 3D"
 authors = ["kapuchai"]
 license = "MIT"

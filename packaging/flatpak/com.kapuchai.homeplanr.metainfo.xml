@@ -31,6 +31,7 @@
   <url type="homepage">https://github.com/kapuchai/homeplanr</url>
   <url type="bugtracker">https://github.com/kapuchai/homeplanr/issues</url>
   <releases>
+    <release version="0.6.0" date="2026-07-16"/>
     <release version="0.5.0" date="2026-07-16"/>
   </releases>
 </component>

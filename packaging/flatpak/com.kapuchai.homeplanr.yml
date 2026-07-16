@@ -39,7 +39,7 @@ modules:
         /app/share/metainfo/com.kapuchai.homeplanr.metainfo.xml
     sources:
       - type: file
-        url: https://github.com/kapuchai/homeplanr/releases/download/v0.5.0/homeplanr_0.5.0_amd64.deb
+        url: https://github.com/kapuchai/homeplanr/releases/download/v0.6.0/homeplanr_0.6.0_amd64.deb
         sha256: TODO_SET_FROM_PUBLISHED_RELEASE_ASSET
         dest-filename: homeplanr.deb
       - type: file

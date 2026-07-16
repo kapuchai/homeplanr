@@ -4,23 +4,28 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.5.0, 2026-07-16)
+## State (as of v0.6.0, 2026-07-16)
 
-0.5.0 "Foundations & Fixes" (no schema change — still v3): the **agent
-testing rig** (Tier 0: e2e/helpers.ts + visual baselines; Tier 1:
-`npm run smoke:native` native WebDriver smoke — see the rig section), all
-nine reported bugs fixed — B1 panel commit misdirection (focus-time commit
-capture + keyed branches + Esc-reverts, e2e-pinned), B2 trackpad support
-(Space+wheel pan + `wheelMode` device pref via resolveWheel), B3 nudge
-y-inversion, B4 duplicate wall-length pills under showDimensions, B5
-deterministic dimension-label sides + centered pills, B6 PDF fit-mode fix
-(svg2pdf {width,height}) + embedded Noto Sans subset (95 KB, OFL, Latin+
-Cyrillic, registered at normal AND weight-500), B7 dialog default dirs
-(exports→Downloads, saves→Documents, remember-last per kind), B8 wide
-shortcut modal, B9 dark-mode contrast retune (floors test-pinned via
-src/test/contrast.ts) — plus split tool groups, a real gear icon, Dim out
-of the zoom cluster, and motion tokens (--dur-1/--dur-2/--ease-out,
-reduced-motion aware). Rename decision: keeping "homeplanr".
+0.6.0 "Distribution & Polish" (no schema change — still v3): **AUR +
+Flatpak packaging** shipped and verified locally (`packaging/aur/` with
+homeplanr-bin PKGBUILD; `packaging/flatpak/` with com.kapuchai.homeplanr
+manifest + AppStream metainfo — see "Distribution channels"; AUR publish
++ Flathub submission live in the ROADMAP deferred queue), **new blueprint
+app icon** (two-variant SVG sources at src-tauri/icons/src/, regen via
+`scripts/makeIcons.sh`, bundle.icon gained 256/512), **filled-cog gear
+icon** + toolbar right cluster reordered to [2D 3D] | ? | gear.
+**Locale/Russian translation DROPPED from the roadmap entirely** (user
+decision 2026-07-16) — the i18n seam stays as chrome-string hygiene; new
+chrome strings still go through en.ts/t().
+
+0.5.0 recap (no schema change): the **agent testing rig** (Tier 0:
+e2e/helpers.ts + visual baselines; Tier 1: `npm run smoke:native` — see
+the rig section), all nine reported bugs fixed (B1 panel commit
+misdirection, B2 trackpad wheel modes — native input still deferred, B3
+nudge y-inversion, B4 duplicate pills, B5 label sides, B6 PDF fit +
+embedded Noto Sans subset with Cyrillic, B7 dialog default dirs, B8 wide
+shortcut modal, B9 dark-mode contrast floors test-pinned), split tool
+groups, motion tokens. Rename decision: keeping "homeplanr".
 
 0.4.0 recap (no schema change): paste determinism (demoted-set pipeline),
 3D camera presets + orbit hint + walk furniture collision (body + eye
