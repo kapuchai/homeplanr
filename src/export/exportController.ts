@@ -16,6 +16,7 @@ import {
 } from './exportPlanSvg'
 import { layoutPaper, scaleLabel, type Orientation, type PaperSize } from './paper'
 import { t } from '../i18n'
+import notoSansUrl from '../assets/fonts/NotoSans-Regular-subset.ttf?url'
 
 /**
  * Export flow (File menu → ExportDialog): render the plan SVG, then save
@@ -32,6 +33,35 @@ const sanitizeName = (name: string): string => {
 /** Raster density for fixed-scale PNG exports (print-oriented). */
 const SCALED_PNG_DPI = 150
 const RASTER_MAX_PX = 4096
+
+/**
+ * Embedded PDF font (B6, 0.5.0): Noto Sans LGC subset (~95 KB, OFL 1.1 —
+ * license alongside the .ttf). jsPDF's standard fonts are WinAnsi-only, so
+ * without this Cyrillic project names garbled in title blocks and svg2pdf
+ * text. The family name must match the first font-family in the plan SVG
+ * (exportPlanSvg FONT). Fetched once per session, cached as base64.
+ */
+const PDF_FONT_FAMILY = 'NotoSans'
+const PDF_FONT_VFS = 'NotoSans-Regular-subset.ttf'
+let pdfFontB64: Promise<string> | null = null
+const loadPdfFontB64 = (): Promise<string> =>
+  (pdfFontB64 ??= fetch(notoSansUrl)
+    .then((r) => {
+      if (!r.ok) throw new Error(`font fetch: ${r.status}`)
+      return r.arrayBuffer()
+    })
+    .then((buf) => {
+      const bytes = new Uint8Array(buf)
+      let bin = ''
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+      }
+      return btoa(bin)
+    })
+    .catch((err: unknown) => {
+      pdfFontB64 = null // failed fetches retry on the next export
+      throw err
+    }))
 
 async function rasterizePng(svg: string, w: number, h: number): Promise<Uint8Array> {
   const img = new Image()
@@ -107,9 +137,9 @@ export interface ExportPdfOptions extends ExportPlanOptions {
 
 /**
  * True-vector PDF: renderPlanSvg → svg2pdf onto a jsPDF page laid out by
- * the pure paper module. jsPDF's standard fonts are WinAnsi-only — Latin
- * text (and m²) is fine; non-Latin project names come out garbled in the
- * title block (documented limitation, embedded fonts are a later feature).
+ * the pure paper module. Text embeds the bundled Noto Sans subset (Latin +
+ * Cyrillic; see loadPdfFontB64) — if the font fetch fails the export still
+ * runs on jsPDF's WinAnsi standard fonts (Latin-only, the pre-0.5.0 state).
  */
 export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
   if (isTxActive()) return
@@ -169,7 +199,23 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
       format: opts.paper,
       orientation: layout.pageW > layout.pageH ? 'landscape' : 'portrait',
     })
-    await pdf.svg(el, layout.content)
+    try {
+      const b64 = await loadPdfFontB64()
+      pdf.addFileToVFS(PDF_FONT_VFS, b64)
+      pdf.addFont(PDF_FONT_VFS, PDF_FONT_FAMILY, 'normal')
+      // room names + text annotations render at font-weight 500 — without
+      // this registration svg2pdf falls back to WinAnsi helvetica for
+      // exactly the strings most likely to be non-Latin
+      pdf.addFont(PDF_FONT_VFS, PDF_FONT_FAMILY, 'normal', 500)
+      pdf.setFont(PDF_FONT_FAMILY) // svg2pdf body + title block below
+    } catch {
+      // WinAnsi fallback — Latin exports still work
+    }
+    // svg2pdf's options are {width,height} — the B6 0.4.0 bug passed the
+    // layout's {w,h}, so fit-mode PDFs fell back to the SVG's own ~mm-wide
+    // width attribute and drew off-page
+    const content = layout.content
+    await pdf.svg(el, { x: content.x, y: content.y, width: content.w, height: content.h })
 
     if (layout.titleBlock) {
       const tb = layout.titleBlock

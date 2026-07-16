@@ -50,7 +50,10 @@ const RASTER_MIN_PX = 512
 // physical stroke widths (m): hairline ≈ 1px, detail ≈ 0.8px at nominal zoom
 const HAIRLINE = 0.01
 const DETAIL = 0.008
-const FONT = 'system-ui, sans-serif'
+// 'NotoSans' is the family exportController registers with jsPDF — svg2pdf
+// matches it for true-vector text with Cyrillic (B6). Browsers/viewers
+// don't know it and fall through to system-ui (SVG + PNG output unchanged).
+const FONT = 'NotoSans, system-ui, sans-serif'
 const NAME_SIZE = 0.11
 const AREA_SIZE = 0.1
 const DIM_SIZE = 0.1
