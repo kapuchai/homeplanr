@@ -28,6 +28,19 @@ export const EYE_HEIGHT = 1.6
 /** MUST stay < PLAYER_RADIUS (anti-tunnel invariant — asserted in a test). */
 export const MAX_SUBSTEP = 0.1
 export const RESOLVE_PASSES = 3
+/**
+ * Furniture blocking bands (both exclusive; ADDITIVE to the wall spans —
+ * the doors-only passability oracle above governs WALLS and is untouched):
+ * - body band (BODY_BAND_LO..HI): torso-height obstacles; rugs pass under.
+ * - eye band (EYE_BAND_LO..HI): anything overlapping the camera slab around
+ *   EYE_HEIGHT also blocks, else walking "under" it clips the near plane
+ *   through its interior. The stock wall-cabinet (1.45–2.15m) blocks for
+ *   this reason; genuinely overhead items (elevation ≥ EYE_BAND_HI) pass.
+ */
+export const BODY_BAND_LO = 0.3
+export const BODY_BAND_HI = 1.2
+export const EYE_BAND_LO = EYE_HEIGHT - 0.2
+export const EYE_BAND_HI = EYE_HEIGHT + 0.2
 
 /** Extra clearance left after a push-out so the contact does not re-fire. */
 const PUSH_EPS = 1e-4
@@ -39,12 +52,12 @@ export interface RectObstacle {
   kind: 'rect'
   cx: number
   cy: number
-  /** Unit axis (the wall frame direction). */
+  /** Unit axis — the wall frame direction, or a furniture item's rotation. */
   ux: number
   uy: number
-  /** Half-extent along the axis. */
+  /** Half-extent along the axis (half span / half width). */
   hu: number
-  /** Half-extent along perp(axis) — half the wall thickness. */
+  /** Half-extent along perp(axis) (half thickness / half depth). */
   hv: number
 }
 
@@ -113,6 +126,25 @@ export function buildCollisionSet(doc: ProjectDocument, derived: DerivedGeometry
     obstacles.push({
       kind: 'poly',
       ring: signedArea(ring) >= 0 ? ring : ring.slice().reverse(),
+    })
+  }
+
+  // Furniture in the body or eye band — exact rotated footprints as rects.
+  // `mirrored` reflects the mesh only; the w×d footprint is axis-symmetric.
+  for (const f of Object.values(doc.furniture)) {
+    const lo = f.elevation
+    const hi = f.elevation + f.size.h
+    const inBody = lo < BODY_BAND_HI && hi > BODY_BAND_LO
+    const inEye = lo < EYE_BAND_HI && hi > EYE_BAND_LO
+    if (!inBody && !inEye) continue
+    obstacles.push({
+      kind: 'rect',
+      cx: f.x,
+      cy: f.y,
+      ux: Math.cos(f.rotation),
+      uy: Math.sin(f.rotation),
+      hu: f.size.w / 2,
+      hv: f.size.d / 2,
     })
   }
 

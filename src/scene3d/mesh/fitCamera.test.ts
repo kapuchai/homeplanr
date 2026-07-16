@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { fitCameraPose, sceneBBox } from './fitCamera'
+import {
+  fitCameraPose,
+  presetPose,
+  sceneBBox,
+  type CameraPresetKind,
+  type SceneBBox,
+} from './fitCamera'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
 import { emptyDocument } from '../../model/types'
 import { addWallSegment } from '../../model/mutations/walls'
@@ -56,5 +62,52 @@ describe('sceneBBox + fitCameraPose degenerate cases (plan-pinned)', () => {
     // world-space target: y (height) = 1, z = −plan-y-center
     expect(pose.target[1]).toBe(1)
     expect(pose.target[2]).toBeLessThanOrEqual(0)
+  })
+})
+
+describe('presetPose (M2, 0.4.0) — pose+target only, clamp-compliant', () => {
+  const box: SceneBBox = {
+    minX: 0, minY: 0, maxX: 8, maxY: 6, minZ: 0, maxZ: 2.5,
+    cx: 4, cy: 3, diag: 10,
+  }
+  const KINDS: readonly CameraPresetKind[] = ['top', 'front', 'iso', 'reset']
+  const d3 = (a: readonly number[], b: readonly number[]) =>
+    Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!)
+  /** Polar angle (from +y) of the camera as OrbitControls measures it. */
+  const polar = (kind: CameraPresetKind) => {
+    const p = presetPose(box, kind)
+    return Math.acos((p.position[1] - p.target[1]) / d3(p.position, p.target))
+  }
+
+  it('all presets share the fitted distance and the 1m-above-floor target', () => {
+    const distances = KINDS.map((k) => d3(presetPose(box, k).position, presetPose(box, k).target))
+    for (const dd of distances) expect(dd).toBeCloseTo(distances[0]!, 9)
+    for (const k of KINDS) {
+      expect(presetPose(box, k).target).toEqual([4, 1, -3])
+      expect(presetPose(box, k).maxDistance).toBe(fitCameraPose(box).maxDistance)
+    }
+  })
+
+  it('reset IS fitCameraPose', () => {
+    expect(presetPose(box, 'reset')).toEqual(fitCameraPose(box))
+  })
+
+  it('top and front stay inside the OrbitControls polar clamps [0.1, π/2 − 0.12]', () => {
+    expect(polar('top')).toBeGreaterThanOrEqual(0.1)
+    expect(polar('top')).toBeLessThanOrEqual(0.15) // near-vertical
+    expect(polar('front')).toBeLessThanOrEqual(Math.PI / 2 - 0.12)
+    expect(polar('front')).toBeGreaterThanOrEqual(Math.PI / 2 - 0.2) // near-horizontal
+  })
+
+  it('top/front look from the 2D-south side (camera −z of target → screen-up = 2D up)', () => {
+    for (const k of ['top', 'front'] as const) {
+      const p = presetPose(box, k)
+      expect(p.position[2]).toBeLessThan(p.target[2])
+      expect(p.position[0]).toBeCloseTo(p.target[0], 9) // centered in x
+    }
+  })
+
+  it('iso is the classic isometric elevation atan(1/√2)', () => {
+    expect(Math.PI / 2 - polar('iso')).toBeCloseTo(Math.atan(1 / Math.SQRT2), 9)
   })
 })

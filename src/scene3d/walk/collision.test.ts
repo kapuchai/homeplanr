@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULTS, emptyDocument, type ProjectDocument } from '../../model/types'
 import { addWallChain, addWallSegment } from '../../model/mutations/walls'
 import { addOpening } from '../../model/mutations/openings'
+import { addFurniture } from '../../model/mutations/furniture'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
 import { dist, vec, type Vec2 } from '../../geometry/vec'
 import { centroid, pointInPolygon } from '../../geometry/polygon'
 import {
+  BODY_BAND_HI,
+  BODY_BAND_LO,
+  EYE_BAND_HI,
+  EYE_BAND_LO,
+  EYE_HEIGHT,
   MAX_SUBSTEP,
   PLAYER_RADIUS,
   buildCollisionSet,
@@ -202,6 +208,103 @@ describe('collision core (12 pinned cases)', () => {
       addWallSegment(d, vec(0, -2), vec(0, 2), { thickness: 1 })
     })
     expect(validateTeleport(set, vec(0, 0))).toBeNull()
+  })
+
+  it('(F1) furniture bands: rug passes under, overhead shelf passes, table AND head-height cabinet block (constants pinned)', () => {
+    expect(BODY_BAND_LO).toBe(0.3)
+    expect(BODY_BAND_HI).toBe(1.2)
+    expect(EYE_BAND_LO).toBe(EYE_HEIGHT - 0.2)
+    expect(EYE_BAND_HI).toBe(EYE_HEIGHT + 0.2)
+    const { set } = setup((d) => {
+      addFurniture(d, { catalogItemId: 'rug', x: 0, y: 0, size: { w: 2, d: 1.4, h: 0.02 } })
+      // the stock wall-cabinet: 1.45–2.15m contains the 1.6m eye — must
+      // block, or the walk camera clips through its interior
+      addFurniture(d, {
+        catalogItemId: 'wall-cabinet',
+        x: 5,
+        y: 0,
+        size: { w: 0.8, d: 0.35, h: 0.7 },
+        elevation: 1.45,
+      })
+      addFurniture(d, { catalogItemId: 'table', x: 10, y: 0, size: { w: 1.6, d: 0.9, h: 0.75 } })
+      // genuinely overhead (≥ EYE_BAND_HI): walk under freely
+      addFurniture(d, {
+        catalogItemId: 'high-shelf',
+        x: 15,
+        y: 0,
+        size: { w: 1, d: 0.3, h: 0.4 },
+        elevation: 1.9,
+      })
+    })
+    expect(set.obstacles).toHaveLength(2) // table + head-height cabinet
+    expect(deepest(set, vec(0, 0))).toBeNull() // rug underfoot
+    expect(deepest(set, vec(5, 0))).not.toBeNull() // cabinet at head height
+    expect(deepest(set, vec(10, 0))).not.toBeNull() // table blocks
+    expect(deepest(set, vec(15, 0))).toBeNull() // overhead shelf
+  })
+
+  it('(F2) band edges are exclusive: h=0.3 on the floor and a 1.2–1.35m sliver both pass', () => {
+    const { set } = setup((d) => {
+      addFurniture(d, { catalogItemId: 'low', x: 0, y: 0, size: { w: 1, d: 1, h: 0.3 } })
+      // between the bands: above the body band, below the eye band
+      addFurniture(d, {
+        catalogItemId: 'sliver',
+        x: 5,
+        y: 0,
+        size: { w: 1, d: 1, h: 0.15 },
+        elevation: 1.2,
+      })
+      // exactly at the eye-band ceiling
+      addFurniture(d, {
+        catalogItemId: 'at-ceiling',
+        x: 10,
+        y: 0,
+        size: { w: 1, d: 1, h: 0.5 },
+        elevation: EYE_BAND_HI,
+      })
+    })
+    expect(set.obstacles).toHaveLength(0)
+  })
+
+  it('(F3) rotated sofa: oriented footprint is exact; slide along the face keeps tangential progress', () => {
+    const rot = Math.PI / 4
+    const { set } = setup((d) => {
+      addFurniture(d, {
+        catalogItemId: 'sofa',
+        x: 0,
+        y: 0,
+        rotation: rot,
+        size: { w: 2, d: 0.9, h: 0.8 },
+      })
+    })
+    const nx = -Math.sin(rot) // face normal = perp of the rotated axis
+    const ny = Math.cos(rot)
+    const tx = Math.cos(rot)
+    const ty = Math.sin(rot)
+    // Minkowski pin on the long face: hv = d/2 = 0.45
+    expect(deepest(set, vec(nx * (0.45 + R + 0.02), ny * (0.45 + R + 0.02)))).toBeNull()
+    expect(deepest(set, vec(nx * (0.45 + R - 0.02), ny * (0.45 + R - 0.02)))).not.toBeNull()
+    // diagonal push into the face: normal motion stops at the face, the
+    // tangential component passes through in full (face-normal pushes only)
+    const start = vec(nx * (0.45 + R + 0.3), ny * (0.45 + R + 0.3))
+    const out = resolveMove(set, start, vec(-nx + tx * 0.5, -ny + ty * 0.5))
+    expect(deepest(set, out)?.depth ?? 0).toBeLessThanOrEqual(1e-3)
+    const tangential = out.x * tx + out.y * ty
+    expect(tangential).toBeCloseTo(start.x * tx + start.y * ty + 0.5, 2)
+    expect(out.x * nx + out.y * ny).toBeGreaterThanOrEqual(0.45 + R - 1e-3)
+  })
+
+  it('(F4) teleport vs furniture: edge point nudges out ≤ 0.5m, deep center rejects', () => {
+    const { set } = setup((d) => {
+      addFurniture(d, { catalogItemId: 'wardrobe', x: 0, y: 0, size: { w: 1.2, d: 0.65, h: 2 } })
+      addFurniture(d, { catalogItemId: 'block', x: 10, y: 0, size: { w: 2, d: 2, h: 1 } })
+    })
+    const p = vec(0.1, 0.1) // just inside the wardrobe → 0.475m push clears it
+    const q = validateTeleport(set, p)
+    expect(q).not.toBeNull()
+    expect(dist(q!, p)).toBeLessThanOrEqual(0.5)
+    expect(deepest(set, q!)).toBeNull()
+    expect(validateTeleport(set, vec(10, 0))).toBeNull() // 1.25m push needed
   })
 
   it('(12) getCollisionSet caches by document identity', () => {

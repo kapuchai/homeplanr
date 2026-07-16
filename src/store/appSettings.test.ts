@@ -14,6 +14,7 @@ const DEFAULTS: AppSettings = {
   snapEnabled: true,
   showGrid: true,
   autosaveEnabled: false,
+  orbitHintSeen: false,
 }
 
 describe('parseAppSettings', () => {
@@ -35,6 +36,7 @@ describe('parseAppSettings', () => {
       snapEnabled: false,
       showGrid: false,
       autosaveEnabled: true,
+      orbitHintSeen: true,
     }
     expect(parseAppSettings(JSON.stringify({ v: 1, ...s }))).toEqual(s)
   })
@@ -59,6 +61,7 @@ describe('parseAppSettings', () => {
       snapEnabled: true,
       showGrid: true,
       autosaveEnabled: false,
+      orbitHintSeen: false,
     })
     expect(parseAppSettings(JSON.stringify({ v: 1, units: 'inches' }))).toEqual(DEFAULTS)
   })
@@ -98,6 +101,7 @@ describe('useAppSettings persistence', () => {
       snapEnabled: s.snapEnabled,
       showGrid: s.showGrid,
       autosaveEnabled: s.autosaveEnabled,
+      orbitHintSeen: s.orbitHintSeen,
     }).toEqual(DEFAULTS)
   })
 
@@ -110,9 +114,11 @@ describe('useAppSettings persistence', () => {
     s.setSnapEnabled(false)
     s.setShowGrid(false)
     s.setAutosaveEnabled(true)
+    s.setOrbitHintSeen(true)
     expect(useAppSettings.getState().theme).toBe('dark')
     expect(useAppSettings.getState().units).toBe('cm')
     expect(useAppSettings.getState().snapEnabled).toBe(false)
+    expect(useAppSettings.getState().orbitHintSeen).toBe(true)
     expect(JSON.parse(storage.get(APP_SETTINGS_KEY)!)).toEqual({
       v: 1,
       theme: 'dark',
@@ -122,6 +128,7 @@ describe('useAppSettings persistence', () => {
       snapEnabled: false,
       showGrid: false,
       autosaveEnabled: true,
+      orbitHintSeen: true,
     })
   })
 

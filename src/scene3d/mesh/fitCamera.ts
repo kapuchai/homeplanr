@@ -93,14 +93,40 @@ export interface CameraPose {
   maxDistance: number
 }
 
-/** Azimuth 45°, elevation 55°, distance fitted by fov; clamped [3, 200]m. */
-export function fitCameraPose(box: SceneBBox, fovDeg = 45): CameraPose {
+export type CameraPresetKind = 'top' | 'front' | 'iso' | 'reset'
+
+/**
+ * OrbitControls polar clamps — the single source for both the OrbitControls
+ * props in PlannerCanvas AND the preset elevations below (a preset outside
+ * the clamps would be snapped away by controls.update()).
+ */
+export const MIN_POLAR = 0.1
+export const MAX_POLAR = Math.PI / 2 - 0.12
+
+/**
+ * Preset camera poses (M2, 0.4.0) — pose + target ONLY; the one
+ * rotation-x={-π/2} mapping point is never involved. All presets share the
+ * fitted distance and the 1m-above-floor target of the initial pose, and
+ * stay strictly inside the polar clamps:
+ * - top: near-vertical, azimuth −90° so screen-up matches the 2D view
+ *   (world +z = plan −y = 2D up);
+ * - front: near-horizontal from the 2D-south side, same azimuth;
+ * - iso: classic isometric (azimuth 45°, elevation atan(1/√2) ≈ 35.26°);
+ * - reset: the initial fit (azimuth 45°, elevation 55°).
+ */
+export function presetPose(box: SceneBBox, kind: CameraPresetKind, fovDeg = 45): CameraPose {
   const distance = Math.min(
     200,
     Math.max(3, (box.diag / 2 / Math.tan(((fovDeg / 2) * Math.PI) / 180)) * 1.15),
   )
-  const azimuth = Math.PI / 4
-  const elevation = (55 * Math.PI) / 180
+  const { azimuth, elevation } =
+    kind === 'top'
+      ? { azimuth: -Math.PI / 2, elevation: Math.PI / 2 - (MIN_POLAR + 0.02) }
+      : kind === 'front'
+        ? { azimuth: -Math.PI / 2, elevation: Math.PI / 2 - (MAX_POLAR - 0.03) }
+        : kind === 'iso'
+          ? { azimuth: Math.PI / 4, elevation: Math.atan(1 / Math.SQRT2) }
+          : { azimuth: Math.PI / 4, elevation: (55 * Math.PI) / 180 }
   // plan (x, y, z) → world (x, z, −y); target sits 1m above the floor
   const tx = box.cx
   const ty = 1
@@ -114,4 +140,9 @@ export function fitCameraPose(box: SceneBBox, fovDeg = 45): CameraPose {
     target: [tx, ty, tz],
     maxDistance: Math.max(30, 3 * box.diag),
   }
+}
+
+/** Azimuth 45°, elevation 55°, distance fitted by fov; clamped [3, 200]m. */
+export function fitCameraPose(box: SceneBBox, fovDeg = 45): CameraPose {
+  return presetPose(box, 'reset', fovDeg)
 }

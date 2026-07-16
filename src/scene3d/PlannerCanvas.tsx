@@ -20,7 +20,17 @@ import {
   mergeMeshData,
 } from './mesh/prismGeometry'
 import { toBufferGeometry } from './mesh/toBufferGeometry'
-import { fitCameraPose, sceneBBox, type SceneBBox } from './mesh/fitCamera'
+import {
+  MAX_POLAR,
+  MIN_POLAR,
+  fitCameraPose,
+  presetPose,
+  sceneBBox,
+  type CameraPose,
+  type CameraPresetKind,
+  type SceneBBox,
+} from './mesh/fitCamera'
+import { useAppSettings } from '../store/appSettings'
 import { floorMaterial, itemMaterial, sceneMaterial, wallFaceMaterial } from './sceneMaterials'
 import { WalkControls } from './walk/WalkControls'
 import { useWalkStore } from './walk/walkStore'
@@ -329,11 +339,60 @@ function ContextGuard({ onLost }: { onLost: () => void }) {
   return null
 }
 
+/**
+ * Applies a requested camera preset imperatively: OrbitControls owns the
+ * target + damping, so a preset writes camera.position + controls.target and
+ * calls update() — swapping the declarative target prop mid-flight would
+ * fight damping/zoomToCursor. Damping inertia is flushed FIRST (a fling's
+ * residual velocity would otherwise drift the camera off the preset over the
+ * following frames). Pose + target only; the rotation-x mapping group is
+ * never involved. `controls` is in the deps: drei registers it a beat after
+ * mount, and a preset clicked in that window must apply once it lands (the
+ * seq ref keeps it from re-applying afterwards).
+ */
+function CameraPresetApplier({
+  request,
+}: {
+  request: { pose: CameraPose; seq: number } | null
+}) {
+  const camera = useThree((s) => s.camera)
+  const controls = useThree((s) => s.controls) as unknown as {
+    target: { set: (x: number, y: number, z: number) => void }
+    update: () => void
+    enableDamping: boolean
+  } | null
+  const invalidate = useThree((s) => s.invalidate)
+  const applied = useRef(0)
+  useEffect(() => {
+    if (!request || !controls || applied.current === request.seq) return
+    applied.current = request.seq
+    // flush residual inertia: with damping off, update() consumes the whole
+    // pending delta at once (against the OLD pose, which we overwrite next)
+    const hadDamping = controls.enableDamping
+    controls.enableDamping = false
+    controls.update()
+    camera.position.set(...request.pose.position)
+    controls.target.set(...request.pose.target)
+    controls.update()
+    controls.enableDamping = hadDamping
+    invalidate()
+  }, [request, controls, camera, invalidate])
+  return null
+}
+
+/** Persist the one-time orbit hint dismissal (shared by orbit + presets). */
+function markOrbitHintSeen() {
+  const s = useAppSettings.getState()
+  if (!s.orbitHintSeen) s.setOrbitHintSeen(true)
+}
+
 export function PlannerCanvas() {
   const doc = useSceneDoc()
   const derived = getDerived(doc)
   const box = useMemo(() => sceneBBox(doc, derived), [doc, derived])
   const pose = useMemo(() => fitCameraPose(box), [box])
+  const [presetReq, setPresetReq] = useState<{ pose: CameraPose; seq: number } | null>(null)
+  const orbitHintSeen = useAppSettings((s) => s.orbitHintSeen)
   const [glError, setGlError] = useState<string | null>(null)
   const [epoch, setEpoch] = useState(0) // bump to remount the Canvas
   const failFlag = useRef(
@@ -352,7 +411,12 @@ export function PlannerCanvas() {
     const plan = worldToPlan([e.point.x, e.point.y, e.point.z])
     const ok = validateTeleport(getCollisionSet(doc, derived), plan)
     if (ok) walk.requestWalkTo(ok)
-    else walk.setHint('That spot is inside a wall')
+    else walk.setHint('That spot is blocked') // walls or furniture
+  }
+
+  const applyPreset = (kind: CameraPresetKind) => {
+    markOrbitHintSeen()
+    setPresetReq((r) => ({ pose: presetPose(box, kind), seq: (r?.seq ?? 0) + 1 }))
   }
 
   const hint =
@@ -361,7 +425,9 @@ export function PlannerCanvas() {
       ? 'Click a floor to start walking · Esc exits'
       : walkMode === 'walking'
         ? 'WASD/arrows move · Shift sprints · drag looks · click floor teleports · Esc exits'
-        : null)
+        : orbitHintSeen
+          ? null
+          : 'Drag orbits · wheel zooms')
 
   if (glError) {
     return (
@@ -377,6 +443,7 @@ export function PlannerCanvas() {
           type="button"
           onClick={() => {
             setGlError(null)
+            setPresetReq(null) // a stale pose must not re-apply on remount
             setEpoch((n) => n + 1)
           }}
         >
@@ -423,9 +490,11 @@ export function PlannerCanvas() {
           target={pose.target}
           minDistance={2}
           maxDistance={pose.maxDistance}
-          minPolarAngle={0.1}
-          maxPolarAngle={Math.PI / 2 - 0.12}
+          minPolarAngle={MIN_POLAR}
+          maxPolarAngle={MAX_POLAR}
+          onStart={markOrbitHintSeen}
         />
+        <CameraPresetApplier request={presetReq} />
         <group rotation-x={-Math.PI / 2}>
           {Object.values(derived.wallSolids).map((s) => (
             <WallMeshes key={s.wallId} solid={s} wall={doc.walls[s.wallId]} />
@@ -446,6 +515,25 @@ export function PlannerCanvas() {
       </Canvas>
       </GlErrorBoundary>
       <div className="view3d-controls segmented small">
+        {(
+          [
+            ['top', 'Top', 'Look straight down (plan orientation)'],
+            ['front', 'Front', 'Look from the front, near floor level'],
+            ['iso', 'Iso', 'Isometric three-quarter view'],
+            ['reset', 'Reset', 'Refit the whole scene'],
+          ] as const
+        ).map(([kind, label, title]) => (
+          <button
+            key={kind}
+            type="button"
+            title={title}
+            disabled={walkMode === 'walking'}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyPreset(kind)}
+          >
+            {label}
+          </button>
+        ))}
         <button
           type="button"
           aria-label="Walk"

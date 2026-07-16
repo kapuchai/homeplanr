@@ -23,6 +23,8 @@ export interface AppSettings {
   showGrid: boolean
   /** Autosave to the current file path (crash recovery is separate). */
   autosaveEnabled: boolean
+  /** One-time 3D orbit hint — set on the first orbit interaction. */
+  orbitHintSeen: boolean
 }
 
 export const APP_SETTINGS_KEY = 'homeplanr:v1:app-settings'
@@ -39,6 +41,7 @@ const DEFAULTS: AppSettings = {
   snapEnabled: true,
   showGrid: true,
   autosaveEnabled: false,
+  orbitHintSeen: false,
 }
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -63,6 +66,8 @@ export function parseAppSettings(json: string | null): AppSettings {
       showGrid: typeof r.showGrid === 'boolean' ? r.showGrid : DEFAULTS.showGrid,
       autosaveEnabled:
         typeof r.autosaveEnabled === 'boolean' ? r.autosaveEnabled : DEFAULTS.autosaveEnabled,
+      orbitHintSeen:
+        typeof r.orbitHintSeen === 'boolean' ? r.orbitHintSeen : DEFAULTS.orbitHintSeen,
     }
   } catch {
     return { ...DEFAULTS }
@@ -91,6 +96,7 @@ const persist = (s: AppSettings): void => {
         snapEnabled: s.snapEnabled,
         showGrid: s.showGrid,
         autosaveEnabled: s.autosaveEnabled,
+        orbitHintSeen: s.orbitHintSeen,
       }),
     )
   } catch {
@@ -106,6 +112,7 @@ interface AppSettingsState extends AppSettings {
   setSnapEnabled: (enabled: boolean) => void
   setShowGrid: (show: boolean) => void
   setAutosaveEnabled: (enabled: boolean) => void
+  setOrbitHintSeen: (seen: boolean) => void
 }
 
 export const useAppSettings = create<AppSettingsState>()(
@@ -123,6 +130,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),
       setShowGrid: (showGrid) => apply({ showGrid }),
       setAutosaveEnabled: (autosaveEnabled) => apply({ autosaveEnabled }),
+      setOrbitHintSeen: (orbitHintSeen) => apply({ orbitHintSeen }),
     }
   }),
 )
