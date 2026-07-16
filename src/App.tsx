@@ -58,6 +58,8 @@ function CaretIcon() {
 }
 
 function GearIcon() {
+  // gear body + center hole + 8 CHUNKY teeth crossing the body edge — the
+  // 0.4.0 icon (small core, detached thin rays) read as a sun (0.5.0)
   return (
     <svg
       width="16"
@@ -69,8 +71,12 @@ function GearIcon() {
       strokeLinecap="round"
       aria-hidden="true"
     >
-      <circle cx="8" cy="8" r="2.6" />
-      <path d="M8 1.6v2.1M8 12.3v2.1M14.4 8h-2.1M3.7 8H1.6M12.5 3.5 11 5M5 11l-1.5 1.5M12.5 12.5 11 11M5 5 3.5 3.5" />
+      <circle cx="8" cy="8" r="4.4" />
+      <circle cx="8" cy="8" r="1.6" />
+      <path
+        strokeWidth="2.2"
+        d="M8 1.3v2.3M8 12.4v2.3M14.7 8h-2.3M3.6 8H1.3M12.7 3.3 11.1 4.9M4.9 11.1l-1.6 1.6M12.7 12.7l-1.6-1.6M4.9 4.9 3.3 3.3"
+      />
     </svg>
   )
 }
@@ -208,9 +214,14 @@ function Toolbar() {
       <span className="brand">{t('toolbar.brand')}</span>
       <FileMenu />
       <ProjectName />
+      {/* two tool groups (0.5.0): selection/annotation vs construction */}
       <div className="segmented" style={{ marginLeft: 12 }}>
         {/* switchTool (never setActiveTool): the outgoing tool must deactivate */}
         {toolBtn(t('tool.select'), activeTool === 'select', () => switchTool('select'), t('tool.selectTitle'))}
+        {toolBtn(t('tool.measure'), activeTool === 'measure', () => switchTool('measure'), t('tool.measureTitle'))}
+        {toolBtn(t('tool.text'), activeTool === 'annotate-text', () => switchTool('annotate-text'), t('tool.textTitle'))}
+      </div>
+      <div className="segmented">
         {toolBtn(t('tool.wall'), activeTool === 'draw-wall', () => switchTool('draw-wall'), t('tool.wallTitle'))}
         {toolBtn(
           t('tool.door'),
@@ -230,8 +241,6 @@ function Toolbar() {
           },
           t('tool.windowTitle'),
         )}
-        {toolBtn(t('tool.measure'), activeTool === 'measure', () => switchTool('measure'), t('tool.measureTitle'))}
-        {toolBtn(t('tool.text'), activeTool === 'annotate-text', () => switchTool('annotate-text'), t('tool.textTitle'))}
       </div>
       <div className="segmented">
         <button

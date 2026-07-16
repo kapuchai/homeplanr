@@ -6,13 +6,13 @@ import { zoomToFitContent } from './tools/keymap'
 import { t } from '../i18n'
 
 /**
- * Bottom-right zoom cluster: [−] [NN%] [+] [Fit] [Dim]. Every button swallows
- * its mousedown — a focused button would re-trigger on the next Space press
- * (the pan key). Subscribes only to `k` and the dimensions toggle.
+ * Bottom-right zoom cluster: [−] [NN%] [+] [Fit] [Snap] [Grid]. Every button
+ * swallows its mousedown — a focused button would re-trigger on the next
+ * Space press (the pan key). Dim moved out in 0.5.0 (Options → View and
+ * Shift+D remain — the cluster is for high-frequency toggles).
  */
 export function ZoomControls() {
   const k = useViewportStore((s) => s.k)
-  const showDimensions = useAppSettings((s) => s.showDimensions)
   const snapEnabled = useAppSettings((s) => s.snapEnabled)
   const showGrid = useAppSettings((s) => s.showGrid)
   const zoomAtCenter = (factor: number) => {
@@ -51,15 +51,6 @@ export function ZoomControls() {
         onClick={() => zoomToFitContent(useDocStore.getState().doc)}
       >
         {t('zoom.fit')}
-      </button>
-      <button
-        className={showDimensions ? 'active' : ''}
-        aria-pressed={showDimensions}
-        title={t('zoom.dimTitle')}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => useAppSettings.getState().setShowDimensions(!showDimensions)}
-      >
-        {t('zoom.dim')}
       </button>
       <button
         className={snapEnabled ? 'active' : ''}

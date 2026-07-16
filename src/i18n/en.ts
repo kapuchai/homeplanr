@@ -295,8 +295,6 @@ export const en = {
   'zoom.inTitle': 'Zoom in (+)',
   'zoom.fit': 'Fit',
   'zoom.fitTitle': 'Zoom to fit (Shift+1)',
-  'zoom.dim': 'Dim',
-  'zoom.dimTitle': 'Wall dimensions (Shift+D)',
   'zoom.snap': 'Snap',
   'zoom.snapTitle': 'Snapping (S · hold Ctrl to suspend)',
   'zoom.grid': 'Grid',
