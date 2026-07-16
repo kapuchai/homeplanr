@@ -43,3 +43,7 @@ tmp/
 coverage/
 playwright-report/
 test-results/
+
+# --- Claude Code (local agent tooling + session working docs) ---
+.claude/
+docs/roadmap/
