@@ -28,6 +28,8 @@ export const PALETTE: Record<MaterialId, MaterialSpec> = {
   glass: { color: '#cfe4ee', roughness: 0.08, metalness: 0, opacity: 0.35 },
   screenBlack: { color: '#14161a', roughness: 0.3, metalness: 0 },
   foliage: { color: '#6b8f5f', roughness: 0.95, metalness: 0 },
+  // v6 wall-art print surface; per-instance images replace it at render
+  canvas: { color: '#e9e4d8', roughness: 0.95, metalness: 0 },
 }
 
 /** Scene-level materials (not per-item slots). */

@@ -10,6 +10,8 @@ import { FLOOR_GROUPS, FLOOR_MATERIALS, WALL_FINISHES, WALL_PAINTS } from '../ca
 import { ROOM_TYPES, roomTypeSpec } from '../catalog/roomTypes'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
+import { usePersistStore } from '../store/persistence/controller'
+import { ingestImage } from '../store/persistence/imageIngest'
 import { LABEL_PLACEHOLDER } from '../editor2d/tools/annotateTextTool'
 import { DEFAULTS } from '../model/types'
 import type { AnnotationId, FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
@@ -33,6 +35,22 @@ import { t } from '../i18n'
  * ids). take() clears the capture so blur/unmount can never double-commit;
  * Esc clears it first so nothing commits.
  */
+/** Wall-art upload: pick → ingest (downscale/cap) → ONE store mutation.
+ * A null ingest (undecodable / won't fit the byte budget) surfaces through
+ * the adapter's native message — never silently. */
+async function uploadFurnitureImage(id: FurnitureId): Promise<void> {
+  const adapter = usePersistStore.getState().adapter
+  if (!adapter) return
+  const picked = await adapter.openImageDialog()
+  if (!picked) return
+  const content = await ingestImage(picked.dataUrl)
+  if (!content) {
+    await adapter.message(t('props.imageFailed.title'), t('props.imageFailed.body'))
+    return
+  }
+  useDocStore.getState().setFurnitureImage(id, content)
+}
+
 function useFocusCommit(draft: string) {
   const capture = useRef<((raw: string) => void) | null>(null)
   const draftRef = useRef(draft)
@@ -728,6 +746,21 @@ export function PropertiesPanel() {
           value={furniture.elevation}
           onCommit={(v) => a.transformFurniture(furniture.id, { elevation: v })}
         />
+        {item?.imageSlot ? (
+          <Row>
+            <span>{t('props.image')}</span>
+            <div className="segmented small">
+              <button type="button" onClick={() => void uploadFurnitureImage(furniture.id)}>
+                {furniture.assetId ? t('props.imageReplace') : t('props.imageUpload')}
+              </button>
+              {furniture.assetId ? (
+                <button type="button" onClick={() => a.setFurnitureImage(furniture.id, null)}>
+                  {t('props.imageRemove')}
+                </button>
+              ) : null}
+            </div>
+          </Row>
+        ) : null}
       </aside>
     )
   }

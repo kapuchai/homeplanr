@@ -32,6 +32,7 @@ import {
 } from './mesh/fitCamera'
 import { useAppSettings } from '../store/appSettings'
 import { floorMaterial, itemMaterial, sceneMaterial, wallFaceMaterial } from './sceneMaterials'
+import { useArtMaterial } from './artTexture'
 import { WalkControls } from './walk/WalkControls'
 import { useWalkStore } from './walk/walkStore'
 import { getCollisionSet, validateTeleport } from './walk/collision'
@@ -187,6 +188,14 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
     () => (item ? realizeItem(item, { mirrored: !!f.mirrored }) : null),
     [item, f.mirrored],
   )
+  // wall-art image (v6): only image-capable items look the asset up
+  const asset = useDocStore((s) =>
+    item?.imageSlot && f.assetId ? s.doc.assets[f.assetId] : undefined,
+  )
+  const artMaterial = useArtMaterial(
+    asset,
+    item ? { w: item.dims.w, h: item.dims.h } : { w: 1, h: 1 },
+  )
   if (!item || !realized) {
     // unknown item: placeholder box of the stored size
     return (
@@ -211,7 +220,11 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
         <mesh
           key={g.mat}
           geometry={g.geometry}
-          material={itemMaterial(item.materials[g.mat] as MaterialId)}
+          material={
+            g.mat === item.imageSlot && artMaterial
+              ? artMaterial
+              : itemMaterial(item.materials[g.mat] as MaterialId)
+          }
           castShadow
         />
       ))}

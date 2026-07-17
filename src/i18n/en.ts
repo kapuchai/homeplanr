@@ -214,6 +214,13 @@ export const en = {
   'props.y': 'Y',
   'props.mirror': 'Mirror',
   'props.flip': 'Flip',
+  'props.image': 'Image',
+  'props.imageUpload': 'Upload…',
+  'props.imageReplace': 'Replace…',
+  'props.imageRemove': 'Remove',
+  'props.imageFailed.title': 'Image not added',
+  'props.imageFailed.body':
+    'The file could not be read as an image, or it is too large even after downscaling.',
   'props.flipEach': 'Flip each',
   'props.finishFront': 'Finish front',
   'props.finishBack': 'Finish back',

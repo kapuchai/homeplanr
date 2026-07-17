@@ -165,6 +165,18 @@ describe('catalog conformance', () => {
           expect(max[1]).toBeGreaterThanOrEqual(item.dims.d / 2 - 0.02)
         })
       }
+
+      if (item.imageSlot) {
+        it('imageSlot is a declared slot backed by exactly one flat part', () => {
+          expect(item.materials[item.imageSlot!], `slot '${item.imageSlot}'`).toBeDefined()
+          // one part → one box in the merged slot geometry → clean texture UVs
+          const parts = collectParts((b) => item.build3d(b, item.dims)).filter(
+            (p) => p.mat === item.imageSlot,
+          )
+          expect(parts).toHaveLength(1)
+          expect(parts[0]!.kind).toBe('box')
+        })
+      }
     })
   }
 })

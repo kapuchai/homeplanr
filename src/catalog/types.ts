@@ -22,6 +22,7 @@ export type MaterialId =
   | 'glass'
   | 'screenBlack'
   | 'foliage'
+  | 'canvas'
 
 export type CatalogCategory =
   | 'living'
@@ -30,6 +31,7 @@ export type CatalogCategory =
   | 'kitchen'
   | 'bathroom'
   | 'office'
+  | 'decor'
 
 /**
  * silhouette + body form the item's footprint layer (0.7.0): one stroke and
@@ -68,6 +70,12 @@ export interface CatalogItem {
   defaultElevation?: number
   /** Named material slots → default palette entries. */
   materials: Record<string, MaterialId>
+  /**
+   * Slot that displays the instance's embedded image (v6 wall art) — must
+   * be a declared materials slot, and SHOULD be a single flat part so the
+   * texture maps cleanly. Absent = the item takes no image.
+   */
+  imageSlot?: string
   /** Procedural 3D parts (see builder.ts). */
   build3d: (b: Builder, dims: Dims) => void
   /** FUTURE: presence switches the 3D renderer to a GLTF loader. */
