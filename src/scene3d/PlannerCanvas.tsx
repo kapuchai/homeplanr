@@ -4,8 +4,10 @@ import { OrbitControls } from '@react-three/drei'
 import {
   PMREMGenerator,
   ACESFilmicToneMapping,
+  Color,
   Shape,
   type BufferGeometry,
+  type DirectionalLight,
   type MeshStandardMaterial,
 } from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
@@ -47,6 +49,8 @@ import { attemptLock } from './walk/pointerLock'
 import { getCollisionSet, validateTeleport } from './walk/collision'
 import { worldToPlan } from './walk/walkMath'
 import { hiddenWallIds, sameWallSet } from './wallOcclusion'
+import { DEG, solarPosition } from './sun'
+import { lightingRamp } from '../theme/sunRamp'
 import type { WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import { captureAndSave, type CaptureApi } from './screenshot'
@@ -557,7 +561,15 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
   )
 }
 
-/** IBL + shadow-fitted key light + fog + ground, sized by the sceneBBox. */
+/** Shadow-frustum margin (m) around the scene bbox — classic and SunSky agree. */
+const margin3d = 2
+
+/**
+ * IBL + shadow-fitted key light + fog + ground, sized by the sceneBBox.
+ * 0.12.0: with realistic lighting ON the light/fog/sky block is sun-driven
+ * (SunSky); the classic branch below stays bit-identical to pre-0.12.0 —
+ * the master toggle is a render-path switch, never a retune.
+ */
 function SceneEnvironment({
   box,
   onGroundClick,
@@ -566,40 +578,61 @@ function SceneEnvironment({
   onGroundClick?: (e: ThreeEvent<MouseEvent>) => void
 }) {
   const { gl, scene } = useThree()
+  const invalidate = useThree((s) => s.invalidate)
   const theme3d = useThemeStore((s) => s.theme3d)
+  const realistic = useAppSettings((s) => s.realisticLighting)
   useEffect(() => {
     const pmrem = new PMREMGenerator(gl)
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04)
     scene.environment = env.texture
-    scene.environmentIntensity = 0.45
     return () => {
       scene.environment = null
       env.dispose()
       pmrem.dispose()
     }
   }, [gl, scene])
+  // IBL intensity ownership: classic = 0.45 here; realistic = SunSky's ramp.
+  // Split from the texture effect above — React runs CHILD effects first,
+  // so a parent-side unconditional 0.45 would clobber SunSky's night value
+  // right after it lands (the bug that made night render as day).
+  useEffect(() => {
+    if (!realistic) {
+      scene.environmentIntensity = 0.45
+      invalidate()
+    }
+  }, [scene, realistic, invalidate])
 
   const groundR = Math.max(30, 3 * box.diag)
-  const margin = 2
+  const margin = margin3d
   return (
     <>
-      <hemisphereLight intensity={0.5} color={theme3d.hemiSky} groundColor={theme3d.hemiGround} />
-      <ambientLight intensity={0.1} />
-      <directionalLight
-        position={[box.cx + 0.5 * 30, 30, -box.cy + 0.35 * 30]}
-        intensity={1.6}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-normalBias={0.03}
-        shadow-camera-left={-(box.diag / 2 + margin)}
-        shadow-camera-right={box.diag / 2 + margin}
-        shadow-camera-top={box.diag / 2 + margin}
-        shadow-camera-bottom={-(box.diag / 2 + margin)}
-        shadow-camera-near={1}
-        shadow-camera-far={80}
-        target-position={[box.cx, 0, -box.cy]}
-      />
-      <fog attach="fog" args={[theme3d.fog, 2 * box.diag + 10, 6 * box.diag + 30]} />
+      {realistic ? (
+        <SunSky box={box} />
+      ) : (
+        <>
+          <hemisphereLight
+            intensity={0.5}
+            color={theme3d.hemiSky}
+            groundColor={theme3d.hemiGround}
+          />
+          <ambientLight intensity={0.1} />
+          <directionalLight
+            position={[box.cx + 0.5 * 30, 30, -box.cy + 0.35 * 30]}
+            intensity={1.6}
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-normalBias={0.03}
+            shadow-camera-left={-(box.diag / 2 + margin)}
+            shadow-camera-right={box.diag / 2 + margin}
+            shadow-camera-top={box.diag / 2 + margin}
+            shadow-camera-bottom={-(box.diag / 2 + margin)}
+            shadow-camera-near={1}
+            shadow-camera-far={80}
+            target-position={[box.cx, 0, -box.cy]}
+          />
+          <fog attach="fog" args={[theme3d.fog, 2 * box.diag + 10, 6 * box.diag + 30]} />
+        </>
+      )}
       {/* ground disc at z = −1cm (kills floor coplanarity) */}
       <group rotation-x={-Math.PI / 2}>
         <mesh
@@ -611,6 +644,92 @@ function SceneEnvironment({
           <circleGeometry args={[groundR, 48]} />
         </mesh>
       </group>
+    </>
+  )
+}
+
+/**
+ * Sun/moon-driven environment (0.12.0, realistic lighting ON). The ONE
+ * directional caster rides the solar vector — solarPosition(lat, lon,
+ * season, timeOfDay) with northOffset added to the azimuth; below the
+ * ramp's moon threshold the bearing flips 180° and the same light plays
+ * the moon (the ramp dips intensity ~0 through the swap so it never pops).
+ * Every color/intensity channel is the altitude ramp; the sky color
+ * becomes scene.background AND the fog color; the IBL intensity follows
+ * the ramp (cleanup restores classic 0.45/null background). World mapping:
+ * +z = plan north (screen-up), +x = east; the shadow ortho box WIDENS up
+ * to 3× as the light drops so long dawn/dusk shadows stay inside the map
+ * (the classic fixed frustum would clip them).
+ */
+function SunSky({ box }: { box: SceneBBox }) {
+  const scene = useThree((s) => s.scene)
+  const invalidate = useThree((s) => s.invalidate)
+  const light = useRef<DirectionalLight>(null)
+  const latitude = useAppSettings((s) => s.latitude)
+  const longitude = useAppSettings((s) => s.longitude)
+  const northOffset = useAppSettings((s) => s.northOffset)
+  const season = useAppSettings((s) => s.season)
+  const timeOfDay = useAppSettings((s) => s.timeOfDay)
+
+  const sun = solarPosition(latitude, longitude, season, timeOfDay)
+  const ramp = lightingRamp(sun.altitude)
+  const bearing = sun.azimuth + northOffset * DEG + (ramp.moon ? Math.PI : 0)
+  // clamp: the dying sun (crossfade zone) must not shine from underground
+  const altitude = Math.max(ramp.moon ? -sun.altitude : sun.altitude, 0.01)
+  const dist = Math.max(30, 1.8 * box.diag)
+
+  useEffect(() => {
+    const l = light.current
+    if (!l) return
+    l.position.set(
+      box.cx + dist * Math.cos(altitude) * Math.sin(bearing),
+      dist * Math.sin(altitude),
+      -box.cy + dist * Math.cos(altitude) * Math.cos(bearing),
+    )
+    const half =
+      (box.diag / 2 + margin3d) *
+      Math.min(3, Math.max(1, 0.9 / Math.max(Math.sin(altitude), 0.3)))
+    const cam = l.shadow.camera
+    cam.left = -half
+    cam.right = half
+    cam.top = half
+    cam.bottom = -half
+    cam.near = 1
+    cam.far = dist + 3 * box.diag + 20
+    cam.updateProjectionMatrix()
+    l.target.updateMatrixWorld()
+    invalidate()
+  }, [box, dist, bearing, altitude, invalidate])
+
+  useEffect(() => {
+    scene.background = new Color(ramp.sky)
+    scene.environmentIntensity = ramp.env
+    invalidate()
+    return () => {
+      scene.background = null
+      scene.environmentIntensity = 0.45
+      invalidate()
+    }
+  }, [scene, ramp.sky, ramp.env, invalidate])
+
+  return (
+    <>
+      <hemisphereLight
+        intensity={ramp.hemiIntensity}
+        color={ramp.hemiSky}
+        groundColor={ramp.hemiGround}
+      />
+      <ambientLight intensity={ramp.ambient} />
+      <directionalLight
+        ref={light}
+        color={ramp.sunColor}
+        intensity={ramp.sunIntensity}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-normalBias={0.03}
+        target-position={[box.cx, 0, -box.cy]}
+      />
+      <fog attach="fog" args={[ramp.sky, 2 * box.diag + 10, 6 * box.diag + 30]} />
     </>
   )
 }
