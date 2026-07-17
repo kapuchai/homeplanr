@@ -43,6 +43,7 @@ import {
   furnitureSlotMaterial,
   itemMaterial,
   sceneMaterial,
+  shadowOnlyMaterial,
   wallFaceMaterial,
 } from './sceneMaterials'
 import { EMITTER_DEFAULT_COLOR, SCENE_MATERIALS } from '../catalog/palette'
@@ -91,12 +92,18 @@ function WallMeshes({
   solid,
   wall,
   visible = true,
+  shadowGhost = false,
 }: {
   solid: WallSolid
   wall: Wall | undefined
   /** Occluder verdict (M3) — false keeps the meshes mounted but skips
    * render AND shadow casting; geometry survives for flicker-free undo. */
   visible?: boolean
+  /** 0.12.0, realistic lighting: a HIDDEN wall renders as a shadow-only
+   * ghost (shared colorWrite-less material) so the sun cannot flood the
+   * dollhouse view through the hidden side — invisible, non-occluding,
+   * still casting. */
+  shadowGhost?: boolean
 }) {
   const paintFront = wall?.paintFront
   const paintBack = wall?.paintBack
@@ -130,32 +137,48 @@ function WallMeshes({
   }, [solid, paintFront, paintBack, finishFront, finishBack])
   useEffect(() => () => meshes.forEach((m) => m.geo.dispose()), [meshes])
   const angle = Math.atan2(solid.frame.dir.y, solid.frame.dir.x)
+  const ghost = !visible && shadowGhost
   return (
     <group
       position={[solid.frame.origin.x, solid.frame.origin.y, 0]}
       rotation={[0, 0, angle]}
-      visible={visible}
+      visible={visible || ghost}
     >
       {meshes.map((m, i) => (
-        <mesh key={i} geometry={m.geo} material={m.material} castShadow receiveShadow />
+        <mesh
+          key={i}
+          geometry={m.geo}
+          material={ghost ? shadowOnlyMaterial() : m.material}
+          castShadow
+          receiveShadow={!ghost}
+        />
       ))}
     </group>
   )
 }
 
-function PatchMesh({ patch, visible = true }: { patch: PatchSolid; visible?: boolean }) {
+function PatchMesh({
+  patch,
+  visible = true,
+  shadowGhost = false,
+}: {
+  patch: PatchSolid
+  visible?: boolean
+  shadowGhost?: boolean
+}) {
   const geo = useMemo(
     () => toBufferGeometry(buildPrismMeshData({ polygon: patch.polygon, z0: patch.z0, z1: patch.z1 })),
     [patch],
   )
   useEffect(() => () => geo.dispose(), [geo])
+  const ghost = !visible && shadowGhost
   return (
     <mesh
       geometry={geo}
-      material={sceneMaterial('wallPaint')}
+      material={ghost ? shadowOnlyMaterial() : sceneMaterial('wallPaint')}
       castShadow
-      receiveShadow
-      visible={visible}
+      receiveShadow={!ghost}
+      visible={visible || ghost}
     />
   )
 }
@@ -533,6 +556,16 @@ function OpeningFixtures({
  * lm/π), decay 2, unlimited range. castShadow rides the 2-nearest budget
  * at 1024² — the M1 spike cliff is point-light cube maps at ×4/2048.
  */
+/**
+ * Perceptual lumen calibration (0.12.0, user-tuned): PHYSICAL candela
+ * reads white-hot under ACES + the near-white room albedos at apartment
+ * scale, so the photometric conversion is divided down — the lumen UI
+ * stays a meaningful relative scale while an 800 lm floor lamp lands as
+ * a cozy pool, not a floodlight. Probe-tuned; change only with night
+ * screenshots in hand.
+ */
+const LUMEN_SCALE = 1 / 6
+
 function EmitterLight({
   emitter,
   lumen,
@@ -558,7 +591,7 @@ function EmitterLight({
           position={at}
           target={spotTarget}
           color={color}
-          intensity={lumen / Math.PI}
+          intensity={(lumen * LUMEN_SCALE) / Math.PI}
           angle={1.1}
           penumbra={0.5}
           decay={2}
@@ -575,7 +608,7 @@ function EmitterLight({
     <pointLight
       position={at}
       color={color}
-      intensity={lumen / (4 * Math.PI)}
+      intensity={(lumen * LUMEN_SCALE) / (4 * Math.PI)}
       decay={2}
       castShadow={shadowCast}
       shadow-mapSize={[1024, 1024]}
@@ -1275,6 +1308,7 @@ export function PlannerCanvas() {
               solid={s}
               wall={doc.walls[s.wallId]}
               visible={!hiddenWalls.has(s.wallId)}
+              shadowGhost={realisticLighting}
             />
           ))}
           {Object.values(derived.wallSolids).map((s) =>
@@ -1288,7 +1322,12 @@ export function PlannerCanvas() {
             ) : null,
           )}
           {derived.patchSolids.map((p) => (
-            <PatchMesh key={p.nodeId} patch={p} visible={!patchHidden(p.nodeId)} />
+            <PatchMesh
+              key={p.nodeId}
+              patch={p}
+              visible={!patchHidden(p.nodeId)}
+              shadowGhost={realisticLighting}
+            />
           ))}
           {Object.values(derived.rooms).map((r) => (
             <FloorMesh key={r.roomId} room={r} onClick={handleFloorClick} />

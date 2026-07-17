@@ -7,9 +7,12 @@
  * theme-INDEPENDENT — realistic lighting renders the same sky in light and
  * dark UI themes (the sky is the sky).
  *
- * The high-sun stop reproduces the classic scene's values (dir 1.6, hemi
- * 0.5, ambient 0.1, env 0.45) so toggling realistic lighting on around
- * noon lands near the familiar look.
+ * Daytime balance (user-tuned 0.12.0): the UNSHADOWED channels (hemi,
+ * ambient, IBL env) are kept LOW and the shadowed sun strong — walls and
+ * ceilings must matter, so rooms the sun cannot reach stay visibly darker
+ * than outdoors and window shafts carry the interiors. (The original
+ * classic-parity anchor was dropped for this — toggling realistic ON is
+ * ALLOWED to look different; bit-identity only ever applied to OFF.)
  *
  * Below MOON_BELOW_DEG the directional light PLAYS THE MOON: the driver
  * mirrors its bearing and the ramp's sun channels carry moonlight. The
@@ -52,11 +55,11 @@ const STOPS: Stop[] = [
   { alt: -18, sky: '#10141f', sun: '#a8bede', sunI: 0.14, hemiSky: '#1c2438', hemiGround: '#0d0d12', hemiI: 0.14, amb: 0.05, env: 0.06 },
   { alt: -6, sky: '#232a40', sun: '#a8bede', sunI: 0.1, hemiSky: '#232c44', hemiGround: '#101014', hemiI: 0.16, amb: 0.06, env: 0.1 },
   { alt: -2, sky: '#584f6a', sun: '#c8b8a8', sunI: 0.02, hemiSky: '#3a3c54', hemiGround: '#16161c', hemiI: 0.2, amb: 0.07, env: 0.16 },
-  { alt: 0, sky: '#d99a66', sun: '#ff9848', sunI: 0.55, hemiSky: '#6a6884', hemiGround: '#201e24', hemiI: 0.26, amb: 0.08, env: 0.2 },
-  { alt: 6, sky: '#e8b784', sun: '#ffc078', sunI: 1.05, hemiSky: '#98a0b8', hemiGround: '#3a3630', hemiI: 0.34, amb: 0.09, env: 0.3 },
-  { alt: 15, sky: '#c2d0e4', sun: '#ffe2b0', sunI: 1.4, hemiSky: '#b8c4d8', hemiGround: '#4a443c', hemiI: 0.42, amb: 0.1, env: 0.4 },
-  { alt: 35, sky: '#b4cfec', sun: '#fff0d8', sunI: 1.6, hemiSky: '#cddaf0', hemiGround: '#55504a', hemiI: 0.5, amb: 0.1, env: 0.45 },
-  { alt: 90, sky: '#aecdf0', sun: '#fff6e8', sunI: 1.65, hemiSky: '#d6e2f4', hemiGround: '#5a554e', hemiI: 0.5, amb: 0.1, env: 0.45 },
+  { alt: 0, sky: '#d99a66', sun: '#ff9848', sunI: 0.6, hemiSky: '#6a6884', hemiGround: '#201e24', hemiI: 0.2, amb: 0.05, env: 0.12 },
+  { alt: 6, sky: '#e8b784', sun: '#ffc078', sunI: 1.3, hemiSky: '#98a0b8', hemiGround: '#3a3630', hemiI: 0.26, amb: 0.06, env: 0.18 },
+  { alt: 15, sky: '#c2d0e4', sun: '#ffe2b0', sunI: 1.9, hemiSky: '#b8c4d8', hemiGround: '#4a443c', hemiI: 0.3, amb: 0.06, env: 0.24 },
+  { alt: 35, sky: '#b4cfec', sun: '#fff0d8', sunI: 2.2, hemiSky: '#cddaf0', hemiGround: '#55504a', hemiI: 0.34, amb: 0.06, env: 0.26 },
+  { alt: 90, sky: '#aecdf0', sun: '#fff6e8', sunI: 2.3, hemiSky: '#d6e2f4', hemiGround: '#5a554e', hemiI: 0.34, amb: 0.06, env: 0.26 },
 ]
 
 const RAD = Math.PI / 180

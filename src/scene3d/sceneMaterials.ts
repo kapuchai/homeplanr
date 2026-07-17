@@ -78,10 +78,27 @@ export function emissiveSlotMaterial(
   if (!m) {
     m = base.clone()
     m.emissive.set(emissive)
-    m.emissiveIntensity = 0.85
+    m.emissiveIntensity = 0.7
     emissiveCache.set(key, m)
   }
   return m
+}
+
+/**
+ * Shadow-only stand-in (0.12.0): occluder-hidden walls under realistic
+ * lighting keep CASTING — else the sun floods the dollhouse view from the
+ * hidden side (user report). Visible mesh, zero color/depth writes, so it
+ * draws nothing and occludes nothing but still renders into shadow maps.
+ * ONE shared singleton — the no-per-wall-material-clones rule holds.
+ */
+let shadowOnly: MeshStandardMaterial | null = null
+export function shadowOnlyMaterial(): MeshStandardMaterial {
+  if (!shadowOnly) {
+    shadowOnly = new MeshStandardMaterial()
+    shadowOnly.colorWrite = false
+    shadowOnly.depthWrite = false
+  }
+  return shadowOnly
 }
 
 const sceneCache = new Map<string, MeshStandardMaterial>()

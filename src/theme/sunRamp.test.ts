@@ -5,13 +5,15 @@ const RAD = Math.PI / 180
 const HEX = /^#[0-9a-f]{6}$/
 
 describe('lightingRamp', () => {
-  it('high sun reproduces the classic scene values (toggle-on parity anchor)', () => {
+  it('high sun: strong shadowed sun over LOW unshadowed fill (walls must matter)', () => {
     const r = lightingRamp(35 * RAD)
-    expect(r.sunIntensity).toBeCloseTo(1.6, 5)
-    expect(r.hemiIntensity).toBeCloseTo(0.5, 5)
-    expect(r.ambient).toBeCloseTo(0.1, 5)
-    expect(r.env).toBeCloseTo(0.45, 5)
+    expect(r.sunIntensity).toBeCloseTo(2.2, 5)
+    expect(r.hemiIntensity).toBeCloseTo(0.34, 5)
+    expect(r.ambient).toBeCloseTo(0.06, 5)
+    expect(r.env).toBeCloseTo(0.26, 5)
     expect(r.moon).toBe(false)
+    // the contrast contract: unshadowed fill stays well under half the sun
+    expect(r.hemiIntensity + r.ambient + r.env).toBeLessThan(r.sunIntensity / 2)
   })
 
   it('night hands the directional to the moon; day keeps the sun', () => {
@@ -30,13 +32,13 @@ describe('lightingRamp', () => {
     for (let d = -90; d <= 90; d += 0.5) {
       const r = lightingRamp(d * RAD)
       expect(r.sunIntensity).toBeGreaterThanOrEqual(0)
-      expect(r.sunIntensity).toBeLessThanOrEqual(2)
+      expect(r.sunIntensity).toBeLessThanOrEqual(2.5)
       expect(r.hemiIntensity).toBeGreaterThanOrEqual(0)
       expect(r.hemiIntensity).toBeLessThanOrEqual(1)
       expect(r.ambient).toBeGreaterThanOrEqual(0)
       expect(r.ambient).toBeLessThanOrEqual(0.5)
       expect(r.env).toBeGreaterThanOrEqual(0)
-      expect(r.env).toBeLessThanOrEqual(0.45 + 1e-9)
+      expect(r.env).toBeLessThanOrEqual(0.26 + 1e-9)
       expect(r.sky).toMatch(HEX)
       expect(r.sunColor).toMatch(HEX)
       expect(r.hemiSky).toMatch(HEX)

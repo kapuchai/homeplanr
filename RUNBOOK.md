@@ -16,9 +16,15 @@ a longitude-derived integer-hour zone, `solarNoon()` exported;
 `theme/sunRamp.ts` = EVERY scene channel [sun/hemi/ambient/env/sky-fog]
 as one piecewise-linear function of altitude — below −3° the directional
 PLAYS THE MOON with a crossfade dip so the 180° bearing flip never pops;
-the high-sun stop reproduces classic 1.6/0.5/0.1/0.45 as the toggle-on
-parity anchor; SunSky also sets scene.background and WIDENS the shadow
-ortho ≤3× at low sun), **SunArc scrubber** (top-center 3D overlay; the
+daytime is CONTRAST-TUNED [user feedback]: unshadowed fill (hemi 0.34 /
+amb 0.06 / env 0.26) stays well under half the shadowed sun (2.2) so
+interiors read darker than outdoors and window shafts carry rooms —
+test-pinned; SunSky also sets scene.background and WIDENS the shadow
+ortho ≤3× at low sun; hidden dollhouse walls become SHADOW GHOSTS under
+realistic [shared colorWrite-less singleton, still casting] so the sun
+never floods in from the hidden side; EmitterLight lumens are divided by
+LUMEN_SCALE 1/6 [physical candela reads white-hot under ACES —
+probe-tuned, change only with night screenshots]), **SunArc scrubber** (top-center 3D overlay; the
 curve IS the sun's altitude path over the day, glyph sun/moon; preset
 dots sweep timeOfDay via rAF lerp of the value itself riding --dur-2
 [reduced-motion → instant]; PanelHandle live-setState/persist-on-release
@@ -489,7 +495,16 @@ export + 3D screenshot, file association + single instance, Linux
   (lat, lon, season, hours) and every lighting channel a pure function of
   altitude (`sunRamp` stops) — no clocks, no state reads. Scrubbing
   timeOfDay IS the animation system; anything time-driven must flow
-  through these two functions.
+  through these two functions. The daytime CONTRAST CONTRACT is
+  test-pinned: unshadowed fill (hemi+ambient+env) < sun/2, so occlusion
+  visibly matters indoors — never rebalance the stops back toward flat
+  fill without night/noon screenshots in hand.
+- **Hidden walls cast under realistic lighting (0.12.0)**: the occluder's
+  hidden set renders as shadow GHOSTS (ONE shared colorWrite/depthWrite-
+  false singleton — the no-per-wall-clones rule holds; ghosts are
+  invisible, non-occluding, castShadow only, and r3f events ignore
+  handler-less meshes so floor-click teleports still pass). Classic mode
+  keeps plain visible=false. OpeningFixtures stay fully hidden either way.
 - **Interior shadow budget (0.12.0, M1 spike-pinned)**: emitter lights
   always render (shadowless is free on WebKitGTK); only the ≤2 nearest
   lit emitters cast, at 1024² — interior maps NEVER 2048 and never more
