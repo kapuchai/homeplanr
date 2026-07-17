@@ -126,6 +126,13 @@ export const en = {
   'options.section.lighting': 'Lighting (3D)',
   'options.realisticLighting': 'Realistic lighting',
   'options.exposure': 'Exposure',
+  'options.city': 'Location',
+  'options.latLong': 'Lat / long',
+  'options.northOffset': 'North offset',
+  'options.season': 'Season',
+  'options.seasonEquinox': 'Spring / autumn',
+  'options.seasonSummer': 'Summer',
+  'options.seasonWinter': 'Winter',
 
   // ---- export dialog + flow ----
   'export.title': 'Export plan',

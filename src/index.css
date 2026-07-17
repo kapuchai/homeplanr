@@ -642,6 +642,34 @@ body.pointer-locked * {
   color: var(--text-3);
 }
 
+/* Wrapping segmented group (0.12.0 — the 8-city location presets). */
+.segmented.wrap {
+  flex-wrap: wrap;
+  max-width: 300px;
+  justify-content: flex-end;
+}
+
+/* Paired compact numeric inputs (0.12.0 — lat/long). */
+.coord-inputs {
+  display: flex;
+  gap: 6px;
+}
+
+.coord-inputs input {
+  width: calc(var(--ui-scale) * 72px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: calc(var(--ui-scale) * 12px);
+  padding: calc(var(--ui-scale) * 4px) calc(var(--ui-scale) * 6px);
+}
+
+.coord-inputs input:disabled {
+  opacity: 0.45;
+}
+
 /* Range-slider row (0.12.0 — Options → Lighting exposure). */
 .slider-row {
   display: flex;

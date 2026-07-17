@@ -2,12 +2,15 @@ import { useUiStore } from '../store/uiStore'
 import { Modal } from './Modal'
 import {
   ACCENT_IDS,
+  CITY_PRESETS,
   DIMENSION_LEVELS,
   EXPOSURE_RANGE,
+  SEASONS,
   THEME_PREFERENCES,
   UI_SCALES,
   useAppSettings,
   type DimensionLevel,
+  type Season,
   type ThemePreference,
 } from '../store/appSettings'
 import { ACCENTS } from '../theme/accents'
@@ -38,6 +41,12 @@ const DIMENSION_LABELS: Record<DimensionLevel, string> = {
   walls: t('options.dimsWalls'),
   openings: t('options.dimsOpenings'),
   all: t('options.dimsAll'),
+}
+
+const SEASON_LABELS: Record<Season, string> = {
+  equinox: t('options.seasonEquinox'),
+  summer: t('options.seasonSummer'),
+  winter: t('options.seasonWinter'),
 }
 
 /** Shared on/off segmented pair — the Autosave pattern, extracted now
@@ -314,6 +323,84 @@ export function OptionsDialog() {
             onInput={(exposure) => useAppSettings.setState({ exposure })}
             onCommit={settings.setExposure}
           />
+          <div className="options-row">
+            <span>{t('options.city')}</span>
+            <div className="segmented small wrap">
+              {CITY_PRESETS.map((c) => {
+                const active =
+                  Math.abs(settings.latitude - c.lat) < 0.005 &&
+                  Math.abs(settings.longitude - c.lon) < 0.005
+                return (
+                  <button
+                    key={c.name}
+                    type="button"
+                    disabled={!settings.realisticLighting}
+                    aria-pressed={active}
+                    className={active ? 'active' : ''}
+                    onClick={() => {
+                      settings.setLatitude(c.lat)
+                      settings.setLongitude(c.lon)
+                    }}
+                  >
+                    {c.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div className="options-row">
+            <span>{t('options.latLong')}</span>
+            <div className="coord-inputs">
+              <input
+                type="number"
+                min={-90}
+                max={90}
+                step={0.01}
+                value={settings.latitude}
+                disabled={!settings.realisticLighting}
+                aria-label={t('options.latLong')}
+                onChange={(e) => settings.setLatitude(Number(e.target.value))}
+              />
+              <input
+                type="number"
+                min={-180}
+                max={180}
+                step={0.01}
+                value={settings.longitude}
+                disabled={!settings.realisticLighting}
+                aria-label={t('options.latLong')}
+                onChange={(e) => settings.setLongitude(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <SliderRow
+            label={t('options.northOffset')}
+            min={0}
+            max={360}
+            step={5}
+            value={settings.northOffset}
+            format={(v) => `${v}°`}
+            disabled={!settings.realisticLighting}
+            onInput={(northOffset) => useAppSettings.setState({ northOffset })}
+            onCommit={settings.setNorthOffset}
+          />
+          <div className="options-row">
+            <span>{t('options.season')}</span>
+            <div className="segmented small">
+              {SEASONS.map((season) => (
+                <button
+                  key={season}
+                  type="button"
+                  disabled={!settings.realisticLighting}
+                  aria-pressed={settings.season === season}
+                  className={settings.season === season ? 'active' : ''}
+                  onClick={() => settings.setSeason(season)}
+                >
+                  {SEASON_LABELS[season]}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
         <div className="modal-buttons">
           <button type="button" className="primary" onClick={() => setOpen(false)}>

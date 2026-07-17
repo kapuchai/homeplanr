@@ -118,6 +118,21 @@ export const SEASONS: readonly Season[] = ['equinox', 'summer', 'winter']
 /** Exposure slider bounds (Options → Lighting). */
 export const EXPOSURE_RANGE = { min: 0.5, max: 2 } as const
 
+/** Sun-location presets (Options → Lighting). Names are proper nouns and
+ * stay out of the i18n table (the ACCENTS[..].name precedent); the user's
+ * default (Helsinki) leads. Euro-weighted list + two global anchors —
+ * user decision 2026-07-17. */
+export const CITY_PRESETS: readonly { name: string; lat: number; lon: number }[] = [
+  { name: 'Helsinki', lat: 60.17, lon: 24.94 },
+  { name: 'Stockholm', lat: 59.33, lon: 18.06 },
+  { name: 'Berlin', lat: 52.52, lon: 13.4 },
+  { name: 'London', lat: 51.51, lon: -0.13 },
+  { name: 'Paris', lat: 48.86, lon: 2.35 },
+  { name: 'Madrid', lat: 40.42, lon: -3.7 },
+  { name: 'New York', lat: 40.71, lon: -74.01 },
+  { name: 'Tokyo', lat: 35.68, lon: 139.69 },
+]
+
 const DEFAULTS: AppSettings = {
   theme: 'system',
   accent: 'blue',
