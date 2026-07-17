@@ -71,6 +71,12 @@ export interface CatalogItem {
    */
   passable?: boolean
   /**
+   * Placement snaps onto a window and the instance ATTACHES to it
+   * (attachedOpeningId): position/rotation/width derive from the opening
+   * and follow it (model/mutations/attachment.ts). Curtains.
+   */
+  windowAttach?: boolean
+  /**
    * Initial elevation for wall-mounted items (meters above the floor) —
    * both placement paths copy it into the instance. Absent = 0 (on floor).
    */

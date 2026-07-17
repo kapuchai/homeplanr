@@ -75,6 +75,10 @@ export const SNAP_RADII_PX: Record<
 /** Angular capture for the draw-wall angle assist (radians). */
 export const ANGLE_RAY_CAPTURE = (7.5 * Math.PI) / 180
 
+/** px radius inside which a windowAttach item (curtains) captures onto a
+ * window — used by the place ghost AND the drag-drop re-target. */
+export const WINDOW_PICK_PX = 24
+
 const PRIORITY: Record<SnapKind, number> = {
   node: 1,
   wallPoint: 2,

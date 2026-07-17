@@ -1,5 +1,5 @@
 import type { FurnitureInstance, ProjectDocument } from '../types'
-import { newFurnitureId, type AssetId, type FurnitureId } from '../ids'
+import { newFurnitureId, type AssetId, type FurnitureId, type OpeningId } from '../ids'
 import { addAsset, type AssetContent } from './assets'
 
 /**
@@ -33,6 +33,9 @@ export interface AddFurnitureParams {
   /** Embedded image CONTENT (v6) — clipboards carry bytes, not ids, so a
    * cross-document paste re-ingests (content-deduped by addAsset). */
   asset?: AssetContent
+  /** Window attachment at placement (v6 curtains) — caller supplies the
+   * already-derived x/y/rotation/size; the pipeline keeps them synced. */
+  attachedOpeningId?: OpeningId
 }
 
 export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): FurnitureId {
@@ -55,6 +58,7 @@ export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): 
     ...(params.notes ? { notes: params.notes } : {}),
     ...(params.materialOverrides ? { materialOverrides: { ...params.materialOverrides } } : {}),
     ...(params.asset ? { assetId: addAsset(doc, params.asset) } : {}),
+    ...(params.attachedOpeningId ? { attachedOpeningId: params.attachedOpeningId } : {}),
   }
   return id
 }
@@ -75,6 +79,15 @@ export function transformFurniture(
 ): void {
   const f = doc.furniture[id]
   if (!f) return
+  // a MANUAL move/rotate breaks a window attachment (v6 curtains): the
+  // user takes over, else the next pipeline sync would snap the item back
+  // and the edit would read as ignored. Elevation/mirror never detach.
+  if (
+    f.attachedOpeningId &&
+    (patch.x !== undefined || patch.y !== undefined || patch.rotation !== undefined)
+  ) {
+    delete f.attachedOpeningId
+  }
   const round = opts.quantize === false ? (v: number) => v : q
   if (patch.x !== undefined) f.x = round(patch.x)
   if (patch.y !== undefined) f.y = round(patch.y)
@@ -95,6 +108,9 @@ export function resizeFurniture(
 ): void {
   const f = doc.furniture[id]
   if (!f) return
+  // width is attachment-derived (window span + overhang) — a manual width
+  // takes over, so it detaches; depth/height edits keep the attachment
+  if (f.attachedOpeningId && size.w !== undefined) delete f.attachedOpeningId
   if (size.w !== undefined) f.size.w = clampSize(size.w)
   if (size.d !== undefined) f.size.d = clampSize(size.d)
   if (size.h !== undefined) f.size.h = clampHeight(size.h)

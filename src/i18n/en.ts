@@ -221,6 +221,8 @@ export const en = {
   'props.imageFailed.title': 'Image not added',
   'props.imageFailed.body':
     'The file could not be read as an image, or it is too large even after downscaling.',
+  'props.attachedWindow': 'On window',
+  'props.detach': 'Detach',
   'props.flipEach': 'Flip each',
   'props.finishFront': 'Finish front',
   'props.finishBack': 'Finish back',

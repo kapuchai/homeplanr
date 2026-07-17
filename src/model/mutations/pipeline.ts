@@ -2,6 +2,7 @@ import type { ProjectDocument } from '../types'
 import { normalizeGraph } from './walls'
 import { revalidateOpenings } from './openings'
 import { reconcileRooms } from './rooms'
+import { reconcileAttachedFurniture } from './attachment'
 
 /**
  * Mutation execution mode.
@@ -39,4 +40,8 @@ export function runPipeline(
   } else {
     revalidateOpenings(doc, 'live')
   }
+  // both modes: attached furniture (curtains) follows its window live and
+  // lands exactly at commit; runs after opening clamps/deletes so a doomed
+  // window detaches its curtain in the same mutation
+  reconcileAttachedFurniture(doc)
 }

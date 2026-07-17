@@ -4,7 +4,7 @@ import { hitTestAll, hitTestRect } from '../hit/hitTest'
 import type { Vec2 } from '../../geometry/vec'
 import { add, dist, dot, normalize, perp, rotate, scale, sub } from '../../geometry/vec'
 import { closestPointOnSegment } from '../../geometry/segment'
-import { resolveSnap, type SnapResult } from '../../geometry/snapping'
+import { WINDOW_PICK_PX, resolveSnap, type SnapResult } from '../../geometry/snapping'
 import {
   alignmentGuideCandidates,
   gridCandidate,
@@ -20,6 +20,7 @@ import { formatLength } from '../../format/units'
 import { CATALOG } from '../../catalog'
 import { resizeHandlePositions, rotateHandlePos, roomPivot, roomRotateHandlePos, HANDLE_RADIUS_PX, RESIZE_CORNERS, RESIZE_HANDLE_RADIUS_PX } from './handles'
 import { MERGE_EPS } from '../../geometry/constants'
+import { findWindowNear } from '../../model/mutations/attachment'
 import {
   furnitureDragPills,
   incidentWallIds,
@@ -810,6 +811,15 @@ export function createSelectTool(): Tool {
           for (const id of state.ids) {
             const f = doc.furniture[id]
             if (f) ctx.actions().transformFurniture(id, { x: f.x, y: f.y })
+          }
+          // windowAttach re-target: the first live move detached; a single
+          // such item dropped onto a window attaches to it (same tx)
+          if (state.ids.length === 1) {
+            const f = doc.furniture[state.ids[0]!]
+            if (f && CATALOG[f.catalogItemId]?.windowAttach) {
+              const win = findWindowNear(doc, e.world, WINDOW_PICK_PX * ctx.pxToWorld())
+              if (win) ctx.actions().attachFurniture(f.id, win.id, e.world)
+            }
           }
           commitTx(state.tx)
           reset(ctx)

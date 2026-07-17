@@ -1,8 +1,14 @@
 import type { Tool, ToolContext } from './toolTypes'
 import type { Vec2 } from '../../geometry/vec'
 import { add, rotate } from '../../geometry/vec'
-import { resolveSnap, type SnapResult } from '../../geometry/snapping'
+import { WINDOW_PICK_PX, resolveSnap, type SnapResult } from '../../geometry/snapping'
 import { alignmentGuideCandidates, wallBackCandidate } from '../snap/candidates'
+import {
+  findWindowNear,
+  windowAttachTransform,
+  type AttachedTransform,
+} from '../../model/mutations/attachment'
+import type { Window } from '../../model/types'
 import { useAppSettings } from '../../store/appSettings'
 import { CATALOG } from '../../catalog'
 
@@ -15,6 +21,8 @@ import { CATALOG } from '../../catalog'
  */
 export function createPlaceFurnitureTool(): Tool {
   let lastSnap: SnapResult | null = null
+  // windowAttach capture from the last ghost frame — placeAt attaches to it
+  let lastWindow: Window | null = null
   let rotation = 0
   let mirrored = false
   let armedFor: string | null = null
@@ -28,7 +36,35 @@ export function createPlaceFurnitureTool(): Tool {
       armedFor = id
       rotation = 0
       mirrored = false
+      lastWindow = null
     }
+  }
+
+  /** Ghost polygon + preview for an explicit transform (window capture). */
+  const attachGhost = (
+    ctx: ToolContext,
+    itemId: string,
+    at: AttachedTransform,
+    depth: number,
+  ): void => {
+    const hw = at.width / 2
+    const hh = depth / 2
+    const center = { x: at.x, y: at.y }
+    const corners: Vec2[] = [
+      { x: -hw, y: -hh },
+      { x: hw, y: -hh },
+      { x: hw, y: hh },
+      { x: -hw, y: hh },
+    ].map((p) => add(center, rotate(p, at.rotation)))
+    ctx.interaction().set({
+      preview: {
+        kind: 'ghost',
+        polygon: corners,
+        valid: true,
+        furniture: { itemId, at: center, rot: at.rotation, mirrored },
+      },
+      snap: null,
+    })
   }
 
   const ghost = (ctx: ToolContext, world: Vec2): SnapResult | null => {
@@ -37,6 +73,19 @@ export function createPlaceFurnitureTool(): Tool {
     const item = itemId ? CATALOG[itemId] : null
     if (!item) return null
     const doc = ctx.doc()
+    // windowAttach capture outranks wall/guide snapping: near a window the
+    // ghost sits reveal-aligned on the cursor's side of the wall
+    if (item.windowAttach) {
+      const win = findWindowNear(doc, world, WINDOW_PICK_PX * ctx.pxToWorld())
+      const at = win ? windowAttachTransform(doc, win, world, item.dims.d) : null
+      if (win && at) {
+        lastWindow = win
+        lastSnap = null
+        attachGhost(ctx, item.id, at, item.dims.d)
+        return null
+      }
+      lastWindow = null
+    }
     // guide extents must reflect the EFFECTIVE rotation — wall snap can
     // impose one (snap.rotation); the previous frame's resolution is the
     // best available before this frame's resolveSnap runs
@@ -90,6 +139,24 @@ export function createPlaceFurnitureTool(): Tool {
     const item = itemId ? CATALOG[itemId] : null
     if (!item) return
     const snap = ghost(ctx, world)
+    if (lastWindow) {
+      // ghost captured a window this frame — place attached
+      const at = windowAttachTransform(ctx.doc(), lastWindow, world, item.dims.d)
+      if (at) {
+        const id = ctx.actions().addFurniture({
+          catalogItemId: item.id,
+          x: at.x,
+          y: at.y,
+          rotation: at.rotation,
+          size: { w: at.width, d: item.dims.d, h: item.dims.h },
+          elevation: item.defaultElevation ?? 0,
+          attachedOpeningId: lastWindow.id,
+          ...(mirrored ? { mirrored: true } : {}),
+        })
+        ctx.ui().setSelection([id])
+        return
+      }
+    }
     if (!snap) return
     const id = ctx.actions().addFurniture({
       catalogItemId: item.id,
@@ -139,6 +206,7 @@ export function createPlaceFurnitureTool(): Tool {
         ctx.ui().setToolParams({ catalogItemId: null })
         ctx.interaction().clear()
         lastSnap = null
+        lastWindow = null
         return false // bubble: ladder switches back to select
       }
       return false
@@ -148,6 +216,7 @@ export function createPlaceFurnitureTool(): Tool {
       ctx.ui().setToolParams({ catalogItemId: null })
       ctx.interaction().clear()
       lastSnap = null
+      lastWindow = null
       rotation = 0
       mirrored = false
       armedFor = null

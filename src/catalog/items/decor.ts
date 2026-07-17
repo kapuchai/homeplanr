@@ -64,6 +64,7 @@ export const curtain: CatalogItem = {
   dims: { w: 1.6, d: 0.2, h: 2.4 },
   wallSnap: true,
   passable: true,
+  windowAttach: true,
   materials: { rod: 'metalDark', fabric: 'linen' },
   build3d: (b, { w, d, h }) => {
     // brackets reach the wall (back edge); rod + gathered panel pair hang

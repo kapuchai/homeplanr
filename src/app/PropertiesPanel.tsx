@@ -746,6 +746,16 @@ export function PropertiesPanel() {
           value={furniture.elevation}
           onCommit={(v) => a.transformFurniture(furniture.id, { elevation: v })}
         />
+        {furniture.attachedOpeningId ? (
+          <Row>
+            <span>{t('props.attachedWindow')}</span>
+            <div className="segmented small">
+              <button type="button" onClick={() => a.detachFurniture(furniture.id)}>
+                {t('props.detach')}
+              </button>
+            </div>
+          </Row>
+        ) : null}
         {item?.imageSlot ? (
           <Row>
             <span>{t('props.image')}</span>

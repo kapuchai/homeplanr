@@ -13,6 +13,7 @@ import * as rooms from '../model/mutations/rooms'
 import * as project from '../model/mutations/project'
 import * as annotations from '../model/mutations/annotations'
 import * as paste from '../model/mutations/paste'
+import * as attachment from '../model/mutations/attachment'
 import * as roomRig from '../model/mutations/roomRig'
 import type { MutationMode } from '../model/mutations/pipeline'
 
@@ -54,6 +55,9 @@ export interface DocState {
   /** Ingest-or-dedupe + point the instance at it (null clears); ONE
    * mutation ⇒ one undo entry for the whole upload. */
   setFurnitureImage: (id: FurnitureId, content: assets.AssetContent | null) => void
+  // window attachment (v6 curtains)
+  attachFurniture: (id: FurnitureId, openingId: OpeningId, ref?: Vec2) => void
+  detachFurniture: (id: FurnitureId) => void
   duplicateFurniture: (ids: readonly FurnitureId[]) => FurnitureId[]
   alignFurniture: (ids: readonly FurnitureId[], edge: furniture.AlignEdge) => void
   distributeFurniture: (ids: readonly FurnitureId[], axis: 'x' | 'y') => void
@@ -122,6 +126,9 @@ export const useDocStore = create<DocState>()(
             mutate((d) =>
               furniture.setFurnitureAsset(d, id, content ? assets.addAsset(d, content) : undefined),
             ),
+          attachFurniture: (id, openingId, ref) =>
+            mutate((d) => attachment.attachFurnitureToOpening(d, id, openingId, ref)),
+          detachFurniture: (id) => mutate((d) => attachment.detachFurniture(d, id)),
           duplicateFurniture: (ids) => mutate((d) => furniture.duplicateFurniture(d, ids)),
           alignFurniture: (ids, edge) => mutate((d) => furniture.alignFurniture(d, ids, edge)),
           distributeFurniture: (ids, axis) => mutate((d) => furniture.distributeFurniture(d, ids, axis)),
