@@ -286,6 +286,11 @@ export function OptionsDialog() {
             value={settings.showAnnotations}
             onChange={settings.setShowAnnotations}
           />
+          <OnOffRow
+            label={t('options.levelGhost')}
+            value={settings.levelGhostEnabled}
+            onChange={settings.setLevelGhostEnabled}
+          />
         </section>
         <section className="options-section">
           <h4>{t('options.section.view3d')}</h4>

@@ -116,6 +116,7 @@ export const en = {
   'options.dimsOpenings': '+ Openings',
   'options.dimsAll': 'All',
   'options.showAnnotations': 'Measurements & labels',
+  'options.levelGhost': 'Floor-below outline',
   'options.uiScale': 'Interface scale',
   'options.section.view3d': '3D view',
   'options.walkCollision': 'Walk collision',

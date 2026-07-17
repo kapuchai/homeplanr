@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
-import { useActiveLevelDoc } from '../../store/levelView'
+import { useDocStore } from '../../store/docStore'
+import { useActiveLevel } from '../../store/activeLevel'
+import { levelDocOf, resolveLevel, useActiveLevelDoc } from '../../store/levelView'
 import { useUiStore } from '../../store/uiStore'
 import { useAppSettings } from '../../store/appSettings'
 import { formatArea } from '../../format/units'
@@ -33,6 +35,7 @@ export function WorldLayers() {
   const derived = getDerived(doc)
   return (
     <>
+      <LevelGhostLayer />
       <RoomsLayer derived={derived} />
       <WallsLayer doc={doc} derived={derived} />
       <OpeningsLayer doc={doc} derived={derived} />
@@ -42,6 +45,41 @@ export function WorldLayers() {
       <AnnotationsLayer doc={doc} />
       <SelectionLayer doc={doc} derived={derived} />
     </>
+  )
+}
+
+/**
+ * Ghost underlay (v7): the level BELOW the active one, walls only, faint —
+ * the alignment reference for drawing upper storeys. Bottom of the stack
+ * (under room fills), never hit-testable (hitTest reads only the active
+ * level), toggleable in Options → View.
+ */
+function LevelGhostLayer() {
+  const fullDoc = useDocStore((s) => s.doc)
+  const activeLevelId = useActiveLevel((s) => s.activeLevelId)
+  const enabled = useAppSettings((s) => s.levelGhostEnabled)
+  const theme = useThemeStore((s) => s.theme)
+  const active = resolveLevel(fullDoc, activeLevelId)
+  const idx = fullDoc.levels.findIndex((l) => l.id === active.id)
+  const below = idx > 0 ? levelDocOf(fullDoc, fullDoc.levels[idx - 1]!.id) : null
+  const d = useMemo(() => {
+    if (!below) return ''
+    const derived = getDerived(below)
+    const parts: string[] = []
+    for (const poly of Object.values(derived.outlines.wallPolygons)) parts.push(polyPath(poly))
+    for (const patch of Object.values(derived.outlines.nodePatches)) parts.push(polyPath(patch))
+    return parts.join(' ')
+  }, [below])
+  if (!enabled || !below || !d) return null
+  return (
+    <path
+      d={d}
+      fill={theme.wall}
+      fillOpacity={0.14}
+      fillRule="nonzero"
+      stroke="none"
+      pointerEvents="none"
+    />
   )
 }
 

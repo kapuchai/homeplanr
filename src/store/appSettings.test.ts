@@ -22,6 +22,7 @@ const DEFAULTS: AppSettings = {
   collisionEnabled: true,
   wallHideMode: 'hide',
   ceilingsEnabled: true,
+  levelGhostEnabled: true,
   realisticLighting: false,
   exposure: 1,
   latitude: 60.17,
@@ -66,6 +67,7 @@ describe('parseAppSettings', () => {
       collisionEnabled: false,
       wallHideMode: 'off',
       ceilingsEnabled: false,
+      levelGhostEnabled: false,
       realisticLighting: true,
       exposure: 1.4,
       latitude: 59.33,
@@ -100,6 +102,7 @@ describe('parseAppSettings', () => {
           collisionEnabled: 'no',
           wallHideMode: 'fade',
           ceilingsEnabled: 1,
+          levelGhostEnabled: 'yes',
           realisticLighting: 'yes',
           exposure: 'bright',
           latitude: 200,
@@ -127,6 +130,7 @@ describe('parseAppSettings', () => {
       collisionEnabled: true, // 'no' → default
       wallHideMode: 'hide', // 'fade' does not exist (yet) → default
       ceilingsEnabled: true, // 1 → default
+      levelGhostEnabled: true, // 'yes' → default
       realisticLighting: false, // 'yes' → default
       exposure: 1, // non-number → default
       latitude: 90, // out of range → clamped
@@ -214,6 +218,7 @@ describe('useAppSettings persistence', () => {
       collisionEnabled: s.collisionEnabled,
       wallHideMode: s.wallHideMode,
       ceilingsEnabled: s.ceilingsEnabled,
+      levelGhostEnabled: s.levelGhostEnabled,
       realisticLighting: s.realisticLighting,
       exposure: s.exposure,
       latitude: s.latitude,
@@ -248,6 +253,7 @@ describe('useAppSettings persistence', () => {
     s.setCollisionEnabled(false)
     s.setWallHideMode('off')
     s.setCeilingsEnabled(false)
+    s.setLevelGhostEnabled(false)
     s.setRealisticLighting(true)
     s.setExposure(5) // clamps to 2
     s.setLatitude(51.51)
@@ -281,6 +287,7 @@ describe('useAppSettings persistence', () => {
       collisionEnabled: false,
       wallHideMode: 'off',
       ceilingsEnabled: false,
+      levelGhostEnabled: false,
       realisticLighting: true,
       exposure: 2,
       latitude: 51.51,
