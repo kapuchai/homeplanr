@@ -14,7 +14,7 @@ import {
   WebGLRenderer,
   type BufferGeometry,
 } from 'three'
-import type { ProjectDocument } from '../model/types'
+import type { LevelDoc } from '../model/types'
 import type { DerivedGeometry } from '../store/derived'
 import { CATALOG } from '../catalog'
 import { realizeItem } from '../catalog/realize'
@@ -97,7 +97,7 @@ function defaultFactory(): PreviewRendererLike {
  * sceneMaterials caches.
  */
 export function buildPreviewScene(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
 ): { scene: Scene; root: Group; dispose: () => void } {
   const scene = new Scene()
@@ -214,7 +214,7 @@ export interface ScenePreview {
  * (empty scene) or the pipeline is latched off. NEVER throws.
  */
 export function renderScenePreview(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
 ): ScenePreview | null {
   if (failed) return null

@@ -1,4 +1,4 @@
-import type { ProjectDocument, FurnitureInstance } from '../../model/types'
+import type { LevelDoc, FurnitureInstance } from '../../model/types'
 import type { NodeId, WallId } from '../../model/ids'
 import type { DerivedGeometry } from '../../store/derived'
 import type { RigStarts, RoomRig } from '../../model/mutations/roomRig'
@@ -14,7 +14,7 @@ import { gridTier } from '../viewport/viewportMath'
  */
 
 export function nodeCandidates(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   exclude?: ReadonlySet<NodeId>,
 ): SnapCandidate[] {
   const out: SnapCandidate[] = []
@@ -27,7 +27,7 @@ export function nodeCandidates(
 
 /** Closest point on each wall centerline (drives T-join splits). */
 export function wallPointCandidates(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   raw: Vec2,
   exclude?: ReadonlySet<WallId>,
 ): SnapCandidate[] {
@@ -53,7 +53,7 @@ export function wallPointCandidates(
 }
 
 /** Grid candidate: step = the DISPLAYED minor tier (snap what you see). */
-export function gridCandidate(doc: ProjectDocument, k: number): SnapCandidate {
+export function gridCandidate(doc: LevelDoc, k: number): SnapCandidate {
   return { kind: 'grid', step: gridTier(k, doc.settings.gridSize).minor }
 }
 
@@ -92,7 +92,7 @@ function itemAabb(f: FurnitureInstance): { cx: number; cy: number; hw: number; h
  * Only axis-aligned(±2°) participants emit guides.
  */
 export function alignmentGuideCandidates(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   dragged: { hw: number; hh: number; rotation: number },
   draggedIds: ReadonlySet<string>,
 ): SnapCandidate[] {
@@ -147,7 +147,7 @@ export function alignmentGuideCandidates(
  * stays catalog-free.
  */
 export function familyEdgeCandidates(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   dragged: { hw: number; hh: number },
   draggedIds: ReadonlySet<string>,
   isNeighbor: (f: FurnitureInstance) => boolean,
@@ -200,7 +200,7 @@ export function familyEdgeCandidates(
  * snapping works at any angle.
  */
 export function roomSnapCandidates(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   rig: RoomRig,
   starts: RigStarts,
   grab: Vec2,
@@ -256,7 +256,7 @@ export function roomSnapCandidates(
  * face; carries the auto-rotation and the 1-DOF slide line.
  */
 export function wallBackCandidate(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   _derived: DerivedGeometry,
   raw: Vec2,
   itemDepth: number,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULTS, emptyDocument, type ProjectDocument } from '../../model/types'
+import { testLevelDoc } from '../../test/fixtureDoc'
+import { DEFAULTS, type LevelDoc } from '../../model/types'
 import { addWallChain, addWallSegment } from '../../model/mutations/walls'
 import { addOpening } from '../../model/mutations/openings'
 import { addFurniture } from '../../model/mutations/furniture'
@@ -23,13 +24,13 @@ import {
   type Contact,
 } from './collision'
 
-const doc = () => emptyDocument('p_walk', 'walk', '2026-07-12T00:00:00.000Z')
+const doc = () => testLevelDoc('p_walk', 'walk')
 
 /** Half of the default wall thickness — face offset from the centerline. */
 const HALF_T = DEFAULTS.wallThickness / 2
 const R = PLAYER_RADIUS
 
-const setup = (build: (d: ProjectDocument) => void) => {
+const setup = (build: (d: LevelDoc) => void) => {
   resetDerivedForTests()
   const d = doc()
   build(d)

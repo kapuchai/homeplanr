@@ -5,6 +5,13 @@ export function renameProject(doc: ProjectDocument, name: string): void {
   if (trimmed) doc.name = trimmed
 }
 
+/** Project notes (pulled forward from 0.15.0): plain text, trimmed-empty
+ * clears the field so untouched files stay clean. */
+export function setNotes(doc: ProjectDocument, notes: string): void {
+  if (notes.trim()) doc.notes = notes
+  else delete doc.notes
+}
+
 export function updateSettings(
   doc: ProjectDocument,
   patch: Partial<ProjectSettings>,

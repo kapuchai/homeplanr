@@ -7,6 +7,7 @@ import { createMeasureTool } from './measureTool'
 import { createAnnotateTextTool } from './annotateTextTool'
 import { createDrawAreaTool } from './drawAreaTool'
 import { useDocStore } from '../../store/docStore'
+import { getActiveLevelDoc } from '../../store/levelView'
 import { useUiStore } from '../../store/uiStore'
 import { useInteractionStore } from '../session/interactionStore'
 import { useViewportStore } from '../viewport/viewportStore'
@@ -44,8 +45,11 @@ export type ToolRegistry = ReturnType<typeof createToolRegistry>
  * component-scoped.
  */
 export const toolContext: ToolContext = {
-  doc: () => useDocStore.getState().doc,
-  derived: () => getDerived(useDocStore.getState().doc),
+  // Tools see the ACTIVE level (v7) — the same view the mutation seam
+  // writes through, so a tool's reads and its commits can never disagree
+  // about which floor they touch.
+  doc: () => getActiveLevelDoc(),
+  derived: () => getDerived(getActiveLevelDoc()),
   actions: () => useDocStore.getState(),
   ui: () => useUiStore.getState(),
   interaction: () => useInteractionStore.getState(),

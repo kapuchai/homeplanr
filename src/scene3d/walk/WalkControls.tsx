@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Euler, Quaternion, Vector3, type EulerOrder } from 'three'
-import type { ProjectDocument } from '../../model/types'
+import type { LevelDoc } from '../../model/types'
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
 import { useUiStore } from '../../store/uiStore'
@@ -94,7 +94,7 @@ export function WalkControls({
   doc,
   derived,
 }: {
-  doc: ProjectDocument
+  doc: LevelDoc
   derived: DerivedGeometry
 }) {
   const camera = useThree((s) => s.camera)

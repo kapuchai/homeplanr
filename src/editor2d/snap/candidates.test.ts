@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDocument } from '../../model/types'
+import { testLevelDoc } from '../../test/fixtureDoc'
 import { addFurniture } from '../../model/mutations/furniture'
 import { familyEdgeCandidates } from './candidates'
 import { resolveSnap } from '../../geometry/snapping'
 import { vec } from '../../geometry/vec'
 
-const STAMP = '2026-07-17T00:00:00.000Z'
 
 function docWith(items: Parameters<typeof addFurniture>[1][]) {
-  const doc = emptyDocument('p_family', 'Family test', STAMP)
+  const doc = testLevelDoc('p_family', 'Family test')
   const ids = items.map((p) => addFurniture(doc, p))
   return { doc, ids }
 }

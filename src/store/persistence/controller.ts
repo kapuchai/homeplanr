@@ -22,6 +22,8 @@ import {
   type RecoveryBlob,
 } from './recovery'
 import { addAsset, gcAssets } from '../../model/mutations/assets'
+import { getActiveLevelDoc, levelDocOf } from '../levelView'
+import { useActiveLevel } from '../activeLevel'
 import { assetDataUrl, splitDataUrl, thumbDataUrl } from './imageIngest'
 import { renderScenePreview } from '../../scene3d/scenePreview'
 import { getDerived } from '../derived'
@@ -71,7 +73,10 @@ export function buildFileJson(snapshot: ProjectDocument): string {
       const asset = snapshot.previewAssetId ? snapshot.assets[snapshot.previewAssetId] : undefined
       if (asset) lastWrittenPreview = assetDataUrl(asset)
     } else {
-      const shot = renderScenePreview(snapshot, getDerived(snapshot))
+      // v7: the auto preview renders the ACTIVE level (the floor the user
+      // is looking at when they save — the roadmap's active-at-save call)
+      const level = levelDocOf(snapshot, useActiveLevel.getState().activeLevelId)
+      const shot = renderScenePreview(level, getDerived(level))
       const split = shot ? splitDataUrl(shot.dataUrl) : null
       if (shot && split) {
         const clone: ProjectDocument = { ...snapshot, assets: { ...snapshot.assets } }
@@ -424,7 +429,7 @@ export function newFromTemplate(name: string, raw: string): Promise<void> {
     recomputeDirty()
     // templates always carry content at the origin — frame it (the user may
     // have panned anywhere; Editor2D only fits on mount)
-    zoomToFitContent(useDocStore.getState().doc)
+    zoomToFitContent(getActiveLevelDoc())
   })
 }
 
@@ -449,7 +454,7 @@ async function applyOpened(
       autosaveError: false,
     })
     // frame the opened plan — the viewport may be anywhere (mount-only fit)
-    zoomToFitContent(useDocStore.getState().doc)
+    zoomToFitContent(getActiveLevelDoc())
     // preserveRecovery: only the Esc-DISMISSED launch prompt sets this —
     // the user deferred the decision, so the blob stays offerable on a
     // later launch (until the next edit's autosave, single-slot caveat)

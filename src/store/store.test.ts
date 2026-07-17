@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { getActiveLevelDoc } from './levelView'
 import { docTemporal, useDocStore } from './docStore'
 import { abortTx, beginTx, canRedo, canUndo, clearHistory, commitTx, isTxActive, safeUndo } from './transactions'
 import { getDerived, resetDerivedForTests } from './derived'
@@ -26,7 +27,7 @@ describe('docStore composition (pinned middleware stack)', () => {
   it('actions mutate through immer and produce a new doc identity per commit', () => {
     const before = useDocStore.getState().doc
     drawSquare()
-    const after = useDocStore.getState().doc
+    const after = getActiveLevelDoc()
     expect(after).not.toBe(before)
     expect(Object.keys(after.walls)).toHaveLength(4)
     expect(Object.keys(after.rooms)).toHaveLength(1)
@@ -76,7 +77,7 @@ describe('transactions', () => {
   it('N live mutations inside a tx collapse into exactly one history entry', () => {
     drawSquare()
     const base = past()
-    const nodeId = Object.keys(useDocStore.getState().doc.nodes)[0]! as NodeId
+    const nodeId = Object.keys(getActiveLevelDoc().nodes)[0]! as NodeId
     beginTx()
     for (let i = 1; i <= 5; i++) {
       useDocStore.getState().moveNode(nodeId, vec(-i * 0.1, -i * 0.1), { mode: 'live' })
@@ -84,18 +85,18 @@ describe('transactions', () => {
     useDocStore.getState().moveNode(nodeId, vec(-0.5, -0.5), { mode: 'commit' })
     commitTx()
     expect(past()).toBe(base + 1)
-    const n = useDocStore.getState().doc.nodes[nodeId]!
+    const n = getActiveLevelDoc().nodes[nodeId]!
     expect(n.x).toBeCloseTo(-0.5, 9)
     // one undo returns to the pre-drag square
     safeUndo()
-    expect(useDocStore.getState().doc.nodes[nodeId]!.x).toBeCloseTo(0, 9)
+    expect(getActiveLevelDoc().nodes[nodeId]!.x).toBeCloseTo(0, 9)
   })
 
   it('abortTx restores the pristine pre-drag doc reference, no entry', () => {
     drawSquare()
     const pristine = useDocStore.getState().doc
     const base = past()
-    const nodeId = Object.keys(pristine.nodes)[0]! as NodeId
+    const nodeId = Object.keys(getActiveLevelDoc().nodes)[0]! as NodeId
     beginTx()
     useDocStore.getState().moveNode(nodeId, vec(9, 9), { mode: 'live' })
     abortTx()
@@ -105,7 +106,7 @@ describe('transactions', () => {
 
   it('safeUndo is ignored while a tx is active', () => {
     drawSquare()
-    const nodeId = Object.keys(useDocStore.getState().doc.nodes)[0]! as NodeId
+    const nodeId = Object.keys(getActiveLevelDoc().nodes)[0]! as NodeId
     beginTx()
     useDocStore.getState().moveNode(nodeId, vec(1, 1), { mode: 'live' })
     const during = useDocStore.getState().doc
@@ -129,7 +130,7 @@ describe('transactions', () => {
     useDocStore.getState().addWallSegment(vec(0, 2), vec(0, 4))
     const base = past()
     // drag the (0,2) node down onto/through the horizontal wall
-    const doc = useDocStore.getState().doc
+    const doc = getActiveLevelDoc()
     const dragged = Object.values(doc.nodes).find((n) => n.x === 0 && n.y === 2)!
     beginTx()
     useDocStore.getState().moveNode(dragged.id, vec(0, 1), { mode: 'live' })
@@ -138,7 +139,7 @@ describe('transactions', () => {
     commitTx()
     expect(past()).toBe(base + 1)
     // the vertical wall's endpoint welded onto the horizontal wall → T-split
-    expect(Object.keys(useDocStore.getState().doc.walls)).toHaveLength(3)
+    expect(Object.keys(getActiveLevelDoc().walls)).toHaveLength(3)
     expect(canUndo()).toBe(true)
   })
 })
@@ -146,14 +147,14 @@ describe('transactions', () => {
 describe('derived geometry — per-entity reference stability', () => {
   it('same doc → same derived object (WeakMap)', () => {
     drawSquare()
-    const doc = useDocStore.getState().doc
-    expect(getDerived(doc)).toBe(getDerived(doc))
+    const level = getActiveLevelDoc()
+    expect(getDerived(level)).toBe(getDerived(level))
   })
 
   it('moving an isolated wall keeps square solids and room by reference', () => {
     drawSquare()
     useDocStore.getState().addWallSegment(vec(10, 10), vec(14, 10))
-    const doc1 = useDocStore.getState().doc
+    const doc1 = getActiveLevelDoc()
     const d1 = getDerived(doc1)
     const squareWallIds = Object.values(doc1.rooms)[0]!.wallCycle
     const isolated = (Object.keys(doc1.walls) as WallId[]).find(
@@ -164,7 +165,7 @@ describe('derived geometry — per-entity reference stability', () => {
     // move one endpoint of the isolated wall
     const isolatedNode = doc1.walls[isolated]!.a
     useDocStore.getState().moveNode(isolatedNode, vec(10, 11))
-    const doc2 = useDocStore.getState().doc
+    const doc2 = getActiveLevelDoc()
     const d2 = getDerived(doc2)
 
     for (const wid of squareWallIds) {
@@ -182,11 +183,11 @@ describe('derived geometry — per-entity reference stability', () => {
     useDocStore
       .getState()
       .addWallChain([vec(0, 0), vec(2, 0), vec(4, 0), vec(6, 0), vec(8, 0)])
-    const doc1 = useDocStore.getState().doc
+    const doc1 = getActiveLevelDoc()
     const d1 = getDerived(doc1)
     const endpoint = Object.values(doc1.nodes).find((n) => n.x === 0 && n.y === 0)!
     useDocStore.getState().moveNode(endpoint.id, vec(0, -0.7))
-    const doc2 = useDocStore.getState().doc
+    const doc2 = getActiveLevelDoc()
     const d2 = getDerived(doc2)
     const changed = (Object.keys(doc2.walls) as WallId[]).filter(
       (wid) => d2.wallSolids[wid] !== d1.wallSolids[wid],
@@ -208,11 +209,11 @@ describe('derived geometry — per-entity reference stability', () => {
 
   it('moving a square corner invalidates all four walls (all are junction partners) and the room', () => {
     drawSquare()
-    const doc1 = useDocStore.getState().doc
+    const doc1 = getActiveLevelDoc()
     const d1 = getDerived(doc1)
     const corner = Object.values(doc1.nodes).find((n) => n.x === 0 && n.y === 0)!
     useDocStore.getState().moveNode(corner.id, vec(-0.3, -0.3))
-    const doc2 = useDocStore.getState().doc
+    const doc2 = getActiveLevelDoc()
     const d2 = getDerived(doc2)
     // every square wall's miter moves (each shares a node with an incident wall)
     for (const wid of Object.keys(doc2.walls) as WallId[]) {
@@ -228,7 +229,7 @@ describe('serialization', () => {
     drawSquare()
     useDocStore.getState().addOpening({
       kind: 'door',
-      wallId: Object.keys(useDocStore.getState().doc.walls)[0]! as WallId,
+      wallId: Object.keys(getActiveLevelDoc().walls)[0]! as WallId,
       t: 0.5,
     })
     useDocStore.getState().addFurniture({
@@ -250,12 +251,12 @@ describe('serialization', () => {
     drawSquare()
     const doc = useDocStore.getState().doc
     const json = JSON.parse(serializeDocument(doc))
-    json.openings['o_ghost'] = { kind: 'door', wallId: 'w_missing', t: 0.5, width: 0.9, height: 2 }
-    json.nodes['n_bad'] = { x: 'NaN?', y: 0 }
+    json.levels[0].openings['o_ghost'] = { kind: 'door', wallId: 'w_missing', t: 0.5, width: 0.9, height: 2 }
+    json.levels[0].nodes['n_bad'] = { x: 'NaN?', y: 0 }
     const r = parseDocument(JSON.stringify(json))
     expect(r.warnings.length).toBeGreaterThanOrEqual(2)
     expect(r.healed).toBe(true)
-    expect(Object.keys(r.doc.openings)).toHaveLength(0)
+    expect(Object.keys(r.doc.levels[0]!.openings)).toHaveLength(0)
   })
 
   it('forward schemaVersion refuses with ForwardVersionError', () => {
@@ -311,7 +312,7 @@ describe('crash recovery decisions', () => {
 describe('transaction ownership tokens (M1 0.3.0)', () => {
   it('a stale owner token can neither commit nor abort a later transaction', () => {
     drawSquare()
-    const nodeId = Object.keys(useDocStore.getState().doc.nodes)[0]! as NodeId
+    const nodeId = Object.keys(getActiveLevelDoc().nodes)[0]! as NodeId
     const stale = beginTx()
     useDocStore.getState().moveNode(nodeId, vec(1, 1), { mode: 'live' })
     abortTx(stale)
@@ -339,14 +340,14 @@ describe('transaction ownership tokens (M1 0.3.0)', () => {
     useDocStore.getState().transformFurniture(id, { x: 3 })
     const second = beginTx() // preemption commits, never reverts
     expect(past()).toBe(base + 1)
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(3)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBe(3)
     useDocStore.getState().transformFurniture(id, { x: 5 })
     commitTx(second)
     expect(past()).toBe(base + 2)
     safeUndo()
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(3)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBe(3)
     safeUndo()
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(2)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBe(2)
   })
 
   it('beginTx ABORTS an open default-policy tx (unclosed gesture), as before', () => {
@@ -357,7 +358,7 @@ describe('transaction ownership tokens (M1 0.3.0)', () => {
     beginTx()
     useDocStore.getState().transformFurniture(id, { x: 9 })
     const second = beginTx()
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBe(2) // reverted
+    expect(getActiveLevelDoc().furniture[id]!.x).toBe(2) // reverted
     expect(past()).toBe(base)
     abortTx(second)
   })

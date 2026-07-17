@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { emptyDocument, type ProjectDocument } from '../../model/types'
+import { testLevelDoc } from '../../test/fixtureDoc'
+import { type LevelDoc } from '../../model/types'
 import { asOpeningId, type FurnitureId, type OpeningId } from '../../model/ids'
 import { addWallChain, addWallSegment } from '../../model/mutations/walls'
 import { addOpening } from '../../model/mutations/openings'
@@ -24,19 +25,19 @@ import { pillWidthPx } from '../render/pillMetrics'
  * straight-core corner faces (never node positions); furniture rays hit wall
  * faces along the item's local axes.
  */
-const doc = (): ProjectDocument => emptyDocument('p_test', 'test', '2026-07-11T00:00:00.000Z')
+const doc = (): LevelDoc => testLevelDoc('p_test', 'test')
 
-const mi = (d: ProjectDocument): MeasureInput => ({
+const mi = (d: LevelDoc): MeasureInput => ({
   doc: d,
   derived: getDerived(d),
   pxToWorld: 0.01,
   units: 'm',
 })
 
-const box = (d: ProjectDocument, x: number, y: number, rotation = 0, w = 1, dd = 0.6) =>
+const box = (d: LevelDoc, x: number, y: number, rotation = 0, w = 1, dd = 0.6) =>
   addFurniture(d, { catalogItemId: 'test-box', x, y, rotation, size: { w, d: dd, h: 1 } })
 
-const room4x3 = (d: ProjectDocument) =>
+const room4x3 = (d: LevelDoc) =>
   addWallChain(d, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
 
 beforeEach(() => resetDerivedForTests())
@@ -290,8 +291,8 @@ describe('furnitureSizeLabels (0.7.0 ladder)', () => {
 })
 
 describe('performance budgets (loose CI thresholds)', () => {
-  function bigFixture(): { d: ProjectDocument; furnitureId: FurnitureId; openingId: OpeningId } {
-    const d = emptyDocument('p_perf', 'perf', '2026-07-11T00:00:00.000Z')
+  function bigFixture(): { d: LevelDoc; furnitureId: FurnitureId; openingId: OpeningId } {
+    const d = testLevelDoc('p_perf', 'perf')
     // 10×5 grid of 2m rooms ⇒ >100 walls (mirrors store/perf.test.ts)
     for (let gx = 0; gx < 10; gx++) {
       for (let gy = 0; gy < 5; gy++) {

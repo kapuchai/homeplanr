@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../../model/types'
+import type { LevelDoc } from '../../model/types'
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
 import { dist, len } from '../../geometry/vec'
@@ -75,7 +75,7 @@ export interface CollisionSet {
   aabbs: { minX: number; minY: number; maxX: number; maxY: number }[]
 }
 
-export function buildCollisionSet(doc: ProjectDocument, derived: DerivedGeometry): CollisionSet {
+export function buildCollisionSet(doc: LevelDoc, derived: DerivedGeometry): CollisionSet {
   const obstacles: Obstacle[] = []
 
   for (const solid of Object.values(derived.wallSolids)) {
@@ -170,10 +170,10 @@ export function buildCollisionSet(doc: ProjectDocument, derived: DerivedGeometry
   return { obstacles, aabbs }
 }
 
-const setCache = new WeakMap<ProjectDocument, CollisionSet>()
+const setCache = new WeakMap<LevelDoc, CollisionSet>()
 
 /** Memoized on document identity (getDerived pattern — immer commits swap the doc object). */
-export function getCollisionSet(doc: ProjectDocument, derived: DerivedGeometry): CollisionSet {
+export function getCollisionSet(doc: LevelDoc, derived: DerivedGeometry): CollisionSet {
   const hit = setCache.get(doc)
   if (hit) return hit
   const set = buildCollisionSet(doc, derived)

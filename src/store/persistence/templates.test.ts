@@ -44,18 +44,18 @@ describe('bundled template plans', () => {
   it('templates carry real content: rooms named + floored, known furniture, doors and windows', () => {
     for (const t of TEMPLATES) {
       const { doc } = parseDocument(t.raw)
-      const rooms = Object.values(doc.rooms)
+      const rooms = Object.values(doc.levels[0]!.rooms)
       expect(rooms.length, t.id).toBeGreaterThanOrEqual(2)
       for (const r of rooms) {
         expect(r.name, `${t.id}: unnamed room`).toBeTruthy()
         expect(r.floorMaterialId, `${t.id}: unfloored room`).toBeTruthy()
       }
-      const items = Object.values(doc.furniture)
+      const items = Object.values(doc.levels[0]!.furniture)
       expect(items.length, t.id).toBeGreaterThanOrEqual(10)
       for (const f of items) {
         expect(CATALOG[f.catalogItemId], `${t.id}: unknown item ${f.catalogItemId}`).toBeDefined()
       }
-      const openings = Object.values(doc.openings)
+      const openings = Object.values(doc.levels[0]!.openings)
       expect(openings.some((o) => o.kind === 'door'), t.id).toBe(true)
       expect(openings.some((o) => o.kind === 'window'), t.id).toBe(true)
     }
@@ -107,7 +107,7 @@ describe('newFromTemplate — the newProject state matrix', () => {
     expect(usePersistStore.getState().currentFilePath).toBeNull()
     expect(usePersistStore.getState().dirty).toBe(false)
     expect(canUndo()).toBe(false)
-    expect(Object.keys(first.furniture).length).toBeGreaterThanOrEqual(10)
+    expect(Object.keys(first.levels[0]!.furniture).length).toBeGreaterThanOrEqual(10)
 
     await newFromTemplate(t.name, t.raw)
     const second = useDocStore.getState().doc

@@ -15,6 +15,7 @@ export type RoomId = Id<'room'>
 export type FurnitureId = Id<'furniture'>
 export type AnnotationId = Id<'annotation'>
 export type AssetId = Id<'asset'>
+export type LevelId = Id<'level'>
 
 const id = (prefix: string) => `${prefix}_${nanoid(10)}`
 
@@ -25,6 +26,7 @@ export const newRoomId = (): RoomId => id('r') as RoomId
 export const newFurnitureId = (): FurnitureId => id('f') as FurnitureId
 export const newAnnotationId = (): AnnotationId => id('a') as AnnotationId
 export const newAssetId = (): AssetId => id('i') as AssetId
+export const newLevelId = (): LevelId => id('l') as LevelId
 export const newProjectId = (): string => id('p')
 
 /** Cast helpers for validated/parsed input (validator's responsibility). */
@@ -35,3 +37,4 @@ export const asRoomId = (s: string): RoomId => s as RoomId
 export const asFurnitureId = (s: string): FurnitureId => s as FurnitureId
 export const asAnnotationId = (s: string): AnnotationId => s as AnnotationId
 export const asAssetId = (s: string): AssetId => s as AssetId
+export const asLevelId = (s: string): LevelId => s as LevelId

@@ -1,4 +1,4 @@
-import type { ProjectDocument, Room } from '../model/types'
+import type { LevelDoc, Room } from '../model/types'
 import type { FurnitureId, RoomId, WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import type { AddFurnitureParams } from '../model/mutations/furniture'
@@ -51,7 +51,7 @@ let payload: ClipboardPayload | null = null
 
 /** Build a payload for `ids` without touching the module clipboard. */
 export function buildPayload(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   ids: readonly string[],
 ): ClipboardPayload | null {
@@ -157,7 +157,7 @@ export function buildPayload(
 
 /** Copy `ids` (walls/rooms/furniture). Nothing copyable ⇒ false, untouched. */
 export function copyToClipboard(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   ids: readonly string[],
 ): boolean {

@@ -1,4 +1,4 @@
-import type { Opening, ProjectDocument, Window } from '../types'
+import type { Opening, LevelDoc, Window } from '../types'
 import type { FurnitureId, OpeningId } from '../ids'
 import { add, dist, dot, perp, scale, sub, type Vec2 } from '../../geometry/vec'
 import { closestPointOnSegment } from '../../geometry/segment'
@@ -36,7 +36,7 @@ export interface AttachedTransform {
  * unusable (missing wall/nodes, degenerate wall).
  */
 export function windowAttachTransform(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   op: Opening,
   ref: Vec2,
   depth: number,
@@ -68,7 +68,7 @@ export function windowAttachTransform(
  * segment on the wall centerline). Null when none is close enough.
  */
 export function findWindowNear(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   p: Vec2,
   maxDist: number,
 ): Window | null {
@@ -100,7 +100,7 @@ export function findWindowNear(
 /** Attach + sync in one step (placement drop / drag re-target). No-op on
  * missing furniture, non-windows, or unusable geometry. */
 export function attachFurnitureToOpening(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: FurnitureId,
   openingId: OpeningId,
   ref?: Vec2,
@@ -117,7 +117,7 @@ export function attachFurnitureToOpening(
   f.size.w = t.width
 }
 
-export function detachFurniture(doc: ProjectDocument, id: FurnitureId): void {
+export function detachFurniture(doc: LevelDoc, id: FurnitureId): void {
   const f = doc.furniture[id]
   if (f) delete f.attachedOpeningId
 }
@@ -136,7 +136,7 @@ export function detachFurniture(doc: ProjectDocument, id: FurnitureId): void {
  * just leaves the stored transform alone; the commit re-run settles it.
  */
 export function reconcileAttachedFurniture(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   mode: 'live' | 'commit' = 'commit',
 ): void {
   for (const f of Object.values(doc.furniture)) {

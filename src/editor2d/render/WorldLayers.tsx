@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
-import { useDocStore } from '../../store/docStore'
+import { useActiveLevelDoc } from '../../store/levelView'
 import { useUiStore } from '../../store/uiStore'
 import { useAppSettings } from '../../store/appSettings'
 import { formatArea } from '../../format/units'
 import { useViewportStore } from '../viewport/viewportStore'
 import { getDerived, type DerivedGeometry } from '../../store/derived'
-import type { ProjectDocument } from '../../model/types'
+import type { LevelDoc } from '../../model/types'
 import { add, normalize, perp, scale, sub } from '../../geometry/vec'
 import { WALL_PAINTS } from '../../catalog/palette'
 import { CATALOG } from '../../catalog'
@@ -29,7 +29,7 @@ import { useThemeStore } from '../../theme/themeStore'
  */
 
 export function WorldLayers() {
-  const doc = useDocStore((s) => s.doc)
+  const doc = useActiveLevelDoc()
   const derived = getDerived(doc)
   return (
     <>
@@ -102,7 +102,7 @@ function RoomLabels({ derived }: { derived: DerivedGeometry }) {
   )
 }
 
-function WallsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
+function WallsLayer({ doc, derived }: { doc: LevelDoc; derived: DerivedGeometry }) {
   const theme = useThemeStore((s) => s.theme)
   const d = useMemo(() => {
     const parts: string[] = []
@@ -139,7 +139,7 @@ function WallsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGe
   )
 }
 
-function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
+function OpeningsLayer({ doc, derived }: { doc: LevelDoc; derived: DerivedGeometry }) {
   const els: React.ReactNode[] = []
   for (const solid of Object.values(derived.wallSolids)) {
     const wall = doc.walls[solid.wallId]
@@ -161,7 +161,7 @@ function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: Derive
   return <g>{els}</g>
 }
 
-function FurnitureLayer({ doc }: { doc: ProjectDocument }) {
+function FurnitureLayer({ doc }: { doc: LevelDoc }) {
   return (
     <g>
       {Object.values(doc.furniture).map((f) => {
@@ -186,7 +186,7 @@ function FurnitureLayer({ doc }: { doc: ProjectDocument }) {
   )
 }
 
-function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
+function SelectionLayer({ doc, derived }: { doc: LevelDoc; derived: DerivedGeometry }) {
   const selection = useUiStore((s) => s.selection)
   const hovered = useUiStore((s) => s.hoveredId)
   const highlightSide = useUiStore((s) => s.highlightWallSide)

@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../types'
+import type { LevelDoc } from '../types'
 import { DEFAULTS } from '../types'
 import {
   newNodeId,
@@ -56,7 +56,7 @@ export interface GraphPayload {
 }
 
 export function pasteSubgraph(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   payload: GraphPayload,
   target: Vec2,
 ): WallId[] {

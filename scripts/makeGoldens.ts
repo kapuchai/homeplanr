@@ -185,6 +185,14 @@ function buildFull(): ProjectDocument {
   return doc
 }
 
+// Guard BEFORE any build or write: after a bump (SCHEMA_VERSION ahead of
+// BUILDER_VERSION) this script is intentionally version-rotted — rewriting
+// the builders to the new outgoing surface is step 1 of the next bump.
+assert(
+  (SCHEMA_VERSION as number) === BUILDER_VERSION,
+  `builders freeze v${BUILDER_VERSION} but SCHEMA_VERSION is ${SCHEMA_VERSION} — rewrite them first (RUNBOOK schema checklist)`,
+)
+
 const outDir = fileURLToPath(new URL('../src/test/goldens/', import.meta.url))
 mkdirSync(outDir, { recursive: true })
 

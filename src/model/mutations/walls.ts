@@ -1,4 +1,4 @@
-import type { ProjectDocument, Wall, WallNode } from '../types'
+import type { LevelDoc, Wall, WallNode } from '../types'
 import { DEFAULTS } from '../types'
 import { WALL_FINISH_IDS, WALL_PAINT_IDS } from '../../catalog/palette'
 import { newNodeId, newWallId, type AnnotationId, type FurnitureId, type NodeId, type OpeningId, type WallId } from '../ids'
@@ -9,16 +9,16 @@ import { GEOM_EPS, MERGE_EPS, NORMALIZE_MAX_PASSES } from '../../geometry/consta
 import { runPipeline, type MutationMode } from './pipeline'
 
 /** Node position lookup (throwing accessor — invariants guarantee presence). */
-const pos = (doc: ProjectDocument, id: NodeId): Vec2 => {
+const pos = (doc: LevelDoc, id: NodeId): Vec2 => {
   const n = doc.nodes[id]!
   return { x: n.x, y: n.y }
 }
 
-const wallLength = (doc: ProjectDocument, w: Wall): number =>
+const wallLength = (doc: LevelDoc, w: Wall): number =>
   dist(pos(doc, w.a), pos(doc, w.b))
 
 /** Find an existing node within MERGE_EPS of p, else create one. */
-export function getOrCreateNode(doc: ProjectDocument, p: Vec2): NodeId {
+export function getOrCreateNode(doc: LevelDoc, p: Vec2): NodeId {
   let best: WallNode | null = null
   let bestD = MERGE_EPS
   for (const n of Object.values(doc.nodes)) {
@@ -46,7 +46,7 @@ export interface AddWallResult {
  * wallId: null but still reports the nodes).
  */
 export function addWallSegment(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   p1: Vec2,
   p2: Vec2,
   opts: { thickness?: number; height?: number; mode?: MutationMode } = {},
@@ -60,7 +60,7 @@ export function addWallSegment(
 
 /** Add a chain of wall segments through the given points. */
 export function addWallChain(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   points: readonly Vec2[],
   opts: { thickness?: number; height?: number; mode?: MutationMode } = {},
 ): WallId[] {
@@ -76,7 +76,7 @@ export function addWallChain(
 }
 
 function connectNodes(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   a: NodeId,
   b: NodeId,
   opts: { thickness?: number; height?: number },
@@ -103,7 +103,7 @@ function connectNodes(
 
 /** Move a node. 'live' during drags; 'commit' at pointer-up. */
 export function moveNode(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   nodeId: NodeId,
   p: Vec2,
   opts: { mode?: MutationMode } = {},
@@ -117,7 +117,7 @@ export function moveNode(
 
 /** Translate a wall segment perpendicular/freely by moving both nodes. */
 export function moveWall(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   wallId: WallId,
   delta: Vec2,
   opts: { mode?: MutationMode } = {},
@@ -139,7 +139,7 @@ export function moveWall(
  * (plan-pinned): node b moves along the a→b axis; a stays put.
  */
 export function setWallLength(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   wallId: WallId,
   length: number,
   opts: { mode?: MutationMode } = {},
@@ -194,7 +194,7 @@ export function applyWallFinish(
 }
 
 export function updateWall(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   wallId: WallId,
   patch: Partial<
     Pick<Wall, 'thickness' | 'height' | 'paintFront' | 'paintBack' | 'finishFront' | 'finishBack'>
@@ -225,7 +225,7 @@ export function updateWall(
  * used by normalizeGraph; public callers use splitWall below).
  */
 export function splitWallRaw(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   wallId: WallId,
   s: number,
   atNode?: NodeId,
@@ -280,7 +280,7 @@ export function splitWallRaw(
 }
 
 export function splitWall(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   wallId: WallId,
   s: number,
   opts: { mode?: MutationMode } = {},
@@ -296,7 +296,7 @@ export function splitWall(
  * GC'd by the pipeline. Rooms are derived — never directly deletable.
  */
 export function deleteEntities(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   ids: readonly (WallId | NodeId | OpeningId | FurnitureId | AnnotationId)[],
   opts: { mode?: MutationMode } = {},
 ): void {
@@ -337,7 +337,7 @@ export function deleteEntities(
  * use the lexicographic rule instead.
  */
 export function mergeNodes(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   survivor: NodeId,
   loser: NodeId,
   opts: { mode?: MutationMode } = {},
@@ -349,7 +349,7 @@ export function mergeNodes(
 
 /** Rewire all walls from `from` to `to`, dropping degenerates + dupes. */
 function rewireNode(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   from: NodeId,
   to: NodeId,
   demoted?: ReadonlySet<string>,
@@ -370,7 +370,7 @@ function rewireNode(
 
 /** Remove duplicate node-pair walls. Survivor = smallest id, except a
  * demoted (pasted) wall never survives against a kept one. */
-function dedupeWalls(doc: ProjectDocument, demoted?: ReadonlySet<string>): void {
+function dedupeWalls(doc: LevelDoc, demoted?: ReadonlySet<string>): void {
   const rank = (w: Wall) => (demoted?.has(w.id) ? 1 : 0)
   const byPair = new Map<string, Wall>()
   for (const w of Object.values(doc.walls).sort(
@@ -401,7 +401,7 @@ function dedupeWalls(doc: ProjectDocument, demoted?: ReadonlySet<string>): void 
   }
 }
 
-function gcOrphanNodes(doc: ProjectDocument): void {
+function gcOrphanNodes(doc: LevelDoc): void {
   const used = new Set<NodeId>()
   for (const w of Object.values(doc.walls)) {
     used.add(w.a)
@@ -422,7 +422,7 @@ function gcOrphanNodes(doc: ProjectDocument): void {
  * 4. dedupe duplicate-pair walls, GC orphan nodes;
  * repeated until stable or NORMALIZE_MAX_PASSES (best-effort + dev warning).
  */
-export function normalizeGraph(doc: ProjectDocument, demoted?: ReadonlySet<string>): void {
+export function normalizeGraph(doc: LevelDoc, demoted?: ReadonlySet<string>): void {
   // Working copy — splits mint fresh ids mid-normalization, and fragments of
   // demoted walls must stay demoted (splitWallRaw adds them here).
   const demo = demoted ? new Set(demoted) : undefined
@@ -511,7 +511,7 @@ export function normalizeGraph(doc: ProjectDocument, demoted?: ReadonlySet<strin
 }
 
 /** Find and split the first proper interior wall×wall crossing. */
-function splitOneCrossing(doc: ProjectDocument, demoted?: Set<string>): boolean {
+function splitOneCrossing(doc: LevelDoc, demoted?: Set<string>): boolean {
   const list = (Object.keys(doc.walls) as WallId[]).sort()
   for (let i = 0; i < list.length; i++) {
     const w1 = doc.walls[list[i]!]

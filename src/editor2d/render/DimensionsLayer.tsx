@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useDocStore } from '../../store/docStore'
+import { useActiveLevelDoc } from '../../store/levelView'
 import { useAppSettings, type DimensionLevel } from '../../store/appSettings'
 import { useUiStore } from '../../store/uiStore'
 import { useViewportStore } from '../viewport/viewportStore'
@@ -26,7 +26,7 @@ export function DimensionsLayer() {
 }
 
 function Labels({ level }: { level: Exclude<DimensionLevel, 'off'> }) {
-  const doc = useDocStore((s) => s.doc)
+  const doc = useActiveLevelDoc()
   const units = useAppSettings((s) => s.units)
   const uiScale = useAppSettings((s) => s.uiScale)
   const k = useViewportStore((s) => Math.round(s.k / 4) * 4)

@@ -1,4 +1,4 @@
-import type { ProjectDocument, Room } from '../types'
+import type { LevelDoc, Room } from '../types'
 import { newRoomId, type RoomId, type WallId } from '../ids'
 import { detectFaces } from '../../geometry/faces'
 import { pointInPolygonWithHoles } from '../../geometry/polygon'
@@ -16,7 +16,7 @@ import { roomTypeSpec } from '../../catalog/roomTypes'
  * Runs inside topology-changing mutations (pipeline 'commit' mode) so
  * identity is captured by undo snapshots and serialized documents.
  */
-export function reconcileRooms(doc: ProjectDocument): void {
+export function reconcileRooms(doc: LevelDoc): void {
   const faces = detectFaces(doc.nodes, doc.walls)
 
   const roomFingerprint = (room: Room): Set<WallId> => {
@@ -92,7 +92,7 @@ export function reconcileRooms(doc: ProjectDocument): void {
   }
 }
 
-export function renameRoom(doc: ProjectDocument, id: RoomId, name: string): void {
+export function renameRoom(doc: LevelDoc, id: RoomId, name: string): void {
   const room = doc.rooms[id]
   if (!room) return
   const trimmed = name.trim()
@@ -101,7 +101,7 @@ export function renameRoom(doc: ProjectDocument, id: RoomId, name: string): void
 }
 
 export function setRoomFloorMaterial(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: RoomId,
   materialId: string | undefined,
 ): void {
@@ -117,7 +117,7 @@ export function setRoomFloorMaterial(
  * room has no explicit floorMaterialId — a user's floor choice is never
  * overwritten (and clearing the type never touches the floor).
  */
-export function setRoomType(doc: ProjectDocument, id: RoomId, roomType: string | undefined): void {
+export function setRoomType(doc: LevelDoc, id: RoomId, roomType: string | undefined): void {
   const room = doc.rooms[id]
   if (!room) return
   if (roomType) {
@@ -141,7 +141,7 @@ export function setRoomType(doc: ProjectDocument, id: RoomId, roomType: string |
  * One call = one undo entry; no pipeline run (paint never alters topology).
  */
 export function paintRoomWalls(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   roomId: RoomId,
   paintId: string | undefined,
 ): void {

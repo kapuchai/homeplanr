@@ -64,7 +64,7 @@ import { CATALOG } from '../catalog'
 import { realizeItem } from '../catalog/realize'
 import type { WallSolid, PatchSolid, RealizedOpening } from '../geometry/wallSolids'
 import { openingStyleSpec } from '../catalog/openingStyles'
-import type { FurnitureInstance, ProjectDocument, Wall } from '../model/types'
+import type { FurnitureInstance, LevelDoc, Wall } from '../model/types'
 import type { CatalogItem, MaterialId } from '../catalog/types'
 import { t } from '../i18n'
 
@@ -504,7 +504,7 @@ function OpeningFixtures({
   solid,
   visible = true,
 }: {
-  doc: ProjectDocument
+  doc: LevelDoc
   solid: WallSolid
   /** Follows the wall's occluder verdict — a hidden wall's fixtures
    * must not float in the opening it no longer carves visibly. */
@@ -708,7 +708,7 @@ function ShadowBudgetBridge({
   enabled,
   onBudget,
 }: {
-  doc: ProjectDocument
+  doc: LevelDoc
   enabled: boolean
   onBudget: (ids: Set<FurnitureId>) => void
 }) {
@@ -969,7 +969,7 @@ function ThemeBridge3D() {
  * orbit frame.
  */
 function ShadowUpdateBridge(_props: {
-  doc: ProjectDocument
+  doc: LevelDoc
   hiddenWalls: Set<WallId>
   shadowIds: Set<FurnitureId>
 }) {

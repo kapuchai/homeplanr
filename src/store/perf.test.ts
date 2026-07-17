@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDocument, type ProjectDocument } from '../model/types'
+import { testLevelDoc } from '../test/fixtureDoc'
+import { type LevelDoc } from '../model/types'
 import { addWallChain } from '../model/mutations/walls'
 import { addOpening } from '../model/mutations/openings'
 import { addFurniture } from '../model/mutations/furniture'
@@ -12,8 +13,8 @@ import { vec } from '../geometry/vec'
  * far lower; these exist to catch order-of-magnitude regressions, not to
  * benchmark).
  */
-function bigFixture(): ProjectDocument {
-  const doc = emptyDocument('p_perf', 'perf', '2026-07-11T00:00:00.000Z')
+function bigFixture(): LevelDoc {
+  const doc = testLevelDoc('p_perf', 'perf')
   // 10×5 grid of 2m rooms ⇒ >100 walls
   for (let gx = 0; gx < 10; gx++) {
     for (let gy = 0; gy < 5; gy++) {

@@ -28,7 +28,7 @@ import { useViewportStore } from '../viewport/viewportStore'
 import { DIMENSION_LEVELS, useAppSettings } from '../../store/appSettings'
 import { KEY_ZOOM_FACTOR } from '../viewport/viewportMath'
 import type { FurnitureId } from '../../model/ids'
-import type { ProjectDocument } from '../../model/types'
+import type { LevelDoc } from '../../model/types'
 
 /**
  * THE keyboard entry point (plan-pinned):
@@ -73,7 +73,7 @@ export function toKeyInput(e: KeyboardEvent): KeyInput {
 }
 
 /** Fit the 2D view to the doc content — Shift+1 and the ZoomControls Fit button. */
-export function zoomToFitContent(doc: ProjectDocument): void {
+export function zoomToFitContent(doc: LevelDoc): void {
   useViewportStore.getState().zoomToFit(polygonBounds(docContentBounds(doc, getDerived(doc))))
 }
 

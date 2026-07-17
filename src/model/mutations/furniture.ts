@@ -1,4 +1,4 @@
-import type { FurnitureInstance, ProjectDocument } from '../types'
+import type { FurnitureInstance, LevelDoc } from '../types'
 import { newFurnitureId, type AssetId, type FurnitureId, type OpeningId } from '../ids'
 import { addAsset, type AssetContent } from './assets'
 import { reconcileAttachedFurniture } from './attachment'
@@ -42,7 +42,7 @@ export interface AddFurnitureParams {
   lightOn?: boolean
 }
 
-export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): FurnitureId {
+export function addFurniture(doc: LevelDoc, params: AddFurnitureParams): FurnitureId {
   const id = newFurnitureId()
   doc.furniture[id] = {
     id,
@@ -71,14 +71,14 @@ export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): 
 
 /** Batch add (paste); the docStore wires it as ONE set ⇒ one undo entry. */
 export function addFurnitureBatch(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   items: readonly AddFurnitureParams[],
 ): FurnitureId[] {
   return items.map((params) => addFurniture(doc, params))
 }
 
 export function transformFurniture(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: FurnitureId,
   patch: Partial<Pick<FurnitureInstance, 'x' | 'y' | 'rotation' | 'elevation' | 'mirrored'>>,
   opts: { quantize?: boolean } = {},
@@ -108,7 +108,7 @@ export function transformFurniture(
 }
 
 export function resizeFurniture(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: FurnitureId,
   size: Partial<{ w: number; d: number; h: number }>,
 ): void {
@@ -126,7 +126,7 @@ export function resizeFurniture(
   if (f.attachedOpeningId && size.d !== undefined) reconcileAttachedFurniture(doc)
 }
 
-export function renameFurniture(doc: ProjectDocument, id: FurnitureId, name: string): void {
+export function renameFurniture(doc: LevelDoc, id: FurnitureId, name: string): void {
   const f = doc.furniture[id]
   if (!f) return
   const trimmed = name.trim()
@@ -139,7 +139,7 @@ export function renameFurniture(doc: ProjectDocument, id: FurnitureId, name: str
  * prices clear rather than store junk. Prices are unit-less — display
  * dresses them in the currency device pref. */
 export function setFurnitureMeta(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: FurnitureId,
   patch: { price?: number | undefined; notes?: string | undefined },
 ): void {
@@ -169,7 +169,7 @@ export function setFurnitureMeta(
  * rather than store junk (the v6 validator keeps finite > 0 only).
  */
 export function setFurnitureLight(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: FurnitureId,
   patch: { lumen?: number | undefined; lightOn?: boolean | undefined },
 ): void {
@@ -191,7 +191,7 @@ export function setFurnitureLight(
  * clean). Values are NOT validated here — the render side falls back on
  * unknowns (open-registry rule). */
 export function setMaterialOverride(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: FurnitureId,
   slot: string,
   value: string | undefined,
@@ -210,7 +210,7 @@ export function setMaterialOverride(
  * item's placeholder art). The asset itself is added via addAsset — orphans
  * left behind by a swap/clear are shed by gcAssets at file-write time. */
 export function setFurnitureAsset(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: FurnitureId,
   assetId: AssetId | undefined,
 ): void {
@@ -222,7 +222,7 @@ export function setFurnitureAsset(
 
 /** Duplicate selected furniture at a +(0.25, 0.25) m offset; returns new ids. */
 export function duplicateFurniture(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   ids: readonly FurnitureId[],
 ): FurnitureId[] {
   const created: FurnitureId[] = []
@@ -272,7 +272,7 @@ function footprintAabb(f: FurnitureInstance): {
  * 'bottom' = min data-y, left/right = min/max x. One set ⇒ one undo entry.
  */
 export function alignFurniture(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   ids: readonly FurnitureId[],
   edge: AlignEdge,
 ): void {
@@ -312,7 +312,7 @@ export function alignFurniture(
  * spacing. Order = current center order, stable.
  */
 export function distributeFurniture(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   ids: readonly FurnitureId[],
   axis: 'x' | 'y',
 ): void {

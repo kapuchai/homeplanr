@@ -1,4 +1,14 @@
-import type { AnnotationId, AssetId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from './ids'
+import type {
+  AnnotationId,
+  AssetId,
+  FurnitureId,
+  LevelId,
+  NodeId,
+  OpeningId,
+  RoomId,
+  WallId,
+} from './ids'
+import { newLevelId } from './ids'
 
 /**
  * The document model — the single source of truth both renderers derive from.
@@ -83,6 +93,10 @@ export interface Room {
   /** Open room-type registry (v4, UI lands in 0.8.0); any non-empty string —
    * render-side fallback handles unknown values. */
   roomType?: string
+  /** m the room's floor slab sits above its level's floor plane (v7 —
+   * podium/loft steps; absent = 0). Level elevation stacking never reads
+   * it — it is a within-level offset only. */
+  floorElevation?: number
 }
 
 export interface FurnitureInstance {
@@ -187,13 +201,41 @@ export interface ProjectSettings {
   defaultWallHeight: number
 }
 
-export interface ProjectDocument {
-  schemaVersion: 6
-  id: string
-  name: string
-  /** ISO strings. Mutations never touch updatedAt — serialize() stamps it. */
-  createdAt: string
-  updatedAt: string
+/**
+ * One storey (v7). Entity records live INSIDE their level — a level is the
+ * unit of 2D editing (one active level at a time) and of 3D stacking.
+ * Array order in ProjectDocument.levels = stacking order, index 0 = ground.
+ */
+export interface Level {
+  id: LevelId
+  /** User label; absent = the chrome fallback ("Floor N") at render. */
+  name?: string
+  /** Absolute z (m) of this level's floor plane — OVERRIDE only. Absent =
+   * derived by stacking (see model/levels.ts levelElevations): sum of the
+   * levels below (max wall height + slab). No UI in 0.13.0; the field
+   * exists so split-level never needs a schema break. */
+  elevation?: number
+  nodes: Record<NodeId, WallNode>
+  walls: Record<WallId, Wall>
+  openings: Record<OpeningId, Opening>
+  rooms: Record<RoomId, Room>
+  furniture: Record<FurnitureId, FurnitureInstance>
+  annotations: Record<AnnotationId, Annotation>
+}
+
+/**
+ * The single-level working view (v7) — the shape every entity mutation,
+ * getDerived, hit-testing, snapping, and the 2D renderer operate on. Its
+ * entity maps ALIAS one Level's maps; `assets` and `settings` alias the
+ * document's top-level fields (walls read default thickness/height,
+ * wall art writes assets). Views are plain wrappers: writes go THROUGH
+ * the aliased maps (immer drafts in mutations), never onto the view's own
+ * properties — the doc-scoped fields (name, preview, notes, levels) are
+ * deliberately absent so a level-scoped mutation CANNOT touch them.
+ */
+export interface LevelDoc {
+  /** The wrapped level's id — memo/cache key for per-level derived state. */
+  levelId: LevelId
   settings: ProjectSettings
   nodes: Record<NodeId, WallNode>
   walls: Record<WallId, Wall>
@@ -201,9 +243,22 @@ export interface ProjectDocument {
   rooms: Record<RoomId, Room>
   furniture: Record<FurnitureId, FurnitureInstance>
   annotations: Record<AnnotationId, Annotation>
+  assets: Record<AssetId, ImageAsset>
+}
+
+export interface ProjectDocument {
+  schemaVersion: 7
+  id: string
+  name: string
+  /** ISO strings. Mutations never touch updatedAt — serialize() stamps it. */
+  createdAt: string
+  updatedAt: string
+  settings: ProjectSettings
+  /** Storeys, ground first (v7). Never empty — the validator mints one. */
+  levels: Level[]
   /** Embedded image assets (v6) — inert leaf data, excluded from graph
-   * self-heal; referenced by FurnitureInstance.assetId and
-   * previewAssetId. */
+   * self-heal; SHARED across levels (referenced by
+   * FurnitureInstance.assetId on any level and previewAssetId). */
   assets: Record<AssetId, ImageAsset>
   /** Save-preview image (0.11.0, additive on v6). Without previewCustom
    * the preview is AUTO: regenerated into the write-time clone at every
@@ -213,9 +268,11 @@ export interface ProjectDocument {
    * so GC keeps the asset; dangling ids are kept like furniture art. */
   previewAssetId?: AssetId
   previewCustom?: true
+  /** Free-form project notes (pulled forward from 0.15.0; additive on v7). */
+  notes?: string
 }
 
-export const SCHEMA_VERSION = 6 as const
+export const SCHEMA_VERSION = 7 as const
 
 /** Pinned defaults (plan: "DEFAULTS"). All meters. */
 export const DEFAULTS = {
@@ -246,6 +303,18 @@ export function defaultSettings(): ProjectSettings {
   }
 }
 
+export function emptyLevel(id: LevelId = newLevelId()): Level {
+  return {
+    id,
+    nodes: {},
+    walls: {},
+    openings: {},
+    rooms: {},
+    furniture: {},
+    annotations: {},
+  }
+}
+
 export function emptyDocument(id: string, name: string, nowIso: string): ProjectDocument {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -254,12 +323,7 @@ export function emptyDocument(id: string, name: string, nowIso: string): Project
     createdAt: nowIso,
     updatedAt: nowIso,
     settings: defaultSettings(),
-    nodes: {},
-    walls: {},
-    openings: {},
-    rooms: {},
-    furniture: {},
-    annotations: {},
+    levels: [emptyLevel()],
     assets: {},
   }
 }

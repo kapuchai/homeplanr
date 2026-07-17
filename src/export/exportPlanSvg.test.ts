@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { emptyDocument, type ProjectDocument, type Wall } from '../model/types'
+import { testLevelDoc } from '../test/fixtureDoc'
+import { type LevelDoc, type Wall } from '../model/types'
 import { addWallChain, addWallSegment } from '../model/mutations/walls'
 import { addOpening } from '../model/mutations/openings'
 import { addFurniture, transformFurniture } from '../model/mutations/furniture'
@@ -26,7 +27,7 @@ const inkLines = (ink: readonly OpeningPrim[], role: string) =>
 const inkArc = (ink: readonly OpeningPrim[]) =>
   ink.find((p): p is Extract<OpeningPrim, { kind: 'arc' }> => p.kind === 'arc')!
 
-const wallBetween = (doc: ProjectDocument, a: { x: number; y: number }, b: { x: number; y: number }): Wall => {
+const wallBetween = (doc: LevelDoc, a: { x: number; y: number }, b: { x: number; y: number }): Wall => {
   const hit = Object.values(doc.walls).find((w) => {
     const na = doc.nodes[w.a]!
     const nb = doc.nodes[w.b]!
@@ -39,8 +40,8 @@ const wallBetween = (doc: ProjectDocument, a: { x: number; y: number }, b: { x: 
 }
 
 /** 4×3 room + door (bottom wall) + window (right wall) + sofa. */
-function roomFixture(): ProjectDocument {
-  const doc = emptyDocument('p_export', 'Export Fixture', '2026-07-12T00:00:00.000Z')
+function roomFixture(): LevelDoc {
+  const doc = testLevelDoc('p_export', 'Export Fixture')
   addWallChain(doc, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
   addOpening(doc, {
     kind: 'door',
@@ -61,10 +62,10 @@ function roomFixture(): ProjectDocument {
 
 /** Standalone 4m wall with one door — the sweep/parity workhorse. */
 function doorFixture(hinge: 'a' | 'b', swing: 'front' | 'back'): {
-  doc: ProjectDocument
+  doc: LevelDoc
   wall: Wall
 } {
-  const doc = emptyDocument('p_door', 'Door', '2026-07-12T00:00:00.000Z')
+  const doc = testLevelDoc('p_door', 'Door')
   addWallSegment(doc, vec(0, 0), vec(4, 0))
   const wall = Object.values(doc.walls)[0]!
   addOpening(doc, { kind: 'door', wallId: wall.id, t: 0.5, width: 0.9, hinge, swing })
@@ -123,7 +124,7 @@ describe('openingSymbol — WorldLayers parity pin', () => {
   it('reproduces the pre-refactor window triple lines', () => {
     // window t=0.5 default width 1.2 on the same wall ⇒ u0=1.4 u1=2.6,
     // glazing lines at v ∈ {−0.0375, 0, 0.0375}
-    const doc = emptyDocument('p_win', 'Win', '2026-07-12T00:00:00.000Z')
+    const doc = testLevelDoc('p_win', 'Win')
     addWallSegment(doc, vec(0, 0), vec(4, 0))
     const wall = Object.values(doc.walls)[0]!
     addOpening(doc, { kind: 'window', wallId: wall.id, t: 0.5 })
@@ -168,7 +169,7 @@ describe('door-arc sweep matrix (empirically pinned — see RUNBOOK)', () => {
 
 describe('renderPlanSvg', () => {
   it('returns null for an empty document', () => {
-    const doc = emptyDocument('p_empty', 'Empty', '2026-07-12T00:00:00.000Z')
+    const doc = testLevelDoc('p_empty', 'Empty')
     expect(renderPlanSvg(doc, getDerived(doc))).toBeNull()
   })
 
@@ -244,7 +245,7 @@ describe('renderPlanSvg', () => {
   })
 
   it('styled openings export (0.10.0): garage track dashed, passage arcless', () => {
-    const doc = emptyDocument('p_style', 'Style', '2026-07-17T00:00:00.000Z')
+    const doc = testLevelDoc('p_style', 'Style')
     addWallSegment(doc, vec(0, 0), vec(8, 0))
     const wall = Object.values(doc.walls)[0]!
     addOpening(doc, { kind: 'door', wallId: wall.id, t: 0.3, width: 2.4, style: 'garage' })
@@ -294,7 +295,7 @@ describe('renderPlanSvg', () => {
 
   it('serializes furniture prims 1:1 with symbolFor', () => {
     const item = CATALOG['sofa-3']!
-    const doc = emptyDocument('p_sofa', 'Sofa', '2026-07-12T00:00:00.000Z')
+    const doc = testLevelDoc('p_sofa', 'Sofa')
     addFurniture(doc, { catalogItemId: item.id, x: 1, y: 1, size: item.dims })
     const svg = renderPlanSvg(doc, getDerived(doc))!
     const prims = symbolFor(item)
@@ -308,7 +309,7 @@ describe('renderPlanSvg', () => {
 
   it('mirrored furniture emits scale(-1 1) inside its rotate', () => {
     const item = CATALOG['sofa-3']!
-    const doc = emptyDocument('p_mir', 'Mir', '2026-07-12T00:00:00.000Z')
+    const doc = testLevelDoc('p_mir', 'Mir')
     const id = addFurniture(doc, { catalogItemId: item.id, x: 1, y: 1, size: item.dims })
     transformFurniture(doc, id, { mirrored: true })
     const svg = renderPlanSvg(doc, getDerived(doc))!
@@ -316,7 +317,7 @@ describe('renderPlanSvg', () => {
   })
 
   it('unknown catalog items fall back to a dashed rect', () => {
-    const doc = emptyDocument('p_unk', 'Unk', '2026-07-12T00:00:00.000Z')
+    const doc = testLevelDoc('p_unk', 'Unk')
     addFurniture(doc, { catalogItemId: 'not-a-real-item', x: 0, y: 0, size: { w: 1, d: 1, h: 1 } })
     const svg = renderPlanSvg(doc, getDerived(doc))!
     expect(svg).toContain('stroke-dasharray')
@@ -394,7 +395,7 @@ describe('exportPixelSize', () => {
 
 describe('annotations in the export (v3 — always rendered, they are document content)', () => {
   it('renders dimension lines with derived length text and labels with their text', () => {
-    const doc = emptyDocument('p_ann', 'Ann', '2026-07-13T00:00:00.000Z')
+    const doc = testLevelDoc('p_ann', 'Ann')
     addWallChain(doc, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
     const dim = addDimension(doc, { x: 0, y: -1 }, { x: 4, y: -1 }, 0.3)!
     addLabel(doc, { x: 2, y: 2 }, 'Reading nook <3')
@@ -406,7 +407,7 @@ describe('annotations in the export (v3 — always rendered, they are document c
   })
 
   it('annotation extents stretch the export framing (content bounds)', () => {
-    const doc = emptyDocument('p_ann2', 'Ann2', '2026-07-13T00:00:00.000Z')
+    const doc = testLevelDoc('p_ann2', 'Ann2')
     addWallChain(doc, [vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
     const bare = renderPlanSvg(doc, getDerived(doc))!
     addLabel(doc, { x: 30, y: 30 }, 'Far away note')

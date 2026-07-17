@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../types'
+import type { LevelDoc } from '../types'
 import { normalizeGraph } from './walls'
 import { revalidateOpenings } from './openings'
 import { reconcileRooms } from './rooms'
@@ -29,7 +29,7 @@ export interface PipelineOpts {
 }
 
 export function runPipeline(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   mode: MutationMode,
   opts: PipelineOpts = {},
 ): void {

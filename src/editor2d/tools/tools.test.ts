@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getActiveLevelDoc } from '../../store/levelView'
 import { useDocStore, docTemporal } from '../../store/docStore'
 import { useUiStore } from '../../store/uiStore'
 import { useConfirmStore } from '../../app/confirmStore'
@@ -29,8 +30,8 @@ const registry = toolRegistry
 const ctx = toolContext
 
 const past = () => docTemporal.getState().pastStates.length
-const walls = () => Object.keys(useDocStore.getState().doc.walls).length
-const rooms = () => Object.keys(useDocStore.getState().doc.rooms).length
+const walls = () => Object.keys(getActiveLevelDoc().walls).length
+const rooms = () => Object.keys(getActiveLevelDoc().rooms).length
 
 const pe = (world: Vec2, mods: Partial<EditorPointerEvent['mods']> = {}, button = 0): EditorPointerEvent => ({
   world,
@@ -141,7 +142,7 @@ describe('select tool drags', () => {
     useUiStore.getState().setSelection([id])
     drag(vec(2, 2), vec(3.503, 2.704))
     expect(past()).toBe(base + 1)
-    const f = useDocStore.getState().doc.furniture[id]!
+    const f = getActiveLevelDoc().furniture[id]!
     expect(f.x * 100).toBeCloseTo(Math.round(f.x * 100), 6)
     expect(f.x).toBeGreaterThan(3.3)
   })
@@ -165,8 +166,8 @@ describe('select tool drags', () => {
     const b = addSofa(6, 2)
     useUiStore.getState().setSelection([a, b])
     drag(vec(2, 2), vec(2.5, 3))
-    const fa = useDocStore.getState().doc.furniture[a]!
-    const fb = useDocStore.getState().doc.furniture[b]!
+    const fa = getActiveLevelDoc().furniture[a]!
+    const fb = getActiveLevelDoc().furniture[b]!
     expect(fa.x).toBeCloseTo(2.5, 6)
     expect(fa.y).toBeCloseTo(3, 6)
     expect(fb.x).toBeCloseTo(6.5, 6)
@@ -177,7 +178,7 @@ describe('select tool drags', () => {
     useDocStore.getState().addWallSegment(vec(0, 0), vec(4, 0))
     useDocStore.getState().addWallSegment(vec(4, 0), vec(4, 3))
     useDocStore.getState().addWallSegment(vec(0, 3), vec(0, 5))
-    const doc = useDocStore.getState().doc
+    const doc = getActiveLevelDoc()
     const dangling = Object.values(doc.nodes).find((n) => n.x === 0 && n.y === 3)!
     const target = Object.values(doc.nodes).find((n) => n.x === 0 && n.y === 0)!
     // select the dangling node's wall so the node becomes hittable
@@ -185,8 +186,8 @@ describe('select tool drags', () => {
     useUiStore.getState().setSelection([wall.id])
     const base = past()
     drag(vec(0, 3), vec(0.02, 0.03)) // drop near the target node → node snap → merge
-    expect(useDocStore.getState().doc.nodes[dangling.id]).toBeUndefined()
-    expect(useDocStore.getState().doc.nodes[target.id]).toBeDefined()
+    expect(getActiveLevelDoc().nodes[dangling.id]).toBeUndefined()
+    expect(getActiveLevelDoc().nodes[target.id]).toBeDefined()
     expect(past()).toBe(base + 1)
   })
 
@@ -197,7 +198,7 @@ describe('select tool drags', () => {
     const base = past()
     // grab clear of the door span [2.55, 3.45] so the WALL is the top hit
     drag(vec(1.2, 0), vec(1.2, 1.5))
-    const doc = useDocStore.getState().doc
+    const doc = getActiveLevelDoc()
     const w = doc.walls[r.wallId!]!
     expect(doc.nodes[w.a]!.y).toBeCloseTo(1.5, 6)
     expect(doc.nodes[w.b]!.y).toBeCloseTo(1.5, 6)
@@ -210,7 +211,7 @@ describe('select tool drags', () => {
     const opId = useDocStore.getState().addOpening({ kind: 'door', wallId: r.wallId!, t: 0.5 })!
     useUiStore.getState().setSelection([opId])
     drag(vec(3, 0), vec(5.9, 0)) // try to slide past the end
-    const op = useDocStore.getState().doc.openings[opId]!
+    const op = getActiveLevelDoc().openings[opId]!
     const u = op.t * 6
     expect(u + 0.45).toBeLessThanOrEqual(6 - 0.01 + 1e-9)
     expect(u).toBeGreaterThan(4) // did move right
@@ -287,7 +288,7 @@ describe('live measurement pills', () => {
     expect(dists[3]).toBeCloseTo(1.425, 9)
     // both items still moved rigidly
     tool().onPointerUp(pe(vec(2, 1.4), { ctrl: true }), ctx)
-    expect(useDocStore.getState().doc.furniture[b]!.y).toBeCloseTo(1.4, 6)
+    expect(getActiveLevelDoc().furniture[b]!.y).toBeCloseTo(1.4, 6)
   })
 
   it('wall drag publishes incident wall lengths; Esc abort clears pills', () => {
@@ -427,8 +428,8 @@ describe('keymap', () => {
     useDocStore
       .getState()
       .addWallChain([vec(0, 0), vec(4, 0), vec(4, 4), vec(0, 4), vec(0, 0)])
-    const roomId = Object.keys(useDocStore.getState().doc.rooms)[0]!
-    const wallId = Object.keys(useDocStore.getState().doc.walls)[0]!
+    const roomId = Object.keys(getActiveLevelDoc().rooms)[0]!
+    const wallId = Object.keys(getActiveLevelDoc().walls)[0]!
     useUiStore.getState().setSelection([roomId])
     handleKey(key('Delete'), ctx, registry)
     expect(rooms()).toBe(1) // room selection is a no-op
@@ -443,8 +444,8 @@ describe('keymap', () => {
     useUiStore.getState().setSelection([a, b])
     const base = past()
     handleKey(key('r'), ctx, registry)
-    expect(useDocStore.getState().doc.furniture[a]!.rotation).toBeCloseTo(Math.PI / 2, 9)
-    expect(useDocStore.getState().doc.furniture[b]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+    expect(getActiveLevelDoc().furniture[a]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+    expect(getActiveLevelDoc().furniture[b]!.rotation).toBeCloseTo(Math.PI / 2, 9)
     expect(past()).toBe(base + 1)
   })
 
@@ -455,7 +456,7 @@ describe('keymap', () => {
     const sel = useUiStore.getState().selection
     expect(sel).toHaveLength(1)
     expect(sel[0]).not.toBe(id)
-    const copy = useDocStore.getState().doc.furniture[sel[0]! as FurnitureId]!
+    const copy = getActiveLevelDoc().furniture[sel[0]! as FurnitureId]!
     expect(copy.x).toBeCloseTo(2.25, 9)
   })
 
@@ -468,7 +469,7 @@ describe('keymap', () => {
     handleKey(key('ArrowDown', { shiftKey: true }), ctx, registry)
     flushPendingNudge()
     expect(past()).toBe(base + 1)
-    const f = useDocStore.getState().doc.furniture[id]!
+    const f = getActiveLevelDoc().furniture[id]!
     expect(f.x).toBeCloseTo(2.02, 9)
     expect(f.y).toBeCloseTo(1.9, 9) // Down = −y: the view renders y-UP (B3)
   })
@@ -478,11 +479,11 @@ describe('keymap', () => {
     useUiStore.getState().setSelection([id])
     handleKey(key('ArrowUp'), ctx, registry)
     flushPendingNudge()
-    expect(useDocStore.getState().doc.furniture[id]!.y).toBeCloseTo(2.01, 9)
+    expect(getActiveLevelDoc().furniture[id]!.y).toBeCloseTo(2.01, 9)
     handleKey(key('ArrowDown'), ctx, registry)
     handleKey(key('ArrowDown'), ctx, registry)
     flushPendingNudge()
-    expect(useDocStore.getState().doc.furniture[id]!.y).toBeCloseTo(1.99, 9)
+    expect(getActiveLevelDoc().furniture[id]!.y).toBeCloseTo(1.99, 9)
   })
 
   it('undo/redo are swallowed while a transaction is live', () => {
@@ -507,7 +508,7 @@ describe('keymap', () => {
 describe('clipboard copy/paste', () => {
   const copy = () => handleKey(key('c', { ctrlKey: true }), ctx, registry)
   const paste = () => handleKey(key('v', { ctrlKey: true }), ctx, registry)
-  const furnitureCount = () => Object.keys(useDocStore.getState().doc.furniture).length
+  const furnitureCount = () => Object.keys(getActiveLevelDoc().furniture).length
 
   it('Ctrl+C/Ctrl+V pastes at pointerWorld as ONE undo entry and selects the copy', () => {
     const id = addSofa(2, 2)
@@ -520,7 +521,7 @@ describe('clipboard copy/paste', () => {
     const sel = useUiStore.getState().selection
     expect(sel).toHaveLength(1)
     expect(sel[0]).not.toBe(id)
-    const f = useDocStore.getState().doc.furniture[sel[0]! as FurnitureId]!
+    const f = getActiveLevelDoc().furniture[sel[0]! as FurnitureId]!
     expect(f.x).toBeCloseTo(6, 9)
     expect(f.y).toBeCloseTo(7, 9)
     expect(f.catalogItemId).toBe('sofa-3')
@@ -537,7 +538,7 @@ describe('clipboard copy/paste', () => {
     expect(past()).toBe(base + 1)
     const sel = useUiStore.getState().selection
     expect(sel).toHaveLength(2)
-    const [fa, fb] = sel.map((s) => useDocStore.getState().doc.furniture[s as FurnitureId]!)
+    const [fa, fb] = sel.map((s) => getActiveLevelDoc().furniture[s as FurnitureId]!)
     expect(fa!.x).toBeCloseTo(9, 9) // centroid (3, 2.5) → target (10, 10)
     expect(fa!.y).toBeCloseTo(9.5, 9)
     expect(fb!.x).toBeCloseTo(11, 9)
@@ -550,7 +551,7 @@ describe('clipboard copy/paste', () => {
     copy()
     paste() // beforeEach left pointerWorld null
     const f =
-      useDocStore.getState().doc.furniture[useUiStore.getState().selection[0]! as FurnitureId]!
+      getActiveLevelDoc().furniture[useUiStore.getState().selection[0]! as FurnitureId]!
     expect(f.x).toBeCloseTo(2.25, 9)
     expect(f.y).toBeCloseTo(2.25, 9)
   })
@@ -599,7 +600,7 @@ describe('clipboard copy/paste', () => {
     copy()
     paste()
     const f =
-      useDocStore.getState().doc.furniture[useUiStore.getState().selection[0]! as FurnitureId]!
+      getActiveLevelDoc().furniture[useUiStore.getState().selection[0]! as FurnitureId]!
     expect(f.mirrored).toBe(true)
   })
 
@@ -622,12 +623,12 @@ describe('flip (F)', () => {
     const base = past()
     handleKey(key('f'), ctx, registry)
     expect(past()).toBe(base + 1)
-    expect(useDocStore.getState().doc.furniture[a]!.mirrored).toBe(true)
-    expect(useDocStore.getState().doc.furniture[b]!.mirrored).toBe(true)
+    expect(getActiveLevelDoc().furniture[a]!.mirrored).toBe(true)
+    expect(getActiveLevelDoc().furniture[b]!.mirrored).toBe(true)
     handleKey(key('f'), ctx, registry)
     expect(past()).toBe(base + 2)
-    expect('mirrored' in useDocStore.getState().doc.furniture[a]!).toBe(false)
-    expect('mirrored' in useDocStore.getState().doc.furniture[b]!).toBe(false)
+    expect('mirrored' in getActiveLevelDoc().furniture[a]!).toBe(false)
+    expect('mirrored' in getActiveLevelDoc().furniture[b]!).toBe(false)
   })
 
   it('F without selected furniture falls through (no entry)', () => {
@@ -655,7 +656,7 @@ describe('2D viewport navigation', () => {
     tool().onPointerMove(pe(vec(4.5, 4.5)), ctx) // box covers sofa + wall
     const sel = useUiStore.getState().selection
     expect(sel).toContain(id)
-    expect(sel.some((s) => useDocStore.getState().doc.walls[s as never])).toBe(true)
+    expect(sel.some((s) => getActiveLevelDoc().walls[s as never])).toBe(true)
     expect(sel).not.toContain(far)
     tool().onPointerUp(pe(vec(4.5, 4.5)), ctx)
     expect(useUiStore.getState().selection).toEqual(sel) // committed as-is
@@ -684,7 +685,7 @@ describe('2D viewport navigation', () => {
     tool().onPointerMove(pe(vec(3, 3)), ctx) // box crosses the wall, doesn't contain it
     const sel = useUiStore.getState().selection
     expect(sel).toHaveLength(1)
-    expect(useDocStore.getState().doc.walls[sel[0]! as never]).toBeDefined()
+    expect(getActiveLevelDoc().walls[sel[0]! as never]).toBeDefined()
     tool().onPointerUp(pe(vec(3, 3)), ctx)
   })
 
@@ -698,9 +699,9 @@ describe('2D viewport navigation', () => {
     const sel = useUiStore.getState().selection
     expect(sel).toContain(sofa)
     // non-additive marquee: the room from the initial press is dropped
-    expect(sel.some((id) => useDocStore.getState().doc.rooms[id as never])).toBe(false)
+    expect(sel.some((id) => getActiveLevelDoc().rooms[id as never])).toBe(false)
     // walls untouched by the box stay unselected
-    expect(sel.some((id) => useDocStore.getState().doc.walls[id as never])).toBe(false)
+    expect(sel.some((id) => getActiveLevelDoc().walls[id as never])).toBe(false)
     tool().onPointerUp(pe(vec(4.5, 3.5)), ctx)
     expect(useUiStore.getState().selection).toContain(sofa)
   })
@@ -746,8 +747,8 @@ describe('2D viewport navigation', () => {
     handleKey(key('ArrowUp'), ctx, registry)
     expect(useViewportStore.getState().ty).toBe(80)
     expect(past()).toBe(base)
-    const w = useDocStore.getState().doc.walls[r.wallId!]!
-    expect(useDocStore.getState().doc.nodes[w.a]!.y).toBe(0)
+    const w = getActiveLevelDoc().walls[r.wallId!]!
+    expect(getActiveLevelDoc().nodes[w.a]!.y).toBe(0)
   })
 
   it('arrows still nudge (never pan) with furniture selected', () => {
@@ -755,7 +756,7 @@ describe('2D viewport navigation', () => {
     useUiStore.getState().setSelection([id])
     handleKey(key('ArrowRight'), ctx, registry)
     flushPendingNudge()
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2.01, 9)
     expect(useViewportStore.getState().tx).toBe(0)
   })
 
@@ -804,7 +805,7 @@ describe('keymap 3D gate (M6): file ops stay live, editing keys are 2D-only', ()
     useUiStore.getState().setSelection([id])
     handleKey(key('ArrowRight'), ctx, registry)
     flushPendingNudge()
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2, 9)
     useUiStore.getState().clearSelection()
     handleKey(key('ArrowLeft'), ctx, registry)
     expect(useViewportStore.getState().tx).toBe(0)
@@ -825,7 +826,7 @@ describe('keymap 3D gate (M6): file ops stay live, editing keys are 2D-only', ()
     const id = addSofa()
     useUiStore.getState().setSelection([id])
     handleKey(key('Delete'), ctx, registry)
-    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+    expect(getActiveLevelDoc().furniture[id]).toBeDefined()
     expect(useUiStore.getState().selection).toEqual([id])
   })
 
@@ -834,7 +835,7 @@ describe('keymap 3D gate (M6): file ops stay live, editing keys are 2D-only', ()
     const base = past()
     handleKey(key('z', { ctrlKey: true }), ctx, registry)
     expect(past()).toBe(base)
-    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+    expect(getActiveLevelDoc().furniture[id]).toBeDefined()
   })
 
   it('3d: Ctrl+S still reaches the file ops (save hits the adapter)', async () => {
@@ -877,7 +878,7 @@ describe('keymap 3D gate (M6): file ops stay live, editing keys are 2D-only', ()
     const base = past()
     handleKey(key('z', { ctrlKey: true }), ctx, registry)
     expect(past()).toBe(base - 1)
-    expect(useDocStore.getState().doc.furniture[id]).toBeUndefined()
+    expect(getActiveLevelDoc().furniture[id]).toBeUndefined()
     handleKey(key('ArrowLeft'), ctx, registry)
     expect(useViewportStore.getState().tx).toBe(80)
   })
@@ -895,7 +896,7 @@ describe('keymap modal guard', () => {
     handleKey(key('w'), ctx, registry)
     expect(useUiStore.getState().activeTool).toBe('select')
     handleKey(key('Delete'), ctx, registry)
-    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+    expect(getActiveLevelDoc().furniture[id]).toBeDefined()
     handleKey(key('z', { ctrlKey: true }), ctx, registry)
     expect(past()).toBe(base)
     useConfirmStore.getState().resolve('cancel')
@@ -922,7 +923,7 @@ describe('keymap modal guard', () => {
     handleKey(key('w'), ctx, registry)
     expect(useUiStore.getState().activeTool).toBe('select')
     handleKey(key('Delete'), ctx, registry)
-    expect(useDocStore.getState().doc.furniture[id]).toBeDefined()
+    expect(getActiveLevelDoc().furniture[id]).toBeDefined()
     // the dialog owns Escape via its own listener — the keymap must not act
     handleKey(key('Escape'), ctx, registry)
     expect(useUiStore.getState().optionsOpen).toBe(true)
@@ -952,9 +953,9 @@ describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
       expect(isTxActive()).toBe(false)
       expect(past()).toBe(base + 2) // nudge + drag = exactly two entries
       safeUndo()
-      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+      expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2.01, 9)
       safeUndo()
-      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+      expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2, 9)
     } finally {
       vi.useRealTimers()
     }
@@ -969,7 +970,7 @@ describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
     expect(useUiStore.getState().activeTool).toBe('draw-wall')
     expect(isTxActive()).toBe(false)
     expect(past()).toBe(base + 1)
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2.01, 9)
   })
 
   it('a direct switchTool call (toolbar) cannot revert a pending nudge; the idle timer still commits it', () => {
@@ -980,11 +981,11 @@ describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
       const base = past()
       handleKey(key('ArrowRight'), ctx, registry)
       switchTool('measure') // outgoing select onDeactivate owns no tx — must not abort
-      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+      expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2.01, 9)
       vi.advanceTimersByTime(300)
       expect(isTxActive()).toBe(false)
       expect(past()).toBe(base + 1)
-      expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.01, 9)
+      expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2.01, 9)
     } finally {
       vi.useRealTimers()
     }
@@ -996,7 +997,7 @@ describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
     handleKey(key('ArrowRight'), ctx, registry)
     handleKey(key('z', { ctrlKey: true }), ctx, registry)
     expect(isTxActive()).toBe(false)
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2, 9)
   })
 
   it('R rotates the placement ghost, not the just-placed item (S3)', () => {
@@ -1004,13 +1005,13 @@ describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
     switchTool('place-furniture')
     tool().onPointerDown(pe(vec(2, 2)), ctx) // place #1 → selects it
     const first = useUiStore.getState().selection[0]! as FurnitureId
-    expect(useDocStore.getState().doc.furniture[first]).toBeDefined()
+    expect(getActiveLevelDoc().furniture[first]).toBeDefined()
     handleKey(key('r'), ctx, registry) // must reach the GHOST, not the selection
-    expect(useDocStore.getState().doc.furniture[first]!.rotation).toBe(0)
+    expect(getActiveLevelDoc().furniture[first]!.rotation).toBe(0)
     tool().onPointerDown(pe(vec(6, 6)), ctx) // place #2 carries the ghost angle
     const second = useUiStore.getState().selection[0]! as FurnitureId
     expect(second).not.toBe(first)
-    expect(useDocStore.getState().doc.furniture[second]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+    expect(getActiveLevelDoc().furniture[second]!.rotation).toBeCloseTo(Math.PI / 2, 9)
   })
 
   it('F mirrors the placement ghost; R/F still act on the selection in the select tool', () => {
@@ -1019,10 +1020,10 @@ describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
     handleKey(key('f'), ctx, registry)
     tool().onPointerDown(pe(vec(2, 2)), ctx)
     const placed = useUiStore.getState().selection[0]! as FurnitureId
-    expect(useDocStore.getState().doc.furniture[placed]!.mirrored).toBe(true)
+    expect(getActiveLevelDoc().furniture[placed]!.mirrored).toBe(true)
     switchTool('select')
     handleKey(key('r'), ctx, registry) // global handler again: rotates the selection
-    expect(useDocStore.getState().doc.furniture[placed]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+    expect(getActiveLevelDoc().furniture[placed]!.rotation).toBeCloseTo(Math.PI / 2, 9)
   })
 
   it('releasing the primary button while another is held ends the drag (chorded release, R6)', () => {
@@ -1036,7 +1037,7 @@ describe('M1 (0.3.0): nudge preemption, chorded input, ghost keys', () => {
     tool().onPointerMove({ ...pe(vec(2.6, 2.6)), buttons: 2 }, ctx) // left lifted, right held
     expect(isTxActive()).toBe(false) // gesture committed — no phantom tracking
     expect(past()).toBe(base + 1)
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.5, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2.5, 9)
   })
 })
 
@@ -1050,7 +1051,7 @@ describe('M1 (0.3.0): draw-wall rejected segments (R8)', () => {
     expect(walls()).toBe(1)
     click(vec(4, 3)) // continues from B(4,0), not from A(0,0)
     expect(walls()).toBe(2)
-    const doc = useDocStore.getState().doc
+    const doc = getActiveLevelDoc()
     const corner = Object.values(doc.nodes).find((n) => n.x === 4 && n.y === 3)!
     const wall = Object.values(doc.walls).find((w) => w.a === corner.id || w.b === corner.id)!
     const otherId = wall.a === corner.id ? wall.b : wall.a
@@ -1099,7 +1100,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     tool().onPointerMove(pe(vec(4, 4)), ctx)
     tool().onPointerMove(pe(vec(5, 5)), ctx)
     expect(isTxActive()).toBe(false)
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2, 9)
   })
 
   it('arrow keys during a foreign drag are swallowed, never folded into its tx', () => {
@@ -1111,7 +1112,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     handleKey(key('ArrowRight'), ctx, registry)
     expect(useDocStore.getState().doc).toBe(during) // no mutation joined the drag
     tool().onKeyDown?.('Escape', ctx) // abort the drag
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2, 9)
   })
 
   it('Shift+R counter-rotates the placement ghost', () => {
@@ -1120,7 +1121,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     handleKey(key('R', { shiftKey: true }), ctx, registry)
     tool().onPointerDown(pe(vec(2, 2)), ctx)
     const placed = useUiStore.getState().selection[0]! as FurnitureId
-    expect(useDocStore.getState().doc.furniture[placed]!.rotation).toBeCloseTo(-Math.PI / 2, 9)
+    expect(getActiveLevelDoc().furniture[placed]!.rotation).toBeCloseTo(-Math.PI / 2, 9)
   })
 
   it('a bare AltGraph tap mid-run does not split the nudge (EU layouts)', () => {
@@ -1132,7 +1133,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     handleKey(key('ArrowRight'), ctx, registry)
     flushPendingNudge()
     expect(past()).toBe(base + 1) // ONE coalesced entry
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2.02, 9)
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2.02, 9)
   })
 
   it('re-arming with a DIFFERENT card resets the ghost rotation/mirror (same-tool path)', () => {
@@ -1144,7 +1145,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     useUiStore.getState().setToolParams({ catalogItemId: 'bed-double' })
     tool().onPointerDown(pe(vec(3, 3)), ctx)
     const placed = useUiStore.getState().selection[0]! as FurnitureId
-    const f = useDocStore.getState().doc.furniture[placed]!
+    const f = getActiveLevelDoc().furniture[placed]!
     expect(f.rotation).toBe(0)
     expect(f.mirrored).toBeUndefined()
   })
@@ -1160,7 +1161,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     switchTool('place-furniture')
     tool().onPointerDown(pe(vec(2, 2)), ctx)
     const placed = useUiStore.getState().selection[0]! as FurnitureId
-    const f = useDocStore.getState().doc.furniture[placed]!
+    const f = getActiveLevelDoc().furniture[placed]!
     expect(f.mirrored).toBeUndefined()
     expect(f.rotation).toBe(0)
   })
@@ -1174,7 +1175,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     handleKey(key('ArrowRight'), ctx, registry) // nudge tx pending
     handleKey(key('Backspace'), ctx, registry) // flushes + is swallowed
     expect(walls()).toBe(1) // the segment was NOT stepped back
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(8.01, 9) // nudge kept
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(8.01, 9) // nudge kept
     expect(isTxActive()).toBe(false)
   })
 
@@ -1184,7 +1185,7 @@ describe('M1 (0.3.0): review-hardening pins', () => {
     useDocStore.getState().transformFurniture(id, { x: 9 })
     handleKey(key('Escape'), ctx, registry)
     expect(isTxActive()).toBe(false)
-    expect(useDocStore.getState().doc.furniture[id]!.x).toBeCloseTo(2, 9) // reverted
+    expect(getActiveLevelDoc().furniture[id]!.x).toBeCloseTo(2, 9) // reverted
     void stuck
   })
 })
@@ -1194,13 +1195,13 @@ describe('M3 (0.3.0): Ctrl+A and zoom-to-selection', () => {
     useDocStore
       .getState()
       .addWallChain([vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
-    const doc0 = useDocStore.getState().doc
+    const doc0 = getActiveLevelDoc()
     const wallId = Object.keys(doc0.walls)[0]! as never
     useDocStore.getState().addOpening({ kind: 'door', wallId, t: 0.5 })
     const sofa = addSofa(2, 1.5)
     handleKey(key('a', { ctrlKey: true }), ctx, registry)
     const sel = new Set(useUiStore.getState().selection)
-    const doc = useDocStore.getState().doc
+    const doc = getActiveLevelDoc()
     expect(sel.size).toBe(4 + 1 + 1) // 4 walls + 1 door + 1 sofa
     expect(sel.has(sofa)).toBe(true)
     for (const id of Object.keys(doc.rooms)) expect(sel.has(id)).toBe(false)
@@ -1227,18 +1228,18 @@ describe('M4 (0.3.0): commands, batch editing, context-menu guard', () => {
     useDocStore
       .getState()
       .addWallChain([vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
-    const ids = Object.keys(useDocStore.getState().doc.walls)
+    const ids = Object.keys(getActiveLevelDoc().walls)
     const base = past()
     const tx = beginTxForTest()
     for (const id of ids) useDocStore.getState().updateWall(id as never, { thickness: 0.3 })
     commitTxForTest(tx)
     expect(past()).toBe(base + 1)
     for (const id of ids) {
-      expect(useDocStore.getState().doc.walls[id as never]!.thickness).toBeCloseTo(0.3, 9)
+      expect(getActiveLevelDoc().walls[id as never]!.thickness).toBeCloseTo(0.3, 9)
     }
     safeUndo()
     for (const id of ids) {
-      expect(useDocStore.getState().doc.walls[id as never]!.thickness).not.toBeCloseTo(0.3, 9)
+      expect(getActiveLevelDoc().walls[id as never]!.thickness).not.toBeCloseTo(0.3, 9)
     }
   })
 
@@ -1248,11 +1249,11 @@ describe('M4 (0.3.0): commands, batch editing, context-menu guard', () => {
     expect(splitWallAt(ctx, r.wallId!, vec(1, 0.5))).toBe(true)
     expect(walls()).toBe(2)
     expect(
-      Object.values(useDocStore.getState().doc.nodes).some(
+      Object.values(getActiveLevelDoc().nodes).some(
         (n) => Math.abs(n.x - 1) < 1e-6 && Math.abs(n.y) < 1e-6,
       ),
     ).toBe(true)
-    const anyWall = Object.keys(useDocStore.getState().doc.walls)[0]! as never
+    const anyWall = Object.keys(getActiveLevelDoc().walls)[0]! as never
     expect(splitWallAt(ctx, anyWall, vec(0.0001, 0))).toBe(false)
   })
 
@@ -1261,12 +1262,12 @@ describe('M4 (0.3.0): commands, batch editing, context-menu guard', () => {
     useUiStore.getState().setSelection([id])
     useUiStore.getState().setContextMenu({ x: 10, y: 10, world: vec(0, 0) })
     handleKey(key('Delete'), ctx, registry)
-    expect(useDocStore.getState().doc.furniture[id]).toBeDefined() // swallowed
+    expect(getActiveLevelDoc().furniture[id]).toBeDefined() // swallowed
     handleKey(key('Escape'), ctx, registry)
     expect(useUiStore.getState().contextMenu).toBeNull()
     expect(useUiStore.getState().selection).toEqual([id]) // Esc only closed the menu
     handleKey(key('Delete'), ctx, registry)
-    expect(useDocStore.getState().doc.furniture[id]).toBeUndefined()
+    expect(getActiveLevelDoc().furniture[id]).toBeUndefined()
   })
 
   it('pasteClipboard pastes at an explicit world point (context-menu Paste here)', async () => {
@@ -1277,8 +1278,8 @@ describe('M4 (0.3.0): commands, batch editing, context-menu guard', () => {
     expect(pasteClipboard(ctx, vec(9, 9))).toBe(true)
     const pasted = useUiStore.getState().selection[0]! as FurnitureId
     expect(pasted).not.toBe(id)
-    expect(useDocStore.getState().doc.furniture[pasted]!.x).toBeCloseTo(9, 6)
-    expect(useDocStore.getState().doc.furniture[pasted]!.y).toBeCloseTo(9, 6)
+    expect(getActiveLevelDoc().furniture[pasted]!.x).toBeCloseTo(9, 6)
+    expect(getActiveLevelDoc().furniture[pasted]!.y).toBeCloseTo(9, 6)
   })
 })
 
@@ -1290,7 +1291,7 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     click(vec(4, 6))
     expect(tool().onKeyDown?.('Enter', ctx)).toBe(true)
     expect(past()).toBe(base + 1)
-    const anns = Object.values(useDocStore.getState().doc.annotations)
+    const anns = Object.values(getActiveLevelDoc().annotations)
     expect(anns).toHaveLength(1)
     expect(anns[0]!.kind).toBe('dimension')
     expect(useUiStore.getState().selection).toEqual([anns[0]!.id])
@@ -1302,7 +1303,7 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     switchTool('annotate-text')
     tool().onPointerDown(pe(vec(2, 2)), ctx)
     tool().onPointerDown(pe(vec(5, 5)), ctx)
-    const anns = Object.values(useDocStore.getState().doc.annotations)
+    const anns = Object.values(getActiveLevelDoc().annotations)
     expect(anns).toHaveLength(2)
     expect(anns.every((a) => a.kind === 'label' && a.text === 'Text')).toBe(true)
     expect(useUiStore.getState().selection).toHaveLength(1) // the latest
@@ -1314,7 +1315,7 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     const base = past()
     useUiStore.getState().setSelection([id])
     drag(vec(2, 2), vec(4, 3))
-    const ann = useDocStore.getState().doc.annotations[id]!
+    const ann = getActiveLevelDoc().annotations[id]!
     expect(ann.kind === 'label' && ann.x).toBeCloseTo(4, 6)
     expect(ann.kind === 'label' && ann.y).toBeCloseTo(3, 6)
     expect(past()).toBe(base + 1)
@@ -1324,7 +1325,7 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     const id = useDocStore.getState().addDimension(vec(0, 4), vec(4, 4), 0)!
     const base = past()
     drag(vec(2, 4), vec(2.2, 5)) // grab the line, pull perpendicular
-    const ann = useDocStore.getState().doc.annotations[id]!
+    const ann = getActiveLevelDoc().annotations[id]!
     expect(ann.kind).toBe('dimension')
     if (ann.kind === 'dimension') {
       expect(ann.offset).toBeCloseTo(1, 6) // world +1 along +perp(a→b)
@@ -1336,7 +1337,7 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     tool().onPointerDown(pe(vec(2, 5)), ctx)
     tool().onPointerMove(pe(vec(2, 8)), ctx)
     expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
-    const after = useDocStore.getState().doc.annotations[id]!
+    const after = getActiveLevelDoc().annotations[id]!
     expect(after.kind === 'dimension' && after.offset).toBeCloseTo(1, 6)
   })
 
@@ -1364,7 +1365,7 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     const id = useDocStore.getState().addLabel(vec(1, 1), 'Bye')!
     useUiStore.getState().setSelection([id])
     handleKey(key('Delete'), ctx, registry)
-    expect(useDocStore.getState().doc.annotations[id]).toBeUndefined()
+    expect(getActiveLevelDoc().annotations[id]).toBeUndefined()
   })
 
   it('Ctrl+A skips HIDDEN annotations (0.7.0 parity — no invisible Delete targets)', () => {
@@ -1373,13 +1374,13 @@ describe('M6 (0.3.0): annotations — measure→Enter, T tool, drags', () => {
     useAppSettings.getState().setShowAnnotations(false)
     handleKey(key('a', { ctrlKey: true }), ctx, registry)
     expect(useUiStore.getState().selection).toEqual([sofa])
-    expect(useDocStore.getState().doc.annotations[dim]).toBeDefined() // untouched
+    expect(getActiveLevelDoc().annotations[dim]).toBeDefined() // untouched
     useAppSettings.getState().setShowAnnotations(true)
   })
 })
 
 describe('area tool (0.7.0): trace, close, drag', () => {
-  const anns = () => Object.values(useDocStore.getState().doc.annotations)
+  const anns = () => Object.values(getActiveLevelDoc().annotations)
 
   it('click-chain + first-vertex click closes: ONE area annotation, one undo entry, selected', () => {
     registry.switchTo(ctx, 'draw-area')
@@ -1448,7 +1449,7 @@ describe('area tool (0.7.0): trace, close, drag', () => {
     registry.switchTo(ctx, 'select')
     const base = past()
     drag(vec(1, 0), vec(1.5, 1)) // grab the bottom edge midpoint
-    const moved = useDocStore.getState().doc.annotations[ann.id]!
+    const moved = getActiveLevelDoc().annotations[ann.id]!
     expect(moved.kind === 'area' && moved.points[0]!.x).toBeCloseTo(0.5, 9)
     expect(moved.kind === 'area' && moved.points[0]!.y).toBeCloseTo(1, 9)
     // rigid: area unchanged (2×2 square)
@@ -1480,7 +1481,7 @@ describe('M8 (0.3.0): snap/grid hotkeys, help overlay, shortcut sheet', () => {
     const id = addSofa()
     useUiStore.getState().setSelection([id])
     handleKey(key('Delete'), ctx, registry)
-    expect(useDocStore.getState().doc.furniture[id]).toBeDefined() // swallowed
+    expect(getActiveLevelDoc().furniture[id]).toBeDefined() // swallowed
     useUiStore.getState().setHelpOpen(false)
   })
 
@@ -1512,7 +1513,7 @@ describe('M9 (0.3.0): furniture resize handles + duplicate room', () => {
     tool().onPointerDown(pe(vec(3.1, 2.475)), ctx)
     tool().onPointerMove(pe(vec(3.9, 3.525)), ctx) // stretch to 3×2
     tool().onPointerUp(pe(vec(3.9, 3.525)), ctx)
-    const f = useDocStore.getState().doc.furniture[id]!
+    const f = getActiveLevelDoc().furniture[id]!
     expect(f.size.w).toBeCloseTo(3, 6)
     expect(f.size.d).toBeCloseTo(2, 6)
     expect(f.x).toBeCloseTo(2.4, 6) // anchor (0.9,1.525) stayed put
@@ -1533,7 +1534,7 @@ describe('M9 (0.3.0): furniture resize handles + duplicate room', () => {
     tool().onPointerDown(pe(vec(-0.5, 1)), ctx)
     tool().onPointerMove(pe(vec(-1, 2)), ctx)
     tool().onPointerUp(pe(vec(-1, 2)), ctx)
-    const f = useDocStore.getState().doc.furniture[id]!
+    const f = getActiveLevelDoc().furniture[id]!
     expect(f.size.w).toBeCloseTo(3, 6)
     expect(f.size.d).toBeCloseTo(1.5, 6)
     expect(f.x).toBeCloseTo(-0.25, 6)
@@ -1552,7 +1553,7 @@ describe('M9 (0.3.0): furniture resize handles + duplicate room', () => {
     tool().onPointerDown(pe(vec(3.1, 2.475)), ctx)
     tool().onPointerMove(pe(vec(1.0, 1.6)), ctx)
     tool().onPointerUp(pe(vec(1.0, 1.6)), ctx)
-    const f = useDocStore.getState().doc.furniture[id]!
+    const f = getActiveLevelDoc().furniture[id]!
     expect(f.size.d).toBeGreaterThanOrEqual(0.1)
     expect(f.size.w).toBeGreaterThanOrEqual(0.1)
   })
@@ -1562,13 +1563,13 @@ describe('M9 (0.3.0): furniture resize handles + duplicate room', () => {
     useDocStore
       .getState()
       .addWallChain([vec(0, 0), vec(4, 0), vec(4, 3), vec(0, 3), vec(0, 0)])
-    const room = Object.values(useDocStore.getState().doc.rooms)[0]!
+    const room = Object.values(getActiveLevelDoc().rooms)[0]!
     useDocStore.getState().renameRoom(room.id, 'Bedroom')
     addSofa(2, 1.5)
     const base = past()
     expect(duplicateRoom(ctx, room.id)).toBe(true)
     expect(past()).toBe(base + 1) // ONE undo entry for the whole clone
-    const d = useDocStore.getState().doc
+    const d = getActiveLevelDoc()
     expect(walls()).toBe(8)
     expect(rooms()).toBe(2)
     expect(Object.keys(d.furniture)).toHaveLength(2)
@@ -1581,7 +1582,7 @@ describe('M9 (0.3.0): furniture resize handles + duplicate room', () => {
 
 describe('0.8.0 M2: room drag gesture', () => {
   const store = () => useDocStore.getState()
-  const nodes = () => Object.values(store().doc.nodes)
+  const nodes = () => Object.values(getActiveLevelDoc().nodes)
   const nodeAt = (p: Vec2) => nodes().find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 1e-6)
   const square = (x0 = 0, y0 = 0, s = 4) =>
     store().addWallChain([
@@ -1601,7 +1602,7 @@ describe('0.8.0 M2: room drag gesture', () => {
     square()
     click(vec(1, 1)) // click #1 selects the room
     const roomId = useUiStore.getState().selection[0]!
-    expect(store().doc.rooms[roomId as never]).toBeDefined()
+    expect(getActiveLevelDoc().rooms[roomId as never]).toBeDefined()
     const base = past()
     drag(vec(1, 1), vec(3, 1)) // drag #2 moves it by (2,0)
     expect(past()).toBe(base + 1)
@@ -1620,7 +1621,7 @@ describe('0.8.0 M2: room drag gesture', () => {
     const sofa = addSofa(2, 2)
     click(vec(1, 1))
     drag(vec(1, 1), vec(1, 3)) // delta (0,2)
-    const f = store().doc.furniture[sofa]!
+    const f = getActiveLevelDoc().furniture[sofa]!
     expect(f.x).toBeCloseTo(2, 9)
     expect(f.y).toBeCloseTo(4, 9)
   })
@@ -1698,7 +1699,7 @@ describe('0.8.0 M2: room drag gesture', () => {
 
 describe('0.8.0 M3: room drag snapping', () => {
   const store = () => useDocStore.getState()
-  const nodes = () => Object.values(store().doc.nodes)
+  const nodes = () => Object.values(getActiveLevelDoc().nodes)
   const nodeAt = (p: Vec2) => nodes().find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 1e-6)
   const square = (x0 = 0, y0 = 0, s = 4) =>
     store().addWallChain([
@@ -1709,10 +1710,10 @@ describe('0.8.0 M3: room drag snapping', () => {
       vec(x0, y0),
     ])
   const xWallsAt = (x: number) =>
-    Object.values(store().doc.walls).filter(
+    Object.values(getActiveLevelDoc().walls).filter(
       (w) =>
-        Math.abs(store().doc.nodes[w.a]!.x - x) < 1e-6 &&
-        Math.abs(store().doc.nodes[w.b]!.x - x) < 1e-6,
+        Math.abs(getActiveLevelDoc().nodes[w.a]!.x - x) < 1e-6 &&
+        Math.abs(getActiveLevelDoc().nodes[w.b]!.x - x) < 1e-6,
     )
 
   it('roomSnapCandidates: corner-node points carry the weld-corner display; guides the centerline', async () => {
@@ -1720,16 +1721,16 @@ describe('0.8.0 M3: room drag snapping', () => {
     const { roomSnapCandidates } = await import('../snap/candidates')
     square() // stationary A
     square(6, 1, 2) // B: 6..8 × 1..3
-    const b = Object.values(store().doc.rooms).find((r) =>
+    const b = Object.values(getActiveLevelDoc().rooms).find((r) =>
       r.wallCycle.some((id) => {
-        const w = store().doc.walls[id]!
-        return store().doc.nodes[w.a]!.x >= 6
+        const w = getActiveLevelDoc().walls[id]!
+        return getActiveLevelDoc().nodes[w.a]!.x >= 6
       }),
     )!
-    const info = collectRoomRig(store().doc, b.id)!
-    const starts = captureRigStarts(store().doc, info.rig)
+    const info = collectRoomRig(getActiveLevelDoc(), b.id)!
+    const starts = captureRigStarts(getActiveLevelDoc(), info.rig)
     const grab = vec(7, 2)
-    const cands = roomSnapCandidates(store().doc, info.rig, starts, grab)
+    const cands = roomSnapCandidates(getActiveLevelDoc(), info.rig, starts, grab)
     // corner (6,1) offset (−1,−1): stationary node (4,0) → grab point (5,1)
     const corner = cands.find(
       (c) =>
@@ -1800,11 +1801,11 @@ describe('0.8.0 M3: room drag snapping', () => {
 describe('0.8.0 M4: room rotation', () => {
   const store = () => useDocStore.getState()
   const nodeAt = (p: Vec2) =>
-    Object.values(store().doc.nodes).find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 1e-4)
+    Object.values(getActiveLevelDoc().nodes).find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 1e-4)
   const wallBetween = (p: Vec2, q: Vec2) =>
-    Object.values(store().doc.walls).find((w) => {
-      const na = store().doc.nodes[w.a]!
-      const nb = store().doc.nodes[w.b]!
+    Object.values(getActiveLevelDoc().walls).find((w) => {
+      const na = getActiveLevelDoc().nodes[w.a]!
+      const nb = getActiveLevelDoc().nodes[w.b]!
       return (
         (Math.hypot(na.x - p.x, na.y - p.y) < 1e-4 && Math.hypot(nb.x - q.x, nb.y - q.y) < 1e-4) ||
         (Math.hypot(na.x - q.x, na.y - q.y) < 1e-4 && Math.hypot(nb.x - p.x, nb.y - p.y) < 1e-4)
@@ -1826,10 +1827,10 @@ describe('0.8.0 M4: room rotation', () => {
     for (const p of [vec(3, -1), vec(3, 3), vec(1, 3), vec(1, -1)]) {
       expect(nodeAt(p), `corner ${p.x},${p.y}`).toBeDefined()
     }
-    expect(store().doc.openings[doorId]).toBeDefined()
-    expect(store().doc.openings[doorId]!.wallId).toBe(bottom.id)
-    expect(store().doc.openings[doorId]!.t).toBeCloseTo(0.25, 6)
-    const f = store().doc.furniture[sofa]!
+    expect(getActiveLevelDoc().openings[doorId]).toBeDefined()
+    expect(getActiveLevelDoc().openings[doorId]!.wallId).toBe(bottom.id)
+    expect(getActiveLevelDoc().openings[doorId]!.t).toBeCloseTo(0.25, 6)
+    const f = getActiveLevelDoc().furniture[sofa]!
     expect(f.x).toBeCloseTo(2, 6)
     expect(f.y).toBeCloseTo(0, 6)
     expect(f.rotation).toBeCloseTo(Math.PI / 2, 9)
@@ -1892,8 +1893,8 @@ describe('0.8.0 M4: room rotation', () => {
     expect(past()).toBe(base + 1)
     expect(walls()).toBe(7) // square maps onto itself; tear rewelds
     expect(rooms()).toBe(2)
-    expect(store().doc.openings[doorId]).toBeDefined()
-    expect(store().doc.openings[doorId]!.wallId).toBe(divider.id)
+    expect(getActiveLevelDoc().openings[doorId]).toBeDefined()
+    expect(getActiveLevelDoc().openings[doorId]!.wallId).toBe(divider.id)
     safeUndo()
     expect(walls()).toBe(7)
   })

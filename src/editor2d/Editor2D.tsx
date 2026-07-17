@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useDocStore } from '../store/docStore'
+import { getActiveLevelDoc } from '../store/levelView'
 import { useUiStore } from '../store/uiStore'
 import { useInteractionStore } from './session/interactionStore'
 import { useViewportStore } from './viewport/viewportStore'
@@ -54,7 +54,7 @@ export function Editor2D() {
     ro.observe(el)
     const r = el.getBoundingClientRect()
     useViewportStore.getState().setSize(r.width, r.height)
-    zoomToFitContent(useDocStore.getState().doc)
+    zoomToFitContent(getActiveLevelDoc())
     return () => ro.disconnect()
   }, [])
 

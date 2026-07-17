@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { useDocStore } from './docStore'
+import { useActiveLevel } from './activeLevel'
+import { levelDocOf } from './levelView'
 import { useAppSettings } from './appSettings'
 
 /**
@@ -107,42 +109,55 @@ export const useUiStore = create<UiState>()(
 )
 
 /**
- * Prune selection/hover ids that no longer exist in the document, and drop
- * annotation ids when the annotations layer is hidden (0.7.0) — an invisible
- * selection outline with a live Delete key reads as broken.
+ * Prune selection/hover ids that no longer exist on the ACTIVE level (v7 —
+ * selection is level-scoped: entities on another floor are neither visible
+ * nor hittable, so a live Delete key on them reads as broken), and drop
+ * annotation ids when the annotations layer is hidden (0.7.0).
+ * Runs on doc commits AND floor switches; also clamps a stale
+ * activeLevelId back to null when its level leaves the document.
  * Called once from app bootstrap (kept out of module scope so importing the
  * store in tests has no side effects). Returns the unsubscribe function.
  */
 export function initSelectionPruning(): () => void {
-  const unsubDoc = useDocStore.subscribe(
-    (s) => s.doc,
-    (doc) => {
-      const exists = (id: string) =>
-        id in doc.walls ||
-        id in doc.nodes ||
-        id in doc.openings ||
-        id in doc.furniture ||
-        id in doc.rooms ||
-        id in doc.annotations
-      const ui = useUiStore.getState()
-      const kept = ui.selection.filter(exists)
-      if (kept.length !== ui.selection.length) ui.setSelection(kept)
-      if (ui.hoveredId && !exists(ui.hoveredId)) ui.setHovered(null)
-    },
-  )
+  const prune = () => {
+    const doc = useDocStore.getState().doc
+    const levels = useActiveLevel.getState()
+    if (levels.activeLevelId && !doc.levels.some((l) => l.id === levels.activeLevelId)) {
+      levels.setActiveLevel(null) // re-fires this handler via the subscription
+      return
+    }
+    const level = levelDocOf(doc, levels.activeLevelId)
+    const exists = (id: string) =>
+      id in level.walls ||
+      id in level.nodes ||
+      id in level.openings ||
+      id in level.furniture ||
+      id in level.rooms ||
+      id in level.annotations
+    const ui = useUiStore.getState()
+    const kept = ui.selection.filter(exists)
+    if (kept.length !== ui.selection.length) ui.setSelection(kept)
+    if (ui.hoveredId && !exists(ui.hoveredId)) ui.setHovered(null)
+  }
+  const unsubDoc = useDocStore.subscribe((s) => s.doc, prune)
+  const unsubLevel = useActiveLevel.subscribe((s) => s.activeLevelId, prune)
   const unsubVisibility = useAppSettings.subscribe(
     (s) => s.showAnnotations,
     (show) => {
       if (show) return
-      const doc = useDocStore.getState().doc
+      const level = levelDocOf(
+        useDocStore.getState().doc,
+        useActiveLevel.getState().activeLevelId,
+      )
       const ui = useUiStore.getState()
-      const kept = ui.selection.filter((id) => !(id in doc.annotations))
+      const kept = ui.selection.filter((id) => !(id in level.annotations))
       if (kept.length !== ui.selection.length) ui.setSelection(kept)
-      if (ui.hoveredId && ui.hoveredId in doc.annotations) ui.setHovered(null)
+      if (ui.hoveredId && ui.hoveredId in level.annotations) ui.setHovered(null)
     },
   )
   return () => {
     unsubDoc()
+    unsubLevel()
     unsubVisibility()
   }
 }

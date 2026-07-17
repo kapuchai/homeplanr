@@ -1,5 +1,11 @@
-import type { ProjectDocument } from '../types'
+import type { ImageAsset, ProjectDocument } from '../types'
 import { newAssetId, type AssetId } from '../ids'
+
+/** Anything carrying the shared assets map — the full document or a
+ * LevelDoc view (whose `assets` aliases the same top-level map). */
+interface AssetsHost {
+  assets: Record<AssetId, ImageAsset>
+}
 
 /**
  * Embedded image assets (v6). Inert leaf data — no pipeline runs here, and
@@ -19,7 +25,7 @@ export interface AssetContent {
 /** Insert an image, content-deduped: re-adding identical bytes (same-doc
  * paste, repeated upload) returns the existing id instead of growing the
  * document. */
-export function addAsset(doc: ProjectDocument, content: AssetContent): AssetId {
+export function addAsset(doc: AssetsHost, content: AssetContent): AssetId {
   for (const a of Object.values(doc.assets)) {
     if (a.data === content.data && a.mime === content.mime) return a.id
   }
@@ -29,13 +35,17 @@ export function addAsset(doc: ProjectDocument, content: AssetContent): AssetId {
 }
 
 /** Every asset id the document references — THE GC oracle. Reference
- * kinds: wall-art (FurnitureInstance.assetId) and the save preview
- * (doc.previewAssetId, 0.11.0). New reference kinds extend THIS
+ * kinds: wall-art (FurnitureInstance.assetId, on ANY level — v7 scans
+ * every level's furniture; a single-level scan would GC-delete assets
+ * referenced only by another floor at the next save) and the save
+ * preview (doc.previewAssetId, 0.11.0). New reference kinds extend THIS
  * function or gcAssets eats their assets. */
 export function referencedAssetIds(doc: ProjectDocument): Set<AssetId> {
   const refs = new Set<AssetId>()
-  for (const f of Object.values(doc.furniture)) {
-    if (f.assetId) refs.add(f.assetId)
+  for (const level of doc.levels) {
+    for (const f of Object.values(level.furniture)) {
+      if (f.assetId) refs.add(f.assetId)
+    }
   }
   if (doc.previewAssetId) refs.add(doc.previewAssetId)
   return refs

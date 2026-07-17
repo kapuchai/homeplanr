@@ -2,17 +2,22 @@ import {
   DEFAULTS,
   SCHEMA_VERSION,
   defaultSettings,
+  emptyLevel,
+  type Level,
   type Opening,
   type ProjectDocument,
 } from '../../model/types'
+import { makeLevelDoc } from '../../model/levels'
 import {
   asAnnotationId,
   asAssetId,
   asFurnitureId,
+  asLevelId,
   asNodeId,
   asOpeningId,
   asRoomId,
   asWallId,
+  newLevelId,
   newProjectId,
   type WallId,
 } from '../../model/ids'
@@ -116,6 +121,19 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   // moves. The batched style/lumen/lightOn fields ship ahead of their UIs
   // (0.10.0 / 0.12.0) like the v4 batch did.
   5: (raw) => ({ ...raw, schemaVersion: 6 }),
+  // v6 → v7: the STRUCTURAL storeys wrap — the six entity maps move into
+  // levels[0] (every pre-0.13.0 document is a one-level building). Assets
+  // stay top-level (shared across levels); settings/preview/dates
+  // untouched. Map references are copied, never mutated (purity); junk
+  // map values ride along for the validator to judge, exactly as before.
+  6: (raw) => {
+    const { nodes, walls, openings, rooms, furniture, annotations, ...rest } = raw
+    return {
+      ...rest,
+      levels: [{ id: newLevelId(), nodes, walls, openings, rooms, furniture, annotations }],
+      schemaVersion: 7,
+    }
+  },
 }
 
 export function parseDocument(json: string): ParseResult {
@@ -160,13 +178,10 @@ export function validateParsedObject(raw: unknown): ParseResult {
       ? { previewAssetId: asAssetId(obj.previewAssetId) }
       : {}),
     ...(obj.previewCustom === true ? { previewCustom: true as const } : {}),
+    // project notes (additive on v7): junk drops silently
+    ...(isStr(obj.notes) && obj.notes ? { notes: obj.notes } : {}),
     settings: defaultSettings(),
-    nodes: {},
-    walls: {},
-    openings: {},
-    rooms: {},
-    furniture: {},
-    annotations: {},
+    levels: [],
     assets: {},
   }
 
@@ -182,12 +197,71 @@ export function validateParsedObject(raw: unknown): ParseResult {
     }
   }
 
+  // levels (v7): junk entries prune with a warning; an empty result mints
+  // one empty level (a document is never level-less). Duplicate/absent
+  // level ids re-mint silently (field-level rule).
+  const seenLevelIds = new Set<string>()
+  if (Array.isArray(obj.levels)) {
+    for (const [i, rawLevel] of (obj.levels as unknown[]).entries()) {
+      if (!isObj(rawLevel)) {
+        warnings.push(`Removed invalid level ${i}`)
+        continue
+      }
+      const rawId = isStr(rawLevel.id) && rawLevel.id ? rawLevel.id : null
+      const level = emptyLevel(rawId && !seenLevelIds.has(rawId) ? asLevelId(rawId) : newLevelId())
+      seenLevelIds.add(level.id)
+      if (isStr(rawLevel.name) && rawLevel.name.trim()) level.name = rawLevel.name
+      if (isFiniteNum(rawLevel.elevation)) {
+        level.elevation = Math.min(1000, Math.max(-100, rawLevel.elevation))
+      }
+      validateLevelRecords(rawLevel, level, warnings)
+      doc.levels.push(level)
+    }
+  }
+  if (!doc.levels.length) {
+    warnings.push('Restored missing level')
+    doc.levels.push(emptyLevel())
+  }
+
+  // assets — validated below at doc level (shared across levels)
+  validateAssets(obj, doc)
+
+  // --- self-heal: normalize + clamp + reconcile PER LEVEL, then detect
+  // drift (assets stay OUT of the hash, like furniture/annotations —
+  // their presence must never read as graph drift) ---
+  const graphOf = (d: ProjectDocument) =>
+    JSON.stringify(d.levels.map((l) => [l.nodes, l.walls, l.openings, l.rooms]))
+  const before = graphOf(doc)
+  for (const level of doc.levels) {
+    const view = makeLevelDoc(doc, level)
+    normalizeGraph(view)
+    revalidateOpenings(view)
+    reconcileRooms(view)
+    // attached furniture follows any load-time window clamps (v6) — same
+    // mandatory post-opening step as the runtime pipeline. Furniture is
+    // outside the heal hash, so this deterministic sync stays SILENT (old
+    // files keep opening clean), like a migration.
+    reconcileAttachedFurniture(view)
+  }
+  const after = graphOf(doc)
+
+  return { doc, warnings, healed: warnings.length > 0 || before !== after }
+}
+
+/** Per-level record whitelist (v7) — the pre-levels per-record validators,
+ * scoped to one level's maps. Referential checks (walls need nodes,
+ * openings/rooms need walls) are LEVEL-LOCAL by construction. */
+function validateLevelRecords(
+  raw: Record<string, unknown>,
+  level: Level,
+  warnings: string[],
+): void {
   // nodes
-  if (isObj(obj.nodes)) {
-    for (const [key, v] of Object.entries(obj.nodes)) {
+  if (isObj(raw.nodes)) {
+    for (const [key, v] of Object.entries(raw.nodes)) {
       if (isObj(v) && isFiniteNum(v.x) && isFiniteNum(v.y)) {
         const id = asNodeId(key)
-        doc.nodes[id] = { id, x: v.x, y: v.y }
+        level.nodes[id] = { id, x: v.x, y: v.y }
       } else {
         warnings.push(`Removed invalid node ${key}`)
       }
@@ -195,18 +269,18 @@ export function validateParsedObject(raw: unknown): ParseResult {
   }
 
   // walls (need both endpoints)
-  if (isObj(obj.walls)) {
-    for (const [key, v] of Object.entries(obj.walls)) {
+  if (isObj(raw.walls)) {
+    for (const [key, v] of Object.entries(raw.walls)) {
       if (
         isObj(v) &&
         isStr(v.a) &&
         isStr(v.b) &&
-        doc.nodes[asNodeId(v.a)] &&
-        doc.nodes[asNodeId(v.b)] &&
+        level.nodes[asNodeId(v.a)] &&
+        level.nodes[asNodeId(v.b)] &&
         v.a !== v.b
       ) {
         const id = asWallId(key)
-        doc.walls[id] = {
+        level.walls[id] = {
           id,
           a: asNodeId(v.a),
           b: asNodeId(v.b),
@@ -236,12 +310,12 @@ export function validateParsedObject(raw: unknown): ParseResult {
   }
 
   // openings (need a live wall + sane params)
-  if (isObj(obj.openings)) {
-    for (const [key, v] of Object.entries(obj.openings)) {
+  if (isObj(raw.openings)) {
+    for (const [key, v] of Object.entries(raw.openings)) {
       const ok =
         isObj(v) &&
         isStr(v.wallId) &&
-        doc.walls[asWallId(v.wallId)] &&
+        level.walls[asWallId(v.wallId)] &&
         isFiniteNum(v.t) &&
         v.t > 0 &&
         v.t < 1 &&
@@ -266,14 +340,14 @@ export function validateParsedObject(raw: unknown): ParseResult {
         ...(isStr(v.style) && v.style ? { style: v.style } : {}),
       }
       if (v.kind === 'door') {
-        doc.openings[id] = {
+        level.openings[id] = {
           ...base,
           kind: 'door',
           hinge: v.hinge === 'b' ? 'b' : 'a',
           swing: v.swing === 'back' ? 'back' : 'front',
         } satisfies Opening
       } else {
-        doc.openings[id] = {
+        level.openings[id] = {
           ...base,
           kind: 'window',
           sillHeight: isFiniteNum(v.sillHeight) ? Math.max(0, v.sillHeight) : DEFAULTS.window.sillHeight,
@@ -283,14 +357,14 @@ export function validateParsedObject(raw: unknown): ParseResult {
   }
 
   // rooms (identity carriers — invalid wall refs pruned, reconcile rebuilds)
-  if (isObj(obj.rooms)) {
-    for (const [key, v] of Object.entries(obj.rooms)) {
+  if (isObj(raw.rooms)) {
+    for (const [key, v] of Object.entries(raw.rooms)) {
       if (!isObj(v) || !Array.isArray(v.wallCycle)) {
         warnings.push(`Removed invalid room ${key}`)
         continue
       }
       const cycle = (v.wallCycle as unknown[])
-        .filter((w): w is string => isStr(w) && !!doc.walls[asWallId(w)])
+        .filter((w): w is string => isStr(w) && !!level.walls[asWallId(w)])
         .map(asWallId)
       if (!cycle.length) {
         warnings.push(`Removed room ${key} (no surviving walls)`)
@@ -300,13 +374,13 @@ export function validateParsedObject(raw: unknown): ParseResult {
         ? (v.holeCycles as unknown[]).map((h) =>
             Array.isArray(h)
               ? (h as unknown[])
-                  .filter((w): w is string => isStr(w) && !!doc.walls[asWallId(w)])
+                  .filter((w): w is string => isStr(w) && !!level.walls[asWallId(w)])
                   .map(asWallId)
               : [],
           )
         : []
       const id = asRoomId(key)
-      doc.rooms[id] = {
+      level.rooms[id] = {
         id,
         wallCycle: cycle,
         holeCycles,
@@ -316,13 +390,18 @@ export function validateParsedObject(raw: unknown): ParseResult {
           : {}),
         // v4, open registry: any non-empty string (render-side fallback)
         ...(isStr(v.roomType) && v.roomType ? { roomType: v.roomType } : {}),
+        // v7: per-room floor slab lift (podium/loft) — only positive values
+        // stored, capped at 2 m; junk/zero silently absent
+        ...(isFiniteNum(v.floorElevation) && v.floorElevation > 0
+          ? { floorElevation: Math.min(2, v.floorElevation) }
+          : {}),
       }
     }
   }
 
   // furniture
-  if (isObj(obj.furniture)) {
-    for (const [key, v] of Object.entries(obj.furniture)) {
+  if (isObj(raw.furniture)) {
+    for (const [key, v] of Object.entries(raw.furniture)) {
       const size = isObj(v) ? v.size : null
       const ok =
         isObj(v) &&
@@ -342,7 +421,7 @@ export function validateParsedObject(raw: unknown): ParseResult {
       const sz = size as { w: number; d: number; h: number }
       // w/d floor 0.1; h floor 0.01 — flat items (rug) are legitimately thin
       const clamp = (n: number, min: number) => Math.min(5, Math.max(min, n))
-      doc.furniture[id] = {
+      level.furniture[id] = {
         id,
         catalogItemId: v.catalogItemId as string,
         x: v.x as number,
@@ -380,8 +459,8 @@ export function validateParsedObject(raw: unknown): ParseResult {
   // annotations (v3) — free plan artifacts: never graph-healed (excluded
   // from the self-heal hash below, like furniture), whole-entity invalid →
   // prune with a warning, invalid optional FIELDS → silently absent
-  if (isObj(obj.annotations)) {
-    for (const [key, v] of Object.entries(obj.annotations)) {
+  if (isObj(raw.annotations)) {
+    for (const [key, v] of Object.entries(raw.annotations)) {
       if (isObj(v) && v.kind === 'dimension') {
         const a = v.a
         const b = v.b
@@ -399,7 +478,7 @@ export function validateParsedObject(raw: unknown): ParseResult {
         }
         const id = asAnnotationId(key)
         const m = DEFAULTS.maxDimensionOffset
-        doc.annotations[id] = {
+        level.annotations[id] = {
           id,
           kind: 'dimension',
           a: { x: a.x as number, y: a.y as number },
@@ -412,7 +491,7 @@ export function validateParsedObject(raw: unknown): ParseResult {
           continue
         }
         const id = asAnnotationId(key)
-        doc.annotations[id] = {
+        level.annotations[id] = {
           id,
           kind: 'label',
           x: v.x,
@@ -439,17 +518,21 @@ export function validateParsedObject(raw: unknown): ParseResult {
           continue
         }
         const id = asAnnotationId(key)
-        doc.annotations[id] = { id, kind: 'area', points }
+        level.annotations[id] = { id, kind: 'area', points }
       } else {
         warnings.push(`Removed invalid annotation ${key}`)
       }
     }
   }
 
-  // assets (v6) — inert leaf data like furniture/annotations, but junk
-  // entries drop SILENTLY (field-level rule, no warning): they only arrive
-  // from hand-edited files, and a warning would flip `healed` on open.
-  // Payload size is unbounded here by design — caps are ingest-time.
+}
+
+/** Doc-level assets whitelist (v6; the map is SHARED across levels in v7).
+ * Inert leaf data like furniture/annotations, but junk entries drop
+ * SILENTLY (field-level rule, no warning): they only arrive from
+ * hand-edited files, and a warning would flip `healed` on open. Payload
+ * size is unbounded here by design — caps are ingest-time. */
+function validateAssets(obj: Record<string, unknown>, doc: ProjectDocument): void {
   if (isObj(obj.assets)) {
     for (const [key, v] of Object.entries(obj.assets)) {
       if (
@@ -468,20 +551,4 @@ export function validateParsedObject(raw: unknown): ParseResult {
       }
     }
   }
-
-  // --- self-heal: normalize + clamp + reconcile, then detect drift ---
-  // (assets stay OUT of the hash, like furniture/annotations — their
-  // presence must never read as graph drift)
-  const before = JSON.stringify([doc.nodes, doc.walls, doc.openings, doc.rooms])
-  normalizeGraph(doc)
-  revalidateOpenings(doc)
-  reconcileRooms(doc)
-  // attached furniture follows any load-time window clamps (v6) — same
-  // mandatory post-opening step as the runtime pipeline. Furniture is
-  // outside the heal hash, so this deterministic sync stays SILENT (old
-  // files keep opening clean), like a migration.
-  reconcileAttachedFurniture(doc)
-  const after = JSON.stringify([doc.nodes, doc.walls, doc.openings, doc.rooms])
-
-  return { doc, warnings, healed: warnings.length > 0 || before !== after }
 }

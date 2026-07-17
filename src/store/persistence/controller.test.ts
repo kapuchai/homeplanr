@@ -614,7 +614,7 @@ describe('buildFileJson — save-preview embed (0.11.0)', () => {
     })
     const parsed = parseDocument(buildFileJson(buildFixtureDoc())).doc
     expect(parsed.previewAssetId).toBeUndefined()
-    expect(Object.keys(parsed.walls).length).toBeGreaterThan(0) // real bytes
+    expect(Object.keys(parsed.levels[0]!.walls).length).toBeGreaterThan(0) // real bytes
     __setPreviewRendererFactoryForTests(null)
   })
 })

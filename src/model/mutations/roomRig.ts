@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../types'
+import type { LevelDoc } from '../types'
 import {
   newNodeId,
   newWallId,
@@ -76,7 +76,7 @@ export interface RigTransform {
  * deliberately NOT excluded: island walls and their contents ride too, so
  * everything inside the outer boundary belongs to the rig.
  */
-export function collectRoomRig(doc: ProjectDocument, roomId: RoomId): RoomRigInfo | null {
+export function collectRoomRig(doc: LevelDoc, roomId: RoomId): RoomRigInfo | null {
   const room = doc.rooms[roomId]
   if (!room) return null
 
@@ -163,7 +163,7 @@ export function collectRoomRig(doc: ProjectDocument, roomId: RoomId): RoomRigInf
  * Returns a NEW rig (the input is not mutated). No shared geometry → the
  * input rig is returned unchanged.
  */
-export function tearRoomRig(doc: ProjectDocument, rig: RoomRig): RoomRig {
+export function tearRoomRig(doc: LevelDoc, rig: RoomRig): RoomRig {
   const room = doc.rooms[rig.roomId]
   if (!room) return rig
 
@@ -251,7 +251,7 @@ export function tearRoomRig(doc: ProjectDocument, rig: RoomRig): RoomRig {
 }
 
 /** Snapshot rig start positions; every transform frame recomputes FROM these. */
-export function captureRigStarts(doc: ProjectDocument, rig: RoomRig): RigStarts {
+export function captureRigStarts(doc: LevelDoc, rig: RoomRig): RigStarts {
   const nodes = new Map<NodeId, Vec2>()
   for (const id of rig.nodeIds) {
     const n = doc.nodes[id]
@@ -285,7 +285,7 @@ const applyXform = (p: Vec2, t: RigTransform): Vec2 => {
  * offset, and the room lands SHEARED.
  */
 export function transformRigRigid(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   rig: RoomRig,
   starts: RigStarts,
   xform: RigTransform,

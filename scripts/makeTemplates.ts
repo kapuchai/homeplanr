@@ -13,7 +13,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { emptyDocument, type ProjectDocument } from '../src/model/types'
+import { emptyDocument, type LevelDoc, type ProjectDocument } from '../src/model/types'
+import { makeLevelDoc } from '../src/model/levels'
 import { addWallChain, updateWall } from '../src/model/mutations/walls'
 import { addOpening } from '../src/model/mutations/openings'
 import { renameRoom, setRoomFloorMaterial } from '../src/model/mutations/rooms'
@@ -31,7 +32,7 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 /** Wall whose endpoints match (a, b) in either order, 1mm tolerance. */
-function wallAt(doc: ProjectDocument, a: Vec2, b: Vec2) {
+function wallAt(doc: LevelDoc, a: Vec2, b: Vec2) {
   const at = (n: { x: number; y: number }, p: Vec2) =>
     Math.abs(n.x - p.x) < 1e-3 && Math.abs(n.y - p.y) < 1e-3
   const hit = Object.values(doc.walls).find((w) => {
@@ -44,7 +45,7 @@ function wallAt(doc: ProjectDocument, a: Vec2, b: Vec2) {
 }
 
 /** Rooms sorted by derived area, largest first. */
-function roomsByArea(doc: ProjectDocument) {
+function roomsByArea(doc: LevelDoc) {
   resetDerivedForTests()
   const derived = getDerived(doc)
   return Object.values(doc.rooms)
@@ -52,7 +53,7 @@ function roomsByArea(doc: ProjectDocument) {
     .sort((x, y) => y.area - x.area)
 }
 
-function place(doc: ProjectDocument, catalogItemId: string, x: number, y: number, rotation = 0) {
+function place(doc: LevelDoc, catalogItemId: string, x: number, y: number, rotation = 0) {
   const item = CATALOG[catalogItemId]
   assert(item, `unknown catalog item ${catalogItemId}`)
   addFurniture(doc, {
@@ -70,7 +71,8 @@ function place(doc: ProjectDocument, catalogItemId: string, x: number, y: number
 
 /** Studio ~25 m²: single room + bathroom corner, kitchen row, sleeping nook. */
 function buildStudio(): ProjectDocument {
-  const doc = emptyDocument('p_template_studio', 'Studio 25 m²', STAMP)
+  const full = emptyDocument('p_template_studio', 'Studio 25 m²', STAMP)
+  const doc = makeLevelDoc(full, full.levels[0]!)
   addWallChain(doc, [vec(0, 0), vec(5.6, 0), vec(5.6, 4.6), vec(0, 4.6), vec(0, 0)])
   addWallChain(doc, [vec(3.8, 0), vec(3.8, 1.9), vec(5.6, 1.9)]) // bathroom corner
 
@@ -123,12 +125,13 @@ function buildStudio(): ProjectDocument {
 
   // exterior width dimension above the north wall
   addDimension(doc, vec(0, -0.4), vec(5.6, -0.4))
-  return doc
+  return full
 }
 
 /** 1-bedroom ~45 m²: L-shaped living/kitchen, bedroom, bathroom. */
 function buildOneBedroom(): ProjectDocument {
-  const doc = emptyDocument('p_template_1br', '1-bedroom 45 m²', STAMP)
+  const full = emptyDocument('p_template_1br', '1-bedroom 45 m²', STAMP)
+  const doc = makeLevelDoc(full, full.levels[0]!)
   addWallChain(doc, [vec(0, 0), vec(7.8, 0), vec(7.8, 5.8), vec(0, 5.8), vec(0, 0)])
   addWallChain(doc, [vec(4.9, 0), vec(4.9, 3.4), vec(7.8, 3.4)]) // bedroom
   addWallChain(doc, [vec(5.9, 3.4), vec(5.9, 5.8)]) // bathroom
@@ -189,7 +192,7 @@ function buildOneBedroom(): ProjectDocument {
   place(doc, 'washing-machine', 6.3, 4.55, Math.PI / 2)
 
   addDimension(doc, vec(0, -0.4), vec(7.8, -0.4))
-  return doc
+  return full
 }
 
 const outDir = fileURLToPath(new URL('../src/assets/templates/', import.meta.url))
@@ -207,8 +210,8 @@ for (const [name, doc] of targets) {
   assert(!healed && warnings.length === 0, `${name} does not round-trip clean`)
   writeFileSync(join(outDir, name), json)
   console.log(
-    `${name}: ${json.length} bytes — walls ${Object.keys(doc.walls).length},` +
-      ` openings ${Object.keys(doc.openings).length}, rooms ${Object.keys(doc.rooms).length},` +
-      ` furniture ${Object.keys(doc.furniture).length}`,
+    `${name}: ${json.length} bytes — walls ${Object.keys(doc.levels[0]!.walls).length},` +
+      ` openings ${Object.keys(doc.levels[0]!.openings).length}, rooms ${Object.keys(doc.levels[0]!.rooms).length},` +
+      ` furniture ${Object.keys(doc.levels[0]!.furniture).length}`,
   )
 }

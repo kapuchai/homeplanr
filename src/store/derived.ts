@@ -1,5 +1,5 @@
-import type { ProjectDocument, Room } from '../model/types'
-import type { NodeId, RoomId, WallId } from '../model/ids'
+import type { LevelDoc, Room } from '../model/types'
+import type { LevelId, NodeId, RoomId, WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import { computeWallOutlines, type WallOutlines } from '../geometry/wallOutline'
 import { buildPatchSolids, buildWallSolid, type PatchSolid, type WallSolid } from '../geometry/wallSolids'
@@ -52,15 +52,20 @@ interface PrevState {
   derived: DerivedGeometry
 }
 
-const cache = new WeakMap<ProjectDocument, DerivedGeometry>()
-let prev: PrevState | null = null
+const cache = new WeakMap<LevelDoc, DerivedGeometry>()
+/** Cross-commit stability state PER LEVEL (v7) — one shared `prev` would
+ * thrash between levels every 3D frame. Keyed by level id; bounded prune
+ * keeps deleted levels from pinning old geometry forever. */
+const prevByLevel = new Map<LevelId, PrevState>()
+const PREV_CAP = 32
 
 const sigEqual = (a: Sig | undefined, b: Sig): boolean =>
   !!a && a.length === b.length && a.every((v, i) => v === b[i])
 
-export function getDerived(doc: ProjectDocument): DerivedGeometry {
+export function getDerived(doc: LevelDoc): DerivedGeometry {
   const hit = cache.get(doc)
   if (hit) return hit
+  const prev = prevByLevel.get(doc.levelId) ?? null
 
   const outlines = computeWallOutlines(doc.nodes, doc.walls)
 
@@ -189,11 +194,14 @@ export function getDerived(doc: ProjectDocument): DerivedGeometry {
     orphanFaces,
   }
   cache.set(doc, derived)
-  prev = { sigs, patchSigs, roomSigs, derived }
+  if (prevByLevel.size >= PREV_CAP && !prevByLevel.has(doc.levelId)) {
+    prevByLevel.clear()
+  }
+  prevByLevel.set(doc.levelId, { sigs, patchSigs, roomSigs, derived })
   return derived
 }
 
 /** Test hook: drop cross-doc stability state (NOT the per-doc WeakMap). */
 export function resetDerivedForTests(): void {
-  prev = null
+  prevByLevel.clear()
 }

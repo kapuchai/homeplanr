@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { hitTestAll, hitTestRect, hitTestTop } from './hitTest'
-import { buildFixtureDoc } from '../../test/fixtureDoc'
+import { buildFixtureLevelDoc } from '../../test/fixtureDoc'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
 import { addDimension } from '../../model/mutations/annotations'
 import { vec } from '../../geometry/vec'
@@ -9,7 +9,7 @@ const PX = 0.01 // pxToWorld at k=100
 
 describe('hitTestAll on the fixture apartment', () => {
   resetDerivedForTests()
-  const doc = buildFixtureDoc()
+  const doc = buildFixtureLevelDoc()
   const derived = getDerived(doc)
 
   it('sofa center hits furniture first, then the room under it', () => {
@@ -71,7 +71,7 @@ describe('hitTestAll on the fixture apartment', () => {
 
 describe('hitTestRect (marquee) on the fixture apartment', () => {
   resetDerivedForTests()
-  const doc = buildFixtureDoc()
+  const doc = buildFixtureLevelDoc()
   const derived = getDerived(doc)
   const kinds = (a: import('./hitTest').EntityRef[]) => new Set(a.map((h) => h.kind))
 
@@ -98,7 +98,7 @@ describe('hitTestRect (marquee) on the fixture apartment', () => {
   })
 
   it('furniture selects by its ROTATED footprint, not its AABB', () => {
-    const d2 = buildFixtureDoc()
+    const d2 = buildFixtureLevelDoc()
     const rot = Object.values(d2.furniture)[0]!
     // a 2.2×0.95 item at (20,20) rotated 45°: long axis along the (1,1)
     // diagonal. (20.7,20.7) is INSIDE the rotated shape (local u≈0.99<1.1,
@@ -134,7 +134,7 @@ describe('hitTestRect (marquee) on the fixture apartment', () => {
 
 describe('annotationsVisible flag (0.7.0 visibility parity)', () => {
   resetDerivedForTests()
-  const doc = buildFixtureDoc()
+  const doc = buildFixtureLevelDoc()
   const id = addDimension(doc, vec(1, 1), vec(3, 1), 0)!
   const derived = getDerived(doc)
   const on = { x: 2, y: 1 } // on the dimension line

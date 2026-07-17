@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "p_template_1br",
   "name": "1-bedroom 45 m²",
   "createdAt": "2026-07-16T00:00:00.000Z",
@@ -9,550 +9,555 @@
     "defaultWallThickness": 0.15,
     "defaultWallHeight": 2.5
   },
-  "nodes": {
-    "n_ipV-PtBezy": {
-      "id": "n_ipV-PtBezy",
-      "x": 0,
-      "y": 0
-    },
-    "n_ba75mq6C7a": {
-      "id": "n_ba75mq6C7a",
-      "x": 7.8,
-      "y": 0
-    },
-    "n_ccNJ8XyC_s": {
-      "id": "n_ccNJ8XyC_s",
-      "x": 7.8,
-      "y": 5.8
-    },
-    "n_9yFShnOgmk": {
-      "id": "n_9yFShnOgmk",
-      "x": 0,
-      "y": 5.8
-    },
-    "n_P6jKDNEh7r": {
-      "id": "n_P6jKDNEh7r",
-      "x": 4.9,
-      "y": 0
-    },
-    "n_pjRAygDrdP": {
-      "id": "n_pjRAygDrdP",
-      "x": 4.9,
-      "y": 3.4
-    },
-    "n_Q0JCBz6Xyo": {
-      "id": "n_Q0JCBz6Xyo",
-      "x": 7.8,
-      "y": 3.4
-    },
-    "n_7NMV9MPSnf": {
-      "id": "n_7NMV9MPSnf",
-      "x": 5.9,
-      "y": 3.4
-    },
-    "n_tvmI4GcO4W": {
-      "id": "n_tvmI4GcO4W",
-      "x": 5.9,
-      "y": 5.8
+  "levels": [
+    {
+      "id": "l_pvQ30ESYDT",
+      "nodes": {
+        "n_QO2HcSCbeb": {
+          "id": "n_QO2HcSCbeb",
+          "x": 0,
+          "y": 0
+        },
+        "n_OpdgKZdmE2": {
+          "id": "n_OpdgKZdmE2",
+          "x": 7.8,
+          "y": 0
+        },
+        "n_sU9NfxKnu5": {
+          "id": "n_sU9NfxKnu5",
+          "x": 7.8,
+          "y": 5.8
+        },
+        "n_NARUegUQOp": {
+          "id": "n_NARUegUQOp",
+          "x": 0,
+          "y": 5.8
+        },
+        "n_dikaPqC28T": {
+          "id": "n_dikaPqC28T",
+          "x": 4.9,
+          "y": 0
+        },
+        "n_vrDQg1SryH": {
+          "id": "n_vrDQg1SryH",
+          "x": 4.9,
+          "y": 3.4
+        },
+        "n_3a2q2z_HjM": {
+          "id": "n_3a2q2z_HjM",
+          "x": 7.8,
+          "y": 3.4
+        },
+        "n_ZECW7YM1E5": {
+          "id": "n_ZECW7YM1E5",
+          "x": 5.9,
+          "y": 3.4
+        },
+        "n_G_662plbXY": {
+          "id": "n_G_662plbXY",
+          "x": 5.9,
+          "y": 5.8
+        }
+      },
+      "walls": {
+        "w_y5P2u-_jk6": {
+          "id": "w_y5P2u-_jk6",
+          "a": "n_QO2HcSCbeb",
+          "b": "n_dikaPqC28T",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_8fokNYCrpH": {
+          "id": "w_8fokNYCrpH",
+          "a": "n_OpdgKZdmE2",
+          "b": "n_3a2q2z_HjM",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_vIW0kdRVMi": {
+          "id": "w_vIW0kdRVMi",
+          "a": "n_sU9NfxKnu5",
+          "b": "n_G_662plbXY",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_sD-2uUBz25": {
+          "id": "w_sD-2uUBz25",
+          "a": "n_NARUegUQOp",
+          "b": "n_QO2HcSCbeb",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_9Y3ZY8HeK4": {
+          "id": "w_9Y3ZY8HeK4",
+          "a": "n_dikaPqC28T",
+          "b": "n_vrDQg1SryH",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_L0Dev1i9Xe": {
+          "id": "w_L0Dev1i9Xe",
+          "a": "n_vrDQg1SryH",
+          "b": "n_ZECW7YM1E5",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_M4L47AD0-L": {
+          "id": "w_M4L47AD0-L",
+          "a": "n_3a2q2z_HjM",
+          "b": "n_sU9NfxKnu5",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_TPqHPXu-_S": {
+          "id": "w_TPqHPXu-_S",
+          "a": "n_dikaPqC28T",
+          "b": "n_OpdgKZdmE2",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_cBlmGJqJ2u": {
+          "id": "w_cBlmGJqJ2u",
+          "a": "n_ZECW7YM1E5",
+          "b": "n_G_662plbXY",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_JeSEyQeJlI": {
+          "id": "w_JeSEyQeJlI",
+          "a": "n_ZECW7YM1E5",
+          "b": "n_3a2q2z_HjM",
+          "thickness": 0.15,
+          "height": 2.5
+        },
+        "w_DyY8SpVmwx": {
+          "id": "w_DyY8SpVmwx",
+          "a": "n_G_662plbXY",
+          "b": "n_NARUegUQOp",
+          "thickness": 0.15,
+          "height": 2.5
+        }
+      },
+      "openings": {
+        "o_kiE4x1bprI": {
+          "id": "o_kiE4x1bprI",
+          "wallId": "w_DyY8SpVmwx",
+          "t": 0.8500000000000001,
+          "kind": "door",
+          "width": 0.9,
+          "height": 2,
+          "hinge": "a",
+          "swing": "front"
+        },
+        "o_XakpVOBdkE": {
+          "id": "o_XakpVOBdkE",
+          "wallId": "w_9Y3ZY8HeK4",
+          "t": 0.8426470588235294,
+          "kind": "door",
+          "width": 0.9,
+          "height": 2,
+          "hinge": "a",
+          "swing": "back"
+        },
+        "o_OZyRJbA-iH": {
+          "id": "o_OZyRJbA-iH",
+          "wallId": "w_cBlmGJqJ2u",
+          "t": 0.45000000000000007,
+          "kind": "door",
+          "width": 0.9,
+          "height": 2,
+          "hinge": "a",
+          "swing": "front"
+        },
+        "o_ZhLqcMXnT2": {
+          "id": "o_ZhLqcMXnT2",
+          "wallId": "w_y5P2u-_jk6",
+          "t": 0.44999999999999996,
+          "kind": "window",
+          "width": 1.2,
+          "height": 1.2,
+          "sillHeight": 0.9
+        },
+        "o_Jl5n7sLfdt": {
+          "id": "o_Jl5n7sLfdt",
+          "wallId": "w_TPqHPXu-_S",
+          "t": 0.5,
+          "kind": "window",
+          "width": 1.2,
+          "height": 1.2,
+          "sillHeight": 0.9
+        },
+        "o_tRO7WVAmrz": {
+          "id": "o_tRO7WVAmrz",
+          "wallId": "w_sD-2uUBz25",
+          "t": 0.5,
+          "kind": "window",
+          "width": 1.2,
+          "height": 1.2,
+          "sillHeight": 0.9
+        }
+      },
+      "rooms": {
+        "r_pFUvolcSBV": {
+          "id": "r_pFUvolcSBV",
+          "wallCycle": [
+            "w_y5P2u-_jk6",
+            "w_9Y3ZY8HeK4",
+            "w_L0Dev1i9Xe",
+            "w_cBlmGJqJ2u",
+            "w_DyY8SpVmwx",
+            "w_sD-2uUBz25"
+          ],
+          "holeCycles": [],
+          "name": "Living room",
+          "floorMaterialId": "woodFloor",
+          "roomType": "living"
+        },
+        "r_kj-lBcg348": {
+          "id": "r_kj-lBcg348",
+          "wallCycle": [
+            "w_8fokNYCrpH",
+            "w_JeSEyQeJlI",
+            "w_L0Dev1i9Xe",
+            "w_9Y3ZY8HeK4",
+            "w_TPqHPXu-_S"
+          ],
+          "holeCycles": [],
+          "name": "Bedroom",
+          "floorMaterialId": "carpetFloor",
+          "roomType": "bedroom"
+        },
+        "r_RoMS1ZGFkb": {
+          "id": "r_RoMS1ZGFkb",
+          "wallCycle": [
+            "w_vIW0kdRVMi",
+            "w_cBlmGJqJ2u",
+            "w_JeSEyQeJlI",
+            "w_M4L47AD0-L"
+          ],
+          "holeCycles": [],
+          "name": "Bathroom",
+          "floorMaterialId": "tileGray",
+          "roomType": "bathroom"
+        }
+      },
+      "furniture": {
+        "f_dCsvvxhd3d": {
+          "id": "f_dCsvvxhd3d",
+          "catalogItemId": "rug",
+          "x": 2,
+          "y": 3.3,
+          "rotation": 0,
+          "size": {
+            "w": 2,
+            "d": 1.4,
+            "h": 0.02
+          },
+          "elevation": 0
+        },
+        "f_sfgQaATehN": {
+          "id": "f_sfgQaATehN",
+          "catalogItemId": "kitchen-counter",
+          "x": 0.7,
+          "y": 0.35,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 1.8,
+            "d": 0.6,
+            "h": 0.9
+          },
+          "elevation": 0
+        },
+        "f_RoPxYSZqaj": {
+          "id": "f_RoPxYSZqaj",
+          "catalogItemId": "kitchen-sink",
+          "x": 1.65,
+          "y": 0.35,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 0.6,
+            "d": 0.6,
+            "h": 0.9
+          },
+          "elevation": 0
+        },
+        "f_MForhhtWeP": {
+          "id": "f_MForhhtWeP",
+          "catalogItemId": "stove",
+          "x": 2.45,
+          "y": 0.35,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 0.6,
+            "d": 0.6,
+            "h": 0.85
+          },
+          "elevation": 0
+        },
+        "f_CiGnuQUkQ4": {
+          "id": "f_CiGnuQUkQ4",
+          "catalogItemId": "fridge",
+          "x": 3.3,
+          "y": 0.4,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 0.6,
+            "d": 0.65,
+            "h": 1.8
+          },
+          "elevation": 0
+        },
+        "f_WMesI2itzP": {
+          "id": "f_WMesI2itzP",
+          "catalogItemId": "kitchen-island",
+          "x": 1.9,
+          "y": 1.6,
+          "rotation": 0,
+          "size": {
+            "w": 1.8,
+            "d": 0.9,
+            "h": 0.9
+          },
+          "elevation": 0
+        },
+        "f_jc-Um8FfQY": {
+          "id": "f_jc-Um8FfQY",
+          "catalogItemId": "sofa-3",
+          "x": 0.56,
+          "y": 3.3,
+          "rotation": 1.5707963267948966,
+          "size": {
+            "w": 2.2,
+            "d": 0.95,
+            "h": 0.85
+          },
+          "elevation": 0
+        },
+        "f_f-Qz-FsmS_": {
+          "id": "f_f-Qz-FsmS_",
+          "catalogItemId": "coffee-table",
+          "x": 2.05,
+          "y": 3.3,
+          "rotation": 1.5707963267948966,
+          "size": {
+            "w": 1.1,
+            "d": 0.6,
+            "h": 0.45
+          },
+          "elevation": 0
+        },
+        "f_b9cCwPiepw": {
+          "id": "f_b9cCwPiepw",
+          "catalogItemId": "tv-wall",
+          "x": 4.72,
+          "y": 2.6,
+          "rotation": -1.5707963267948966,
+          "size": {
+            "w": 1.25,
+            "d": 0.2,
+            "h": 0.75
+          },
+          "elevation": 1.1
+        },
+        "f_W1kTIdyTYg": {
+          "id": "f_W1kTIdyTYg",
+          "catalogItemId": "dining-table",
+          "x": 3.7,
+          "y": 2,
+          "rotation": 1.5707963267948966,
+          "size": {
+            "w": 1.6,
+            "d": 0.9,
+            "h": 0.74
+          },
+          "elevation": 0
+        },
+        "f_lzeAsbGILy": {
+          "id": "f_lzeAsbGILy",
+          "catalogItemId": "dining-chair",
+          "x": 3.1,
+          "y": 2,
+          "rotation": 1.5707963267948966,
+          "size": {
+            "w": 0.45,
+            "d": 0.52,
+            "h": 0.88
+          },
+          "elevation": 0
+        },
+        "f_vvvXat7UUK": {
+          "id": "f_vvvXat7UUK",
+          "catalogItemId": "dining-chair",
+          "x": 4.3,
+          "y": 2,
+          "rotation": -1.5707963267948966,
+          "size": {
+            "w": 0.45,
+            "d": 0.52,
+            "h": 0.88
+          },
+          "elevation": 0
+        },
+        "f_KgvjBuqjA1": {
+          "id": "f_KgvjBuqjA1",
+          "catalogItemId": "dining-chair",
+          "x": 3.7,
+          "y": 1.1,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 0.45,
+            "d": 0.52,
+            "h": 0.88
+          },
+          "elevation": 0
+        },
+        "f_rHntmwsGI0": {
+          "id": "f_rHntmwsGI0",
+          "catalogItemId": "dining-chair",
+          "x": 3.7,
+          "y": 2.9,
+          "rotation": 0,
+          "size": {
+            "w": 0.45,
+            "d": 0.52,
+            "h": 0.88
+          },
+          "elevation": 0
+        },
+        "f_Awdlukm4TK": {
+          "id": "f_Awdlukm4TK",
+          "catalogItemId": "plant",
+          "x": 0.42,
+          "y": 4.55,
+          "rotation": 0,
+          "size": {
+            "w": 0.4,
+            "d": 0.4,
+            "h": 1.2
+          },
+          "elevation": 0
+        },
+        "f_DFncD7fcc2": {
+          "id": "f_DFncD7fcc2",
+          "catalogItemId": "bed-double",
+          "x": 6.35,
+          "y": 1.25,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 1.67,
+            "d": 2.12,
+            "h": 1
+          },
+          "elevation": 0
+        },
+        "f_NiXCIKtgT8": {
+          "id": "f_NiXCIKtgT8",
+          "catalogItemId": "nightstand",
+          "x": 5.2,
+          "y": 0.4,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 0.45,
+            "d": 0.4,
+            "h": 0.55
+          },
+          "elevation": 0
+        },
+        "f_lbVO5gTU7Q": {
+          "id": "f_lbVO5gTU7Q",
+          "catalogItemId": "nightstand",
+          "x": 7.45,
+          "y": 0.4,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 0.45,
+            "d": 0.4,
+            "h": 0.55
+          },
+          "elevation": 0
+        },
+        "f_q8mtU_M9sw": {
+          "id": "f_q8mtU_M9sw",
+          "catalogItemId": "wardrobe",
+          "x": 7.4,
+          "y": 2.7,
+          "rotation": -1.5707963267948966,
+          "size": {
+            "w": 1.5,
+            "d": 0.6,
+            "h": 2.2
+          },
+          "elevation": 0
+        },
+        "f_UnPBcXdQ4g": {
+          "id": "f_UnPBcXdQ4g",
+          "catalogItemId": "bathtub",
+          "x": 7.35,
+          "y": 4.35,
+          "rotation": -1.5707963267948966,
+          "size": {
+            "w": 1.7,
+            "d": 0.75,
+            "h": 0.58
+          },
+          "elevation": 0
+        },
+        "f_0MPfLtJ1IQ": {
+          "id": "f_0MPfLtJ1IQ",
+          "catalogItemId": "toilet",
+          "x": 6.35,
+          "y": 5.35,
+          "rotation": 0,
+          "size": {
+            "w": 0.38,
+            "d": 0.65,
+            "h": 0.78
+          },
+          "elevation": 0
+        },
+        "f_eNFvWsCPq3": {
+          "id": "f_eNFvWsCPq3",
+          "catalogItemId": "washbasin",
+          "x": 6.4,
+          "y": 3.75,
+          "rotation": 3.141592653589793,
+          "size": {
+            "w": 0.55,
+            "d": 0.45,
+            "h": 0.85
+          },
+          "elevation": 0
+        },
+        "f_WMSb1gdF1h": {
+          "id": "f_WMSb1gdF1h",
+          "catalogItemId": "washing-machine",
+          "x": 6.3,
+          "y": 4.55,
+          "rotation": 1.5707963267948966,
+          "size": {
+            "w": 0.6,
+            "d": 0.6,
+            "h": 0.85
+          },
+          "elevation": 0
+        }
+      },
+      "annotations": {
+        "a_VYa-XSUxMJ": {
+          "id": "a_VYa-XSUxMJ",
+          "kind": "dimension",
+          "a": {
+            "x": 0,
+            "y": -0.4
+          },
+          "b": {
+            "x": 7.8,
+            "y": -0.4
+          },
+          "offset": 0
+        }
+      }
     }
-  },
-  "walls": {
-    "w_yjq4k3lxsS": {
-      "id": "w_yjq4k3lxsS",
-      "a": "n_ipV-PtBezy",
-      "b": "n_P6jKDNEh7r",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_jJXgSEkori": {
-      "id": "w_jJXgSEkori",
-      "a": "n_ba75mq6C7a",
-      "b": "n_Q0JCBz6Xyo",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_zssIiKwlLE": {
-      "id": "w_zssIiKwlLE",
-      "a": "n_ccNJ8XyC_s",
-      "b": "n_tvmI4GcO4W",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_B9gDJqFIJw": {
-      "id": "w_B9gDJqFIJw",
-      "a": "n_9yFShnOgmk",
-      "b": "n_ipV-PtBezy",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_wp64Zn9jL5": {
-      "id": "w_wp64Zn9jL5",
-      "a": "n_P6jKDNEh7r",
-      "b": "n_pjRAygDrdP",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_1xv_m286ns": {
-      "id": "w_1xv_m286ns",
-      "a": "n_pjRAygDrdP",
-      "b": "n_7NMV9MPSnf",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_Gc9vM0AdzC": {
-      "id": "w_Gc9vM0AdzC",
-      "a": "n_Q0JCBz6Xyo",
-      "b": "n_ccNJ8XyC_s",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_-jY2jjZ0NJ": {
-      "id": "w_-jY2jjZ0NJ",
-      "a": "n_P6jKDNEh7r",
-      "b": "n_ba75mq6C7a",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_1qWB4yPReX": {
-      "id": "w_1qWB4yPReX",
-      "a": "n_7NMV9MPSnf",
-      "b": "n_tvmI4GcO4W",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_xR4jb2vbts": {
-      "id": "w_xR4jb2vbts",
-      "a": "n_7NMV9MPSnf",
-      "b": "n_Q0JCBz6Xyo",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_-oz5rwiVOA": {
-      "id": "w_-oz5rwiVOA",
-      "a": "n_tvmI4GcO4W",
-      "b": "n_9yFShnOgmk",
-      "thickness": 0.15,
-      "height": 2.5
-    }
-  },
-  "openings": {
-    "o_FFKlsjSuvx": {
-      "id": "o_FFKlsjSuvx",
-      "wallId": "w_-oz5rwiVOA",
-      "t": 0.8500000000000001,
-      "kind": "door",
-      "width": 0.9,
-      "height": 2,
-      "hinge": "a",
-      "swing": "front"
-    },
-    "o_fTmcE-Ntnh": {
-      "id": "o_fTmcE-Ntnh",
-      "wallId": "w_wp64Zn9jL5",
-      "t": 0.8426470588235294,
-      "kind": "door",
-      "width": 0.9,
-      "height": 2,
-      "hinge": "a",
-      "swing": "back"
-    },
-    "o_1DwVJgkUJD": {
-      "id": "o_1DwVJgkUJD",
-      "wallId": "w_1qWB4yPReX",
-      "t": 0.45000000000000007,
-      "kind": "door",
-      "width": 0.9,
-      "height": 2,
-      "hinge": "a",
-      "swing": "front"
-    },
-    "o_HgyM-asWZF": {
-      "id": "o_HgyM-asWZF",
-      "wallId": "w_yjq4k3lxsS",
-      "t": 0.44999999999999996,
-      "kind": "window",
-      "width": 1.2,
-      "height": 1.2,
-      "sillHeight": 0.9
-    },
-    "o_KOrw6mnt7f": {
-      "id": "o_KOrw6mnt7f",
-      "wallId": "w_-jY2jjZ0NJ",
-      "t": 0.5,
-      "kind": "window",
-      "width": 1.2,
-      "height": 1.2,
-      "sillHeight": 0.9
-    },
-    "o_2TaDmHwc9r": {
-      "id": "o_2TaDmHwc9r",
-      "wallId": "w_B9gDJqFIJw",
-      "t": 0.5,
-      "kind": "window",
-      "width": 1.2,
-      "height": 1.2,
-      "sillHeight": 0.9
-    }
-  },
-  "rooms": {
-    "r_kYvgmFFmlN": {
-      "id": "r_kYvgmFFmlN",
-      "wallCycle": [
-        "w_yjq4k3lxsS",
-        "w_wp64Zn9jL5",
-        "w_1xv_m286ns",
-        "w_1qWB4yPReX",
-        "w_-oz5rwiVOA",
-        "w_B9gDJqFIJw"
-      ],
-      "holeCycles": [],
-      "name": "Living room",
-      "floorMaterialId": "woodFloor",
-      "roomType": "living"
-    },
-    "r_JJE3-PZnQ8": {
-      "id": "r_JJE3-PZnQ8",
-      "wallCycle": [
-        "w_jJXgSEkori",
-        "w_xR4jb2vbts",
-        "w_1xv_m286ns",
-        "w_wp64Zn9jL5",
-        "w_-jY2jjZ0NJ"
-      ],
-      "holeCycles": [],
-      "name": "Bedroom",
-      "floorMaterialId": "carpetFloor",
-      "roomType": "bedroom"
-    },
-    "r_QGv7J8zFQU": {
-      "id": "r_QGv7J8zFQU",
-      "wallCycle": [
-        "w_zssIiKwlLE",
-        "w_1qWB4yPReX",
-        "w_xR4jb2vbts",
-        "w_Gc9vM0AdzC"
-      ],
-      "holeCycles": [],
-      "name": "Bathroom",
-      "floorMaterialId": "tileGray",
-      "roomType": "bathroom"
-    }
-  },
-  "furniture": {
-    "f_JUTwxpsoUA": {
-      "id": "f_JUTwxpsoUA",
-      "catalogItemId": "rug",
-      "x": 2,
-      "y": 3.3,
-      "rotation": 0,
-      "size": {
-        "w": 2,
-        "d": 1.4,
-        "h": 0.02
-      },
-      "elevation": 0
-    },
-    "f_Ia38MYlBma": {
-      "id": "f_Ia38MYlBma",
-      "catalogItemId": "kitchen-counter",
-      "x": 0.7,
-      "y": 0.35,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 1.8,
-        "d": 0.6,
-        "h": 0.9
-      },
-      "elevation": 0
-    },
-    "f_Lkwb-OOdol": {
-      "id": "f_Lkwb-OOdol",
-      "catalogItemId": "kitchen-sink",
-      "x": 1.65,
-      "y": 0.35,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 0.6,
-        "d": 0.6,
-        "h": 0.9
-      },
-      "elevation": 0
-    },
-    "f_uIAaux2Ibh": {
-      "id": "f_uIAaux2Ibh",
-      "catalogItemId": "stove",
-      "x": 2.45,
-      "y": 0.35,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 0.6,
-        "d": 0.6,
-        "h": 0.85
-      },
-      "elevation": 0
-    },
-    "f_Z2WbW2xgzf": {
-      "id": "f_Z2WbW2xgzf",
-      "catalogItemId": "fridge",
-      "x": 3.3,
-      "y": 0.4,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 0.6,
-        "d": 0.65,
-        "h": 1.8
-      },
-      "elevation": 0
-    },
-    "f_m0SyRLWFIx": {
-      "id": "f_m0SyRLWFIx",
-      "catalogItemId": "kitchen-island",
-      "x": 1.9,
-      "y": 1.6,
-      "rotation": 0,
-      "size": {
-        "w": 1.8,
-        "d": 0.9,
-        "h": 0.9
-      },
-      "elevation": 0
-    },
-    "f_m7j3TfJGeb": {
-      "id": "f_m7j3TfJGeb",
-      "catalogItemId": "sofa-3",
-      "x": 0.56,
-      "y": 3.3,
-      "rotation": 1.5707963267948966,
-      "size": {
-        "w": 2.2,
-        "d": 0.95,
-        "h": 0.85
-      },
-      "elevation": 0
-    },
-    "f_WeZwh8K9JC": {
-      "id": "f_WeZwh8K9JC",
-      "catalogItemId": "coffee-table",
-      "x": 2.05,
-      "y": 3.3,
-      "rotation": 1.5707963267948966,
-      "size": {
-        "w": 1.1,
-        "d": 0.6,
-        "h": 0.45
-      },
-      "elevation": 0
-    },
-    "f_UhOPTpgTvg": {
-      "id": "f_UhOPTpgTvg",
-      "catalogItemId": "tv-wall",
-      "x": 4.72,
-      "y": 2.6,
-      "rotation": -1.5707963267948966,
-      "size": {
-        "w": 1.25,
-        "d": 0.2,
-        "h": 0.75
-      },
-      "elevation": 1.1
-    },
-    "f_orgS3lXj7B": {
-      "id": "f_orgS3lXj7B",
-      "catalogItemId": "dining-table",
-      "x": 3.7,
-      "y": 2,
-      "rotation": 1.5707963267948966,
-      "size": {
-        "w": 1.6,
-        "d": 0.9,
-        "h": 0.74
-      },
-      "elevation": 0
-    },
-    "f_aQrh3OjbRN": {
-      "id": "f_aQrh3OjbRN",
-      "catalogItemId": "dining-chair",
-      "x": 3.1,
-      "y": 2,
-      "rotation": 1.5707963267948966,
-      "size": {
-        "w": 0.45,
-        "d": 0.52,
-        "h": 0.88
-      },
-      "elevation": 0
-    },
-    "f_uuWaHf9jhL": {
-      "id": "f_uuWaHf9jhL",
-      "catalogItemId": "dining-chair",
-      "x": 4.3,
-      "y": 2,
-      "rotation": -1.5707963267948966,
-      "size": {
-        "w": 0.45,
-        "d": 0.52,
-        "h": 0.88
-      },
-      "elevation": 0
-    },
-    "f_Gwtw6Uhigm": {
-      "id": "f_Gwtw6Uhigm",
-      "catalogItemId": "dining-chair",
-      "x": 3.7,
-      "y": 1.1,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 0.45,
-        "d": 0.52,
-        "h": 0.88
-      },
-      "elevation": 0
-    },
-    "f_5Lfk13KHpx": {
-      "id": "f_5Lfk13KHpx",
-      "catalogItemId": "dining-chair",
-      "x": 3.7,
-      "y": 2.9,
-      "rotation": 0,
-      "size": {
-        "w": 0.45,
-        "d": 0.52,
-        "h": 0.88
-      },
-      "elevation": 0
-    },
-    "f_agdgLlbnKp": {
-      "id": "f_agdgLlbnKp",
-      "catalogItemId": "plant",
-      "x": 0.42,
-      "y": 4.55,
-      "rotation": 0,
-      "size": {
-        "w": 0.4,
-        "d": 0.4,
-        "h": 1.2
-      },
-      "elevation": 0
-    },
-    "f_raZfHf70sq": {
-      "id": "f_raZfHf70sq",
-      "catalogItemId": "bed-double",
-      "x": 6.35,
-      "y": 1.25,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 1.67,
-        "d": 2.12,
-        "h": 1
-      },
-      "elevation": 0
-    },
-    "f_sC0T8ayV-E": {
-      "id": "f_sC0T8ayV-E",
-      "catalogItemId": "nightstand",
-      "x": 5.2,
-      "y": 0.4,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 0.45,
-        "d": 0.4,
-        "h": 0.55
-      },
-      "elevation": 0
-    },
-    "f_Nz_B7p8x2u": {
-      "id": "f_Nz_B7p8x2u",
-      "catalogItemId": "nightstand",
-      "x": 7.45,
-      "y": 0.4,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 0.45,
-        "d": 0.4,
-        "h": 0.55
-      },
-      "elevation": 0
-    },
-    "f_0l1hBJOYbF": {
-      "id": "f_0l1hBJOYbF",
-      "catalogItemId": "wardrobe",
-      "x": 7.4,
-      "y": 2.7,
-      "rotation": -1.5707963267948966,
-      "size": {
-        "w": 1.5,
-        "d": 0.6,
-        "h": 2.2
-      },
-      "elevation": 0
-    },
-    "f_MnSOd9cYPI": {
-      "id": "f_MnSOd9cYPI",
-      "catalogItemId": "bathtub",
-      "x": 7.35,
-      "y": 4.35,
-      "rotation": -1.5707963267948966,
-      "size": {
-        "w": 1.7,
-        "d": 0.75,
-        "h": 0.58
-      },
-      "elevation": 0
-    },
-    "f_I6SserxKtv": {
-      "id": "f_I6SserxKtv",
-      "catalogItemId": "toilet",
-      "x": 6.35,
-      "y": 5.35,
-      "rotation": 0,
-      "size": {
-        "w": 0.38,
-        "d": 0.65,
-        "h": 0.78
-      },
-      "elevation": 0
-    },
-    "f_i2pgdeCfvU": {
-      "id": "f_i2pgdeCfvU",
-      "catalogItemId": "washbasin",
-      "x": 6.4,
-      "y": 3.75,
-      "rotation": 3.141592653589793,
-      "size": {
-        "w": 0.55,
-        "d": 0.45,
-        "h": 0.85
-      },
-      "elevation": 0
-    },
-    "f_TqAgYI-quu": {
-      "id": "f_TqAgYI-quu",
-      "catalogItemId": "washing-machine",
-      "x": 6.3,
-      "y": 4.55,
-      "rotation": 1.5707963267948966,
-      "size": {
-        "w": 0.6,
-        "d": 0.6,
-        "h": 0.85
-      },
-      "elevation": 0
-    }
-  },
-  "annotations": {
-    "a_rGopJQyd1I": {
-      "id": "a_rGopJQyd1I",
-      "kind": "dimension",
-      "a": {
-        "x": 0,
-        "y": -0.4
-      },
-      "b": {
-        "x": 7.8,
-        "y": -0.4
-      },
-      "offset": 0
-    }
-  },
+  ],
   "assets": {}
 }

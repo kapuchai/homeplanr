@@ -1,10 +1,20 @@
-import { emptyDocument, type ProjectDocument } from '../model/types'
+import { emptyDocument, type LevelDoc, type ProjectDocument } from '../model/types'
+import { makeLevelDoc } from '../model/levels'
 import { addWallChain, addWallSegment } from '../model/mutations/walls'
 import { addOpening } from '../model/mutations/openings'
 import { renameRoom } from '../model/mutations/rooms'
 import { addFurniture } from '../model/mutations/furniture'
 import { CATALOG } from '../catalog'
 import { vec } from '../geometry/vec'
+
+/** Standalone single-level working view for mutation tests (v7): a fresh
+ * document's ground level. Mutations see exactly what the store seam
+ * would hand them; the wrapper aliases the doc, so persistence-flavored
+ * tests can build the doc themselves and call makeLevelDoc directly. */
+export function testLevelDoc(id = 'p_test', name = 'test'): LevelDoc {
+  const d = emptyDocument(id, name, '2026-07-11T00:00:00.000Z')
+  return makeLevelDoc(d, d.levels[0]!)
+}
 
 /**
  * The M2 fixture apartment — exercises every render path:
@@ -13,7 +23,8 @@ import { vec } from '../geometry/vec'
  * and four furniture items. Used by the dev bootstrap and by tests.
  */
 export function buildFixtureDoc(): ProjectDocument {
-  const doc = emptyDocument('p_fixture', 'Fixture apartment', '2026-07-11T00:00:00.000Z')
+  const fullDoc = emptyDocument('p_fixture', 'Fixture apartment', '2026-07-11T00:00:00.000Z')
+  const doc = makeLevelDoc(fullDoc, fullDoc.levels[0]!)
 
   // outer shell: 8m × 5m, divider at x=5 (T-junctions top and bottom)
   addWallChain(doc, [vec(0, 0), vec(8, 0), vec(8, 5), vec(0, 5), vec(0, 0)])
@@ -57,5 +68,12 @@ export function buildFixtureDoc(): ProjectDocument {
   place('wardrobe', 6.4, 4.6, Math.PI)
   place('toilet', 7.7, 0.5, -Math.PI / 2)
 
-  return doc
+  return fullDoc
+}
+
+/** The fixture apartment as its ground-level working view — for tests that
+ * exercise entity mutations/derived geometry rather than persistence. */
+export function buildFixtureLevelDoc(): LevelDoc {
+  const doc = buildFixtureDoc()
+  return makeLevelDoc(doc, doc.levels[0]!)
 }

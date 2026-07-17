@@ -1,5 +1,6 @@
 import { useStore } from 'zustand'
 import { docTemporal, useDocStore } from './docStore'
+import { useActiveLevel } from './activeLevel'
 import type { ProjectDocument } from '../model/types'
 
 /**
@@ -87,15 +88,38 @@ export function abortTx(token?: TxToken): void {
   docTemporal.getState().resume()
 }
 
+/**
+ * Undo-follow (v7): after an undo/redo lands, switch the active floor to
+ * the level the step actually changed — undoing a wall you drew upstairs
+ * while looking at the ground floor must not read as "nothing happened".
+ * Level identity is by id; content change is by reference (immer gives a
+ * changed level a new object). Doc-scoped steps (rename, notes) change no
+ * level and leave the floor alone; the pruning subscription clamps a
+ * vanished active id.
+ */
+function followChangedLevel(before: ProjectDocument): void {
+  const after = useDocStore.getState().doc
+  if (after === before) return
+  const prevById = new Map(before.levels.map((l) => [l.id, l]))
+  const changed = after.levels.find((l) => prevById.get(l.id) !== l)
+  if (changed && changed.id !== useActiveLevel.getState().activeLevelId) {
+    useActiveLevel.getState().setActiveLevel(changed.id)
+  }
+}
+
 /** Undo/redo gated against active transactions (keymap/toolbar entry point). */
 export function safeUndo(): void {
   if (txSnapshot !== null) return
+  const before = useDocStore.getState().doc
   docTemporal.getState().undo()
+  followChangedLevel(before)
 }
 
 export function safeRedo(): void {
   if (txSnapshot !== null) return
+  const before = useDocStore.getState().doc
   docTemporal.getState().redo()
+  followChangedLevel(before)
 }
 
 export function clearHistory(): void {

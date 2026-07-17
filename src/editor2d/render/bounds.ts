@@ -1,10 +1,10 @@
-import { DEFAULTS, type ProjectDocument } from '../../model/types'
+import { DEFAULTS, type LevelDoc } from '../../model/types'
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
 import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
 
 /** Point sets covering everything visible — input to zoom-to-fit. */
-export function docContentBounds(doc: ProjectDocument, derived: DerivedGeometry): Vec2[][] {
+export function docContentBounds(doc: LevelDoc, derived: DerivedGeometry): Vec2[][] {
   const polys: Vec2[][] = [
     ...Object.values(derived.outlines.wallPolygons),
     ...Object.values(derived.outlines.nodePatches),
@@ -18,7 +18,7 @@ export function docContentBounds(doc: ProjectDocument, derived: DerivedGeometry)
   return polys
 }
 
-const annotationBounds = (ann: ProjectDocument['annotations'][AnnotationId] & object): Vec2[] => {
+const annotationBounds = (ann: LevelDoc['annotations'][AnnotationId] & object): Vec2[] => {
   if (ann.kind === 'dimension') {
     const dx = ann.b.x - ann.a.x
     const dy = ann.b.y - ann.a.y
@@ -41,7 +41,7 @@ const annotationBounds = (ann: ProjectDocument['annotations'][AnnotationId] & ob
   ]
 }
 
-const furnitureBounds = (f: ProjectDocument['furniture'][FurnitureId] & object): Vec2[] => {
+const furnitureBounds = (f: LevelDoc['furniture'][FurnitureId] & object): Vec2[] => {
   const r = Math.hypot(f.size.w, f.size.d) / 2
   return [
     { x: f.x - r, y: f.y - r },
@@ -51,7 +51,7 @@ const furnitureBounds = (f: ProjectDocument['furniture'][FurnitureId] & object):
 
 /** Point sets covering just the given selection — input to zoom-to-selection. */
 export function selectionContentBounds(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   ids: readonly string[],
 ): Vec2[][] {

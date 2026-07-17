@@ -1,4 +1,4 @@
-import { DEFAULTS as MODEL_DEFAULTS, type ProjectDocument } from '../model/types'
+import { DEFAULTS as MODEL_DEFAULTS, type LevelDoc } from '../model/types'
 import type { DerivedGeometry } from '../store/derived'
 import type { Bounds } from '../geometry/polygon'
 import {
@@ -127,7 +127,7 @@ export function exportPixelSize(
  * has no visible content. Deterministic for a given doc/derived/settings.
  */
 export function renderPlanSvg(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   opts: ExportPlanOptions = {},
 ): string | null {

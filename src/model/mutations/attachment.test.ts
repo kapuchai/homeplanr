@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDocument, type Window } from '../types'
+import { testLevelDoc } from '../../test/fixtureDoc'
+import { type Window } from '../types'
 import type { OpeningId } from '../ids'
 import { addWallSegment, deleteEntities, splitWall } from './walls'
 import { addOpening, updateOpening } from './openings'
@@ -13,11 +14,10 @@ import {
 } from './attachment'
 import { vec } from '../../geometry/vec'
 
-const STAMP = '2026-07-17T00:00:00.000Z'
 
 /** Horizontal wall (0,0)→(4,0), thickness 0.15, one window at t=0.5 w=1.2. */
 function setup() {
-  const doc = emptyDocument('p_attach', 'Attach test', STAMP)
+  const doc = testLevelDoc('p_attach', 'Attach test')
   const { wallId } = addWallSegment(doc, vec(0, 0), vec(4, 0))
   const openingId = addOpening(doc, {
     kind: 'window',

@@ -1,4 +1,4 @@
-import type { Annotation, ProjectDocument } from '../types'
+import type { Annotation, LevelDoc } from '../types'
 import { DEFAULTS } from '../types'
 import { newAnnotationId, type AnnotationId } from '../ids'
 import { dist, type Vec2 } from '../../geometry/vec'
@@ -11,7 +11,7 @@ import { area } from '../../geometry/polygon'
  */
 
 export function addDimension(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   a: Vec2,
   b: Vec2,
   offset = 0,
@@ -29,7 +29,7 @@ export function addDimension(
   return id
 }
 
-export function addLabel(doc: ProjectDocument, pos: Vec2, text: string): AnnotationId | null {
+export function addLabel(doc: LevelDoc, pos: Vec2, text: string): AnnotationId | null {
   if (!text.trim()) return null
   const id = newAnnotationId()
   doc.annotations[id] = { id, kind: 'label', x: pos.x, y: pos.y, text }
@@ -42,7 +42,7 @@ export const MIN_AREA_M2 = 0.001
 /** Traced area polygon (v4) — single mutation on trace close (one undo
  * entry); rejects < 3 points or a near-zero (collinear) polygon, the
  * addDimension precedent. */
-export function addArea(doc: ProjectDocument, points: readonly Vec2[]): AnnotationId | null {
+export function addArea(doc: LevelDoc, points: readonly Vec2[]): AnnotationId | null {
   if (points.length < 3 || area(points) < MIN_AREA_M2) return null
   const id = newAnnotationId()
   doc.annotations[id] = {
@@ -67,7 +67,7 @@ export interface AnnotationPatch {
 }
 
 export function updateAnnotation(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: AnnotationId,
   patch: AnnotationPatch,
 ): void {
@@ -109,7 +109,7 @@ export function updateAnnotation(
 }
 
 /** Kept alongside the entity type: the deleteEntities cascade calls this. */
-export function deleteAnnotations(doc: ProjectDocument, ids: readonly AnnotationId[]): void {
+export function deleteAnnotations(doc: LevelDoc, ids: readonly AnnotationId[]): void {
   for (const id of ids) delete doc.annotations[id]
 }
 

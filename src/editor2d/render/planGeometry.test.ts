@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDocument } from '../../model/types'
+import { testLevelDoc } from '../../test/fixtureDoc'
 import { addWallSegment } from '../../model/mutations/walls'
 import { addOpening } from '../../model/mutations/openings'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
@@ -26,7 +26,7 @@ const arcs = (ink: readonly OpeningPrim[]) =>
 describe('doorGlyph ghost/placed parity', () => {
   const build = (hinge: 'a' | 'b', swing: 'front' | 'back') => {
     resetDerivedForTests()
-    const d = emptyDocument('p_dg', 'dg', '2026-07-16T00:00:00.000Z')
+    const d = testLevelDoc('p_dg', 'dg')
     const r = addWallSegment(d, { x: 1, y: 2 }, { x: 5, y: 4 }) // oblique wall
     const id = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.5, hinge, swing })!
     const derived = getDerived(d)

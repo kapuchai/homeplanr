@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDocument } from '../types'
+import { emptyDocument, emptyLevel } from '../types'
+import { makeLevelDoc } from '../levels'
 import type { AssetId, OpeningId } from '../ids'
 import { addAsset, gcAssets, referencedAssetIds, type AssetContent } from './assets'
 import {
@@ -13,7 +14,13 @@ import { getDerived } from '../../store/derived'
 import { splitDataUrl, assetDataUrl, base64Bytes } from '../../store/persistence/imageIngest'
 
 const STAMP = '2026-07-17T00:00:00.000Z'
-const doc = () => emptyDocument('p_assets_test', 'Assets test', STAMP)
+/** Full document + its ground-level view — GC/reference tests are
+ * doc-scoped (v7 scans all levels), everything else is level-scoped. */
+const pair = () => {
+  const full = emptyDocument('p_assets_test', 'Assets test', STAMP)
+  return { full, d: makeLevelDoc(full, full.levels[0]!) }
+}
+const doc = () => pair().d
 
 const JPEG: AssetContent = { mime: 'image/jpeg', data: 'aGVsbG8=', w: 640, h: 480 }
 const PNG: AssetContent = { mime: 'image/png', data: 'd29ybGQ=', w: 32, h: 32 }
@@ -69,42 +76,57 @@ describe('addFurniture with asset content (paste path)', () => {
 
 describe('gcAssets', () => {
   it('is identity when there are no assets or all are referenced', () => {
-    const d = doc()
-    expect(gcAssets(d)).toBe(d)
+    const { full, d } = pair()
+    expect(gcAssets(full)).toBe(full)
     const fid = addFurniture(d, item())
     setFurnitureAsset(d, fid, addAsset(d, JPEG))
-    expect(gcAssets(d)).toBe(d)
+    expect(gcAssets(full)).toBe(full)
   })
 
   it('drops orphans in a COPY, never touching the input', () => {
-    const d = doc()
+    const { full, d } = pair()
     const fid = addFurniture(d, item())
     const kept = addAsset(d, JPEG)
     setFurnitureAsset(d, fid, kept)
     const orphan = addAsset(d, PNG)
-    const out = gcAssets(d)
-    expect(out).not.toBe(d)
+    const out = gcAssets(full)
+    expect(out).not.toBe(full)
     expect(Object.keys(out.assets)).toEqual([kept])
     // purity: the in-memory doc keeps the orphan (undo may resurrect it)
-    expect(d.assets[orphan]).toBeDefined()
-    expect(out.furniture).toBe(d.furniture) // shallow copy — collections shared
+    expect(full.assets[orphan]).toBeDefined()
+    expect(out.levels).toBe(full.levels) // shallow copy — collections shared
   })
 
   it('referencedAssetIds sees furniture refs only for present fields', () => {
-    const d = doc()
+    const { full, d } = pair()
     addFurniture(d, item())
-    expect(referencedAssetIds(d).size).toBe(0)
+    expect(referencedAssetIds(full).size).toBe(0)
   })
 
   it('previewAssetId (0.11.0) is a reference — gc keeps the preview asset', () => {
-    const d = doc()
+    const { full, d } = pair()
     const preview = addAsset(d, JPEG)
-    d.previewAssetId = preview
+    full.previewAssetId = preview
     const orphan = addAsset(d, PNG)
-    const out = gcAssets(d)
-    expect(referencedAssetIds(d).has(preview)).toBe(true)
+    const out = gcAssets(full)
+    expect(referencedAssetIds(full).has(preview)).toBe(true)
     expect(Object.keys(out.assets)).toEqual([preview])
-    expect(d.assets[orphan]).toBeDefined() // input untouched
+    expect(full.assets[orphan]).toBeDefined() // input untouched
+  })
+
+  it('v7: an asset referenced ONLY by another level survives GC', () => {
+    // the data-loss trap the levels design guards against: saving while on
+    // the ground floor must never GC art hanging on the second floor
+    const { full, d } = pair()
+    full.levels.push(emptyLevel())
+    const upstairs = makeLevelDoc(full, full.levels[1]!)
+    const fid = addFurniture(upstairs, item())
+    setFurnitureAsset(upstairs, fid, addAsset(upstairs, JPEG))
+    addAsset(d, PNG) // ground-floor orphan for contrast
+    const out = gcAssets(full)
+    const keptIds = Object.keys(out.assets)
+    expect(keptIds).toHaveLength(1)
+    expect(out.assets[keptIds[0] as AssetId]!.mime).toBe('image/jpeg')
   })
 })
 
@@ -128,7 +150,6 @@ describe('clipboard asset carry', () => {
     expect(payload.items[0]!.asset).toEqual(JPEG)
 
     const dst = doc() // a fresh document that never saw the asset
-    dst.id = 'p_assets_dst'
     const params = materializeItems(payload, { x: 5, y: 5 })
     const [pid] = params.map((p) => addFurniture(dst, p))
     const aid = dst.furniture[pid!]!.assetId!

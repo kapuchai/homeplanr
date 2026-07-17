@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { testLevelDoc } from '../../test/fixtureDoc'
 import {
   fitCameraPose,
   presetPose,
@@ -7,12 +8,11 @@ import {
   type SceneBBox,
 } from './fitCamera'
 import { getDerived, resetDerivedForTests } from '../../store/derived'
-import { emptyDocument } from '../../model/types'
 import { addWallSegment } from '../../model/mutations/walls'
 import { addFurniture } from '../../model/mutations/furniture'
 import { vec } from '../../geometry/vec'
 
-const doc = () => emptyDocument('p_t', 't', '2026-07-11T00:00:00.000Z')
+const doc = () => testLevelDoc('p_t', 't')
 
 const finite = (pose: ReturnType<typeof fitCameraPose>) => {
   for (const v of [...pose.position, ...pose.target, pose.maxDistance]) {

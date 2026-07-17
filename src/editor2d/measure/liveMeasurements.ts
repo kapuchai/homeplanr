@@ -1,4 +1,4 @@
-import type { ProjectDocument, Wall } from '../../model/types'
+import type { LevelDoc, Wall } from '../../model/types'
 import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
 import type { DerivedGeometry } from '../../store/derived'
 import type { DimensionPill } from '../session/interactionStore'
@@ -18,7 +18,7 @@ import { PILL_H_PX, pillHalfExtentPx } from '../render/pillMetrics'
  * node positions) and furniture rays hit wall FACES, not centerlines.
  */
 export interface MeasureInput {
-  doc: ProjectDocument
+  doc: LevelDoc
   derived: DerivedGeometry
   /** meters per screen px at current zoom. */
   pxToWorld: number
@@ -52,7 +52,7 @@ const PILL_GAP_PX = PILL_OFFSET_PX - PILL_H_PX / 2
 const pillClearancePx = (text: string, n: Vec2, scale = 1): number =>
   pillHalfExtentPx(text, n, scale) + PILL_GAP_PX
 
-export function incidentWallIds(doc: ProjectDocument, nodeId: NodeId): WallId[] {
+export function incidentWallIds(doc: LevelDoc, nodeId: NodeId): WallId[] {
   const out: WallId[] = []
   for (const w of Object.values(doc.walls)) {
     if (w.a === nodeId || w.b === nodeId) out.push(w.id)
@@ -247,8 +247,8 @@ const MIN_LABEL_LENGTH = 0.5
 /** Inside-probe distance (m) for picking the label side. */
 const SIDE_PROBE = 0.05
 
-const wallRoomsCache = new WeakMap<ProjectDocument, Map<WallId, RoomId[]>>()
-const wallRooms = (doc: ProjectDocument): Map<WallId, RoomId[]> => {
+const wallRoomsCache = new WeakMap<LevelDoc, Map<WallId, RoomId[]>>()
+const wallRooms = (doc: LevelDoc): Map<WallId, RoomId[]> => {
   const hit = wallRoomsCache.get(doc)
   if (hit) return hit
   const map = new Map<WallId, RoomId[]>()
@@ -268,7 +268,7 @@ const wallRooms = (doc: ProjectDocument): Map<WallId, RoomId[]> => {
  * instead of the arbitrary a→b winding side (B5).
  */
 function wallLabelSide(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   w: Wall,
   n: Vec2,
@@ -289,7 +289,7 @@ function wallLabelSide(
 
 /** One length label per wall ≥ MIN_LABEL_LENGTH, on the wallLabelSide. */
 export function dimensionLabels(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   units: UnitSystem,
   pxToWorld = 0,
@@ -322,7 +322,7 @@ export function dimensionLabels(
  * when an opening sits at the wall's midpoint.
  */
 export function openingWidthLabels(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   units: UnitSystem,
   pxToWorld = 0,
@@ -360,7 +360,7 @@ export function openingWidthLabels(
  * never collide at any rotation.
  */
 export function furnitureSizeLabels(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   ids: readonly string[],
   units: UnitSystem,
   pxToWorld = 0,

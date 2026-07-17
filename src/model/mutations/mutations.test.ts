@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDocument, type ProjectDocument, type WallFinishId } from '../types'
+import { type LevelDoc, type WallFinishId } from '../types'
+import { testLevelDoc } from '../../test/fixtureDoc'
 import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../ids'
 import {
   addWallChain,
@@ -34,18 +35,18 @@ import { dist } from '../../geometry/vec'
 import { produce } from 'immer'
 import fc from 'fast-check'
 
-const doc = (): ProjectDocument => emptyDocument('p_test', 'test', '2026-07-11T00:00:00.000Z')
+const doc = (): LevelDoc => testLevelDoc()
 
-const square = (d: ProjectDocument, size = 4) =>
+const square = (d: LevelDoc, size = 4) =>
   addWallChain(d, [vec(0, 0), vec(size, 0), vec(size, size), vec(0, size), vec(0, 0)])
 
-const wallCount = (d: ProjectDocument) => Object.keys(d.walls).length
-const nodeCount = (d: ProjectDocument) => Object.keys(d.nodes).length
-const roomCount = (d: ProjectDocument) => Object.keys(d.rooms).length
-const firstRoom = (d: ProjectDocument) => Object.values(d.rooms)[0]!
+const wallCount = (d: LevelDoc) => Object.keys(d.walls).length
+const nodeCount = (d: LevelDoc) => Object.keys(d.nodes).length
+const roomCount = (d: LevelDoc) => Object.keys(d.rooms).length
+const firstRoom = (d: LevelDoc) => Object.values(d.rooms)[0]!
 
 /** Invariant assertions (the document contract). */
-function checkInvariants(d: ProjectDocument) {
+function checkInvariants(d: LevelDoc) {
   const nodeIds = Object.keys(d.nodes) as NodeId[]
   for (let i = 0; i < nodeIds.length; i++) {
     for (let j = i + 1; j < nodeIds.length; j++) {
@@ -169,7 +170,7 @@ describe('normalizeGraph', () => {
 })
 
 describe('splitWall + opening remapping', () => {
-  function wallWithDoor(): { d: ProjectDocument; wallId: WallId; openingId: OpeningId } {
+  function wallWithDoor(): { d: LevelDoc; wallId: WallId; openingId: OpeningId } {
     const d = doc()
     const r = addWallSegment(d, vec(0, 0), vec(6, 0))
     const openingId = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.25 })!
@@ -521,7 +522,7 @@ describe('wall paint + finish (updateWall)', () => {
 
 describe('paintRoomWalls', () => {
   /** Directed lookup: the wall whose a-node sits at pa and b-node at pb. */
-  const wallAt = (d: ProjectDocument, pa: Vec2, pb: Vec2) =>
+  const wallAt = (d: LevelDoc, pa: Vec2, pb: Vec2) =>
     Object.values(d.walls).find(
       (w) => dist(d.nodes[w.a]!, pa) < 1e-9 && dist(d.nodes[w.b]!, pb) < 1e-9,
     )!
@@ -1196,7 +1197,7 @@ describe('0.4.0 M1: paste demotion — existing geometry always wins', () => {
 describe('M9 (0.3.0): align / distribute', () => {
   const box = (x: number, y: number, w = 1, dd = 1, rotation = 0): FurnitureId =>
     addFurniture(doc2, { catalogItemId: 'test-box', x, y, rotation, size: { w, d: dd, h: 1 } })
-  let doc2: ProjectDocument
+  let doc2: LevelDoc
   beforeEach2()
   function beforeEach2() {
     doc2 = doc()
@@ -1238,9 +1239,9 @@ describe('M9 (0.3.0): align / distribute', () => {
 })
 
 describe('0.8.0 M1: room rig — collect / tear / rigid transform', () => {
-  const nodeAt = (d: ProjectDocument, p: Vec2) =>
+  const nodeAt = (d: LevelDoc, p: Vec2) =>
     Object.values(d.nodes).find((n) => dist(n, p) < 1e-6)!
-  const wallBetween = (d: ProjectDocument, p: Vec2, q: Vec2) =>
+  const wallBetween = (d: LevelDoc, p: Vec2, q: Vec2) =>
     Object.values(d.walls).find((w) => {
       const na = d.nodes[w.a]!
       const nb = d.nodes[w.b]!
@@ -1250,7 +1251,7 @@ describe('0.8.0 M1: room rig — collect / tear / rigid transform', () => {
       )
     })
   /** Room owning a wall that touches the node at `p`. */
-  const roomTouching = (d: ProjectDocument, p: Vec2) => {
+  const roomTouching = (d: LevelDoc, p: Vec2) => {
     const n = nodeAt(d, p)
     const wids = new Set(
       Object.values(d.walls)
@@ -1261,7 +1262,7 @@ describe('0.8.0 M1: room rig — collect / tear / rigid transform', () => {
   }
 
   /** Two adjacent 4x4 rooms sharing the x=4 divider (7 walls, 8 nodes). */
-  function twoRooms(d: ProjectDocument) {
+  function twoRooms(d: LevelDoc) {
     addWallChain(d, [vec(0, 0), vec(4, 0), vec(8, 0), vec(8, 4), vec(4, 4), vec(0, 4), vec(0, 0)])
     const divider = addWallSegment(d, vec(4, 0), vec(4, 4)).wallId!
     const left = roomTouching(d, vec(0, 0))
@@ -1272,7 +1273,7 @@ describe('0.8.0 M1: room rig — collect / tear / rigid transform', () => {
   }
 
   /** The full gesture at model level: collect → tear → live frame → commit. */
-  function dragRoom(d: ProjectDocument, roomId: RoomId, delta: Vec2, angleRad = 0) {
+  function dragRoom(d: LevelDoc, roomId: RoomId, delta: Vec2, angleRad = 0) {
     const info = collectRoomRig(d, roomId)
     expect(info).not.toBeNull()
     const rig = tearRoomRig(d, info!.rig)

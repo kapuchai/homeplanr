@@ -1,5 +1,5 @@
 import type { Vec2 } from '../../geometry/vec'
-import type { ProjectDocument } from '../../model/types'
+import type { LevelDoc } from '../../model/types'
 import type { DerivedGeometry } from '../../store/derived'
 import type { DocState } from '../../store/docStore'
 import type { UiState } from '../../store/uiStore'
@@ -23,7 +23,7 @@ export interface EditorPointerEvent {
 }
 
 export interface ToolContext {
-  doc: () => ProjectDocument
+  doc: () => LevelDoc
   derived: () => DerivedGeometry
   actions: () => DocState
   ui: () => UiState

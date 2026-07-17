@@ -2,7 +2,14 @@ import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { temporal } from 'zundo'
-import { emptyDocument, type ProjectDocument, type ProjectSettings } from '../model/types'
+import {
+  emptyDocument,
+  type LevelDoc,
+  type ProjectDocument,
+  type ProjectSettings,
+} from '../model/types'
+import { makeLevelDoc } from '../model/levels'
+import { useActiveLevel } from './activeLevel'
 import { newProjectId, type AnnotationId, type FurnitureId, type NodeId, type OpeningId, type RoomId, type WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import * as walls from '../model/mutations/walls'
@@ -91,6 +98,8 @@ export interface DocState {
   paintRoomWalls: (id: RoomId, paintId: string | undefined) => void
   renameProject: (name: string) => void
   updateSettings: (patch: Partial<ProjectSettings>) => void
+  /** Project notes (0.15.0 pull-forward): undoable doc-scoped edit. */
+  setNotes: (notes: string) => void
   // document lifecycle
   newDocument: (name?: string) => void
   replaceDocument: (doc: ProjectDocument) => void
@@ -103,8 +112,27 @@ export const useDocStore = create<DocState>()(
   temporal(
     subscribeWithSelector(
       immer((set) => {
-        /** Run a mutation on the draft doc and pass its return value out. */
-        function mutate<R>(fn: (doc: ProjectDocument) => R): R {
+        /**
+         * Run an ENTITY mutation against the ACTIVE level (v7 seam): the
+         * mutation receives a throwaway LevelDoc whose maps alias the
+         * draft's level + assets/settings — writes go through the immer
+         * proxies, so one committed mutation still yields one new doc
+         * identity. Every entity action funnels through here; a mutation
+         * physically cannot touch doc-scoped fields (they are absent from
+         * LevelDoc).
+         */
+        function mutate<R>(fn: (doc: LevelDoc) => R): R {
+          let result!: R
+          set((s) => {
+            const activeId = useActiveLevel.getState().activeLevelId
+            const level =
+              (activeId && s.doc.levels.find((l) => l.id === activeId)) || s.doc.levels[0]!
+            result = fn(makeLevelDoc(s.doc, level))
+          })
+          return result
+        }
+        /** Doc-scoped mutations (name/settings/preview/notes/levels). */
+        function mutateDoc<R>(fn: (doc: ProjectDocument) => R): R {
           let result!: R
           set((s) => {
             result = fn(s.doc)
@@ -134,7 +162,7 @@ export const useDocStore = create<DocState>()(
             mutate((d) =>
               furniture.setFurnitureAsset(d, id, content ? assets.addAsset(d, content) : undefined),
             ),
-          setPreviewImage: (content) => mutate((d) => assets.setPreviewImage(d, content)),
+          setPreviewImage: (content) => mutateDoc((d) => assets.setPreviewImage(d, content)),
           attachFurniture: (id, openingId, ref) =>
             mutate((d) => attachment.attachFurnitureToOpening(d, id, openingId, ref)),
           detachFurniture: (id) => mutate((d) => attachment.detachFurniture(d, id)),
@@ -157,16 +185,21 @@ export const useDocStore = create<DocState>()(
           setRoomFloorMaterial: (id, mat) => mutate((d) => rooms.setRoomFloorMaterial(d, id, mat)),
           setRoomType: (id, roomType) => mutate((d) => rooms.setRoomType(d, id, roomType)),
           paintRoomWalls: (id, paintId) => mutate((d) => rooms.paintRoomWalls(d, id, paintId)),
-          renameProject: (name) => mutate((d) => project.renameProject(d, name)),
-          updateSettings: (patch) => mutate((d) => project.updateSettings(d, patch)),
-          newDocument: (name = 'Untitled') =>
+          renameProject: (name) => mutateDoc((d) => project.renameProject(d, name)),
+          updateSettings: (patch) => mutateDoc((d) => project.updateSettings(d, patch)),
+          setNotes: (notes) => mutateDoc((d) => project.setNotes(d, notes)),
+          newDocument: (name = 'Untitled') => {
+            useActiveLevel.getState().setActiveLevel(null)
             set((s) => {
               s.doc = emptyDocument(newProjectId(), name, new Date().toISOString())
-            }),
-          replaceDocument: (doc) =>
+            })
+          },
+          replaceDocument: (doc) => {
+            useActiveLevel.getState().setActiveLevel(null)
             set((s) => {
               s.doc = doc
-            }),
+            })
+          },
         }
       }),
     ),

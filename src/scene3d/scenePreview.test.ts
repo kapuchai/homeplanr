@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { testLevelDoc } from '../test/fixtureDoc'
 import { Mesh } from 'three'
-import { buildFixtureDoc } from '../test/fixtureDoc'
-import { emptyDocument } from '../model/types'
+import { buildFixtureLevelDoc } from '../test/fixtureDoc'
 import { getDerived } from '../store/derived'
 import {
   __setPreviewRendererFactoryForTests,
@@ -29,7 +29,7 @@ beforeEach(() => __setPreviewRendererFactoryForTests(null))
 
 describe('buildPreviewScene', () => {
   it('assembles walls, floors, and furniture from the fixture doc', () => {
-    const doc = buildFixtureDoc()
+    const doc = buildFixtureLevelDoc()
     const { scene, root, dispose } = buildPreviewScene(doc, getDerived(doc))
     expect(root.rotation.x).toBeCloseTo(-Math.PI / 2) // the one mapping
     let meshCount = 0
@@ -47,7 +47,7 @@ describe('renderScenePreview', () => {
   it('renders a JPEG through the injected renderer and disposes it', () => {
     const { r, calls } = fakeRenderer()
     __setPreviewRendererFactoryForTests(() => r)
-    const doc = buildFixtureDoc()
+    const doc = buildFixtureLevelDoc()
     const out = renderScenePreview(doc, getDerived(doc))
     expect(out).not.toBeNull()
     expect(out!.dataUrl.startsWith('data:image/jpeg')).toBe(true)
@@ -62,7 +62,7 @@ describe('renderScenePreview', () => {
   it('an empty document yields null without touching the renderer', () => {
     const factory = vi.fn(() => fakeRenderer().r)
     __setPreviewRendererFactoryForTests(factory)
-    const doc = emptyDocument('p_empty', 'Empty', '2026-07-17T00:00:00.000Z')
+    const doc = testLevelDoc('p_empty', 'Empty')
     expect(renderScenePreview(doc, getDerived(doc))).toBeNull()
     expect(factory).not.toHaveBeenCalled()
   })
@@ -72,7 +72,7 @@ describe('renderScenePreview', () => {
       throw new Error('no GL')
     })
     __setPreviewRendererFactoryForTests(factory)
-    const doc = buildFixtureDoc()
+    const doc = buildFixtureLevelDoc()
     const derived = getDerived(doc)
     expect(renderScenePreview(doc, derived)).toBeNull()
     expect(renderScenePreview(doc, derived)).toBeNull()

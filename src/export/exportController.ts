@@ -1,6 +1,8 @@
 import { jsPDF } from 'jspdf'
 import 'svg2pdf.js'
 import { useDocStore } from '../store/docStore'
+import { levelDocOf } from '../store/levelView'
+import { useActiveLevel } from '../store/activeLevel'
 import { getDerived } from '../store/derived'
 import { isTxActive } from '../store/transactions'
 import { usePersistStore } from '../store/persistence/controller'
@@ -88,14 +90,17 @@ export async function exportImage(
 ): Promise<void> {
   if (isTxActive()) return
   const { adapter } = usePersistStore.getState()
-  const doc = useDocStore.getState().doc
+  const fullDoc = useDocStore.getState().doc
+  // v7: exports render the ACTIVE level (a per-floor selector lands with
+  // the switcher work)
+  const doc = levelDocOf(fullDoc, useActiveLevel.getState().activeLevelId)
   const derived = getDerived(doc)
   const svg = renderPlanSvg(doc, derived, opts)
   if (!svg) {
     await adapter.message(t('export.nothing.title'), t('export.nothing.message'))
     return
   }
-  const name = sanitizeName(doc.name)
+  const name = sanitizeName(fullDoc.name)
   try {
     if (format === 'svg') {
       await adapter.saveBinaryDialog(new TextEncoder().encode(svg), `${name}.svg`, {
@@ -144,14 +149,17 @@ export interface ExportPdfOptions extends ExportPlanOptions {
 export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
   if (isTxActive()) return
   const { adapter } = usePersistStore.getState()
-  const doc = useDocStore.getState().doc
+  const fullDoc = useDocStore.getState().doc
+  // v7: exports render the ACTIVE level (a per-floor selector lands with
+  // the switcher work)
+  const doc = levelDocOf(fullDoc, useActiveLevel.getState().activeLevelId)
   const derived = getDerived(doc)
   const svg = renderPlanSvg(doc, derived, opts)
   if (!svg) {
     await adapter.message(t('export.nothing.title'), t('export.nothing.message'))
     return
   }
-  const name = sanitizeName(doc.name)
+  const name = sanitizeName(fullDoc.name)
   try {
     const bounds = polygonBounds(docContentBounds(doc, derived))!
     const margin = opts.marginM ?? EXPORT_MARGIN_M
@@ -225,7 +233,7 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
       pdf.rect(tb.x, tb.y, tb.w, tb.h)
       pdf.setFontSize(11)
       pdf.setTextColor(20)
-      pdf.text(doc.name, tb.x + 4, tb.y + tb.h / 2 + 1.5)
+      pdf.text(fullDoc.name, tb.x + 4, tb.y + tb.h / 2 + 1.5)
       pdf.setFontSize(9)
       pdf.setTextColor(90)
       pdf.text(`${date}   ·   ${scaleLabel(layout.scaleDenominator)}`, tb.x + tb.w - 4, tb.y + tb.h / 2 + 1.5, {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useDocStore } from '../store/docStore'
+import { useActiveLevelDoc } from '../store/levelView'
 import { useUiStore } from '../store/uiStore'
 import type { RoomId } from '../model/ids'
 import { useAppSettings } from '../store/appSettings'
@@ -12,12 +12,10 @@ export function StatusHint() {
   const selection = useUiStore((s) => s.selection)
   const openingKind = useUiStore((s) => s.toolParams.openingKind)
   const showAnnotations = useAppSettings((s) => s.showAnnotations)
-  const empty = useDocStore(
-    (s) => Object.keys(s.doc.walls).length === 0 && Object.keys(s.doc.furniture).length === 0,
-  )
-  const selRoom = useDocStore(
-    (s) => selection.length === 1 && !!s.doc.rooms[selection[0] as RoomId],
-  )
+  const level = useActiveLevelDoc()
+  const empty =
+    Object.keys(level.walls).length === 0 && Object.keys(level.furniture).length === 0
+  const selRoom = selection.length === 1 && !!level.rooms[selection[0] as RoomId]
   const lastSavedAt = usePersistStore((s) => s.lastSavedAt)
   const lastSaveWasAuto = usePersistStore((s) => s.lastSaveWasAuto)
   const autosaveError = usePersistStore((s) => s.autosaveError)
@@ -80,9 +78,9 @@ export function StatusHint() {
 
 /** Centered first-run hint over the empty canvas. */
 export function EmptyState() {
-  const empty = useDocStore(
-    (s) => Object.keys(s.doc.walls).length === 0 && Object.keys(s.doc.furniture).length === 0,
-  )
+  const level = useActiveLevelDoc()
+  const empty =
+    Object.keys(level.walls).length === 0 && Object.keys(level.furniture).length === 0
   if (!empty) return null
   return (
     <div className="empty-state" aria-hidden>

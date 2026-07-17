@@ -1,4 +1,4 @@
-import { DEFAULTS, type ProjectDocument } from '../../model/types'
+import { DEFAULTS, type LevelDoc } from '../../model/types'
 import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
@@ -75,7 +75,7 @@ export function labelBox(ann: { text: string; fontSize?: number }): { w: number;
 }
 
 export function hitTestAll(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   world: Vec2,
   pxToWorld: number,
@@ -175,7 +175,7 @@ export function hitTestAll(
 }
 
 export const hitTestTop = (
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   world: Vec2,
   pxToWorld: number,
@@ -236,7 +236,7 @@ function bandQuad(p: Vec2, q: Vec2, halfT: number): Vec2[] | null {
  * them. Pass pxToWorld to exclude annotations the layer culls at this zoom.
  */
 export function hitTestRect(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   derived: DerivedGeometry,
   a: Vec2,
   b: Vec2,

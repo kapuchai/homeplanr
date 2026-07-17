@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../../model/types'
+import type { LevelDoc } from '../../model/types'
 import type { DerivedGeometry } from '../../store/derived'
 
 /**
@@ -21,7 +21,7 @@ export interface SceneBBox {
   diag: number
 }
 
-export function sceneBBox(doc: ProjectDocument, derived: DerivedGeometry): SceneBBox {
+export function sceneBBox(doc: LevelDoc, derived: DerivedGeometry): SceneBBox {
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity

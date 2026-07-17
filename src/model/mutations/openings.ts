@@ -1,4 +1,4 @@
-import type { Opening, ProjectDocument } from '../types'
+import type { Opening, LevelDoc } from '../types'
 import { DEFAULTS } from '../types'
 import { STANDARD_STYLE_ID } from '../../catalog/openingStyles'
 import { newOpeningId, type OpeningId, type WallId } from '../ids'
@@ -107,7 +107,7 @@ const DEMOTED_FIT_TOLERANCE = 0.1
  * on flush-snap against gap edges (see fitIntoGaps).
  */
 export function findOpeningSlot(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   wallId: WallId,
   u: number,
   width: number,
@@ -132,7 +132,7 @@ export function findOpeningSlot(
 }
 
 export function addOpening(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   params: AddOpeningParams,
   opts: { mode?: MutationMode } = {},
 ): OpeningId | null {
@@ -183,7 +183,7 @@ export function addOpening(
  * the pipeline's write-through reconcile.
  */
 export function rehomeOpening(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: OpeningId,
   wallId: WallId,
   t: number,
@@ -198,7 +198,7 @@ export function rehomeOpening(
 }
 
 export function updateOpening(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   id: OpeningId,
   patch: Partial<{
     t: number
@@ -249,7 +249,7 @@ export function updateOpening(
  * Runs on every pipeline pass (cheap: one outline computation per call).
  */
 export function revalidateOpenings(
-  doc: ProjectDocument,
+  doc: LevelDoc,
   mode: MutationMode = 'commit',
   demoted?: ReadonlySet<string>,
 ): void {

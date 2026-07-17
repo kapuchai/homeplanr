@@ -1,4 +1,4 @@
-import { useDocStore } from '../store/docStore'
+import { getActiveLevelDoc } from '../store/levelView'
 import { useAppSettings } from '../store/appSettings'
 import { useViewportStore } from './viewport/viewportStore'
 import { K_DEFAULT, KEY_ZOOM_FACTOR } from './viewport/viewportMath'
@@ -48,7 +48,7 @@ export function ZoomControls() {
       <button
         title={t('zoom.fitTitle')}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => zoomToFitContent(useDocStore.getState().doc)}
+        onClick={() => zoomToFitContent(getActiveLevelDoc())}
       >
         {t('zoom.fit')}
       </button>

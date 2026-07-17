@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDocStore } from '../store/docStore'
+import { useActiveLevelDoc } from '../store/levelView'
 import { useUiStore } from '../store/uiStore'
 import { useAppSettings } from '../store/appSettings'
 import {
@@ -500,7 +501,7 @@ function FinishSwatchRow({
  * come from the first item; mixed paint/finish states show no active swatch.
  */
 function MultiPanel({ selection }: { selection: string[] }) {
-  const doc = useDocStore((s) => s.doc)
+  const doc = useActiveLevelDoc()
   const currency = useAppSettings((s) => s.currency)
   const a = useDocStore.getState()
 
@@ -705,7 +706,10 @@ function MultiPanel({ selection }: { selection: string[] }) {
 
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection)
-  const doc = useDocStore((s) => s.doc)
+  const doc = useActiveLevelDoc()
+  // the ONE doc-scoped read in this panel — previewCustom is deliberately
+  // absent from LevelDoc (the save preview belongs to the building)
+  const previewCustom = useDocStore((s) => s.doc.previewCustom)
   const units = useAppSettings((s) => s.units)
   const currency = useAppSettings((s) => s.currency)
   const snapEnabled = useAppSettings((s) => s.snapEnabled)
@@ -1218,9 +1222,9 @@ export function PropertiesPanel() {
             custom = the uploaded image, part of the document (undoable) */}
         <div className="segmented small">
           <button type="button" onClick={() => void uploadPreviewImage()}>
-            {doc.previewCustom ? t('props.imageReplace') : t('props.imageUpload')}
+            {previewCustom ? t('props.imageReplace') : t('props.imageUpload')}
           </button>
-          {doc.previewCustom ? (
+          {previewCustom ? (
             <button type="button" onClick={() => a.setPreviewImage(null)}>
               {t('props.previewAuto')}
             </button>

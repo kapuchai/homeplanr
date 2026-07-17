@@ -4,7 +4,7 @@ import { useThemeStore } from '../../theme/themeStore'
 import { formatArea, formatLength } from '../../format/units'
 import { add, dist, normalize, perp, scale, sub } from '../../geometry/vec'
 import { area, centroid } from '../../geometry/polygon'
-import type { ProjectDocument } from '../../model/types'
+import type { LevelDoc } from '../../model/types'
 import { DEFAULTS } from '../../model/types'
 import { Pill } from './Pill'
 import { AREA_MIN_PX, DIMENSION_MIN_PX, LABEL_MIN_PX } from '../hit/hitTest'
@@ -18,12 +18,12 @@ import { AREA_MIN_PX, DIMENSION_MIN_PX, LABEL_MIN_PX } from '../hit/hitTest'
  * Visibility (0.7.0): gated by the showAnnotations device pref; hitTest
  * receives the same flag — hidden must never be hittable.
  */
-export function AnnotationsLayer({ doc }: { doc: ProjectDocument }) {
+export function AnnotationsLayer({ doc }: { doc: LevelDoc }) {
   const show = useAppSettings((s) => s.showAnnotations)
   return show ? <Annotations doc={doc} /> : null
 }
 
-function Annotations({ doc }: { doc: ProjectDocument }) {
+function Annotations({ doc }: { doc: LevelDoc }) {
   const k = useViewportStore((s) => s.k)
   const units = useAppSettings((s) => s.units)
   const theme = useThemeStore((s) => s.theme)

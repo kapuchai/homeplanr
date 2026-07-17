@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useUiStore } from '../store/uiStore'
-import { useDocStore } from '../store/docStore'
+import { useActiveLevelDoc } from '../store/levelView'
 import { toolContext } from '../editor2d/tools/toolRegistry'
 import {
   alignSelection,
@@ -31,7 +31,7 @@ import type { FurnitureId, RoomId, WallId } from '../model/ids'
 export function ContextMenu() {
   const menu = useUiStore((s) => s.contextMenu)
   const selection = useUiStore((s) => s.selection)
-  const doc = useDocStore((s) => s.doc)
+  const doc = useActiveLevelDoc()
   const viewMode = useUiStore((s) => s.viewMode)
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)

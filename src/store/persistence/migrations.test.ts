@@ -12,12 +12,18 @@ import {
   validateParsedObject,
 } from './serialize'
 import { decodeRecovery } from './recovery'
-import { SCHEMA_VERSION } from '../../model/types'
+import { SCHEMA_VERSION, type ProjectDocument } from '../../model/types'
+import { makeLevelDoc } from '../../model/levels'
 import type { FurnitureId, WallId } from '../../model/ids'
 import { addArea } from '../../model/mutations/annotations'
 import { addWallSegment } from '../../model/mutations/walls'
 import { reconcileRooms } from '../../model/mutations/rooms'
 import { vec } from '../../geometry/vec'
+
+/** Ground level of a CURRENT-version (v7) parsed document — entity maps
+ * live in levels[0]; raw pre-v7 fixture JSON keeps its flat maps. */
+const lv = (d: ProjectDocument) => d.levels[0]!
+const lvDoc = (d: ProjectDocument) => makeLevelDoc(d, lv(d))
 
 const golden = (name: string) =>
   readFileSync(new URL(`../../test/goldens/${name}`, import.meta.url), 'utf8')
@@ -32,6 +38,8 @@ const v4Basic = golden('v4-basic.homeplanr')
 const v4Full = golden('v4-full.homeplanr')
 const v5Basic = golden('v5-basic.homeplanr')
 const v5Full = golden('v5-full.homeplanr')
+const v6Basic = golden('v6-basic.homeplanr')
+const v6Full = golden('v6-full.homeplanr')
 
 const deepFreeze = (o: unknown): void => {
   if (typeof o === 'object' && o !== null) {
@@ -53,6 +61,8 @@ describe('schema migrations (v1 goldens)', () => {
       v4Full,
       v5Basic,
       v5Full,
+      v6Basic,
+      v6Full,
     ]) {
       const r = parseDocument(g)
       expect(r.doc.schemaVersion).toBe(SCHEMA_VERSION)
@@ -66,19 +76,20 @@ describe('schema migrations (v1 goldens)', () => {
     const { doc, warnings, healed } = parseDocument(v1Full)
     expect(warnings).toHaveLength(0)
     expect(healed).toBe(false)
-    expect(Object.keys(doc.walls)).toHaveLength(Object.keys(raw.walls).length)
-    expect(Object.keys(doc.openings)).toHaveLength(Object.keys(raw.openings).length)
-    expect(Object.keys(doc.rooms)).toHaveLength(Object.keys(raw.rooms).length)
-    expect(Object.keys(doc.furniture)).toHaveLength(Object.keys(raw.furniture).length)
-    const living = Object.values(doc.rooms).find((r) => r.name === 'Living room')
+    expect(Object.keys(lv(doc).walls)).toHaveLength(Object.keys(raw.walls).length)
+    expect(Object.keys(lv(doc).openings)).toHaveLength(Object.keys(raw.openings).length)
+    expect(Object.keys(lv(doc).rooms)).toHaveLength(Object.keys(raw.rooms).length)
+    expect(Object.keys(lv(doc).furniture)).toHaveLength(Object.keys(raw.furniture).length)
+    const living = Object.values(lv(doc).rooms).find((r) => r.name === 'Living room')
     expect(living?.floorMaterialId).toBe('darkFloor')
     expect(Object.keys(doc.settings)).not.toContain('unitDisplay')
   })
 
   it('migration steps are pure: frozen v1..v5 inputs are untouched, output is current', () => {
     // v3Full and v4Full both carry finish:'brick' — the field-SPLITTING
-    // v4→v5 migration must build new wall objects, never mutate frozen input
-    for (const g of [v1Full, v2Full, v3Full, v4Full, v5Full]) {
+    // v4→v5 migration must build new wall objects, never mutate frozen input;
+    // v6Full crosses the STRUCTURAL v6→v7 levels wrap the same way
+    for (const g of [v1Full, v2Full, v3Full, v4Full, v5Full, v6Full]) {
       const raw = JSON.parse(g)
       const snapshot = JSON.stringify(raw)
       deepFreeze(raw)
@@ -99,7 +110,7 @@ describe('schema migrations (v1 goldens)', () => {
     const blob = decodeRecovery(json)
     expect(blob).not.toBeNull()
     expect(blob!.doc.schemaVersion).toBe(SCHEMA_VERSION)
-    expect(Object.keys(blob!.doc.walls)).toHaveLength(4)
+    expect(Object.keys(lv(blob!.doc).walls)).toHaveLength(4)
   })
 
   it(`schemaVersion ${SCHEMA_VERSION + 1} refuses with ForwardVersionError`, () => {
@@ -133,51 +144,51 @@ describe('schema migrations (v1 goldens)', () => {
 describe('v2 fields (wall paint/finish, furniture mirror)', () => {
   it('roundtrips valid values, preserving unknown paint ids', () => {
     const { doc } = parseDocument(v1Full)
-    const wall = Object.values(doc.walls)[0]!
+    const wall = Object.values(lv(doc).walls)[0]!
     wall.paintFront = 'sage'
     wall.paintBack = 'limewash-2027' // not in WALL_PAINTS — must survive anyway
     wall.finishFront = 'brick'
     wall.finishBack = 'microcement-2030' // finish is open too (v5) — survives
-    const item = Object.values(doc.furniture)[0]!
+    const item = Object.values(lv(doc).furniture)[0]!
     item.mirrored = true
     const r = parseDocument(serializeDocument(doc, '2026-07-12T00:00:00.000Z'))
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false)
-    const w = r.doc.walls[wall.id]!
+    const w = lv(r.doc).walls[wall.id]!
     expect(w.paintFront).toBe('sage')
     expect(w.paintBack).toBe('limewash-2027')
     expect(w.finishFront).toBe('brick')
     expect(w.finishBack).toBe('microcement-2030')
-    expect(r.doc.furniture[item.id]!.mirrored).toBe(true)
+    expect(lv(r.doc).furniture[item.id]!.mirrored).toBe(true)
   })
 
   it('keeps flat furniture flat: 0.02m height survives the validator clamp', () => {
     const { doc } = parseDocument(v1Full)
-    const item = Object.values(doc.furniture)[0]!
+    const item = Object.values(lv(doc).furniture)[0]!
     item.size = { ...item.size, h: 0.02 }
     const r = parseDocument(serializeDocument(doc, '2026-07-12T00:00:00.000Z'))
-    expect(r.doc.furniture[item.id]!.size.h).toBeCloseTo(0.02, 9)
+    expect(lv(r.doc).furniture[item.id]!.size.h).toBeCloseTo(0.02, 9)
   })
 
   it('normalizes invalid values to absent, silently', () => {
     const { doc } = parseDocument(v1Full)
     const json = JSON.parse(serializeDocument(doc, '2026-07-12T00:00:00.000Z'))
-    const wallIds = Object.keys(json.walls) as WallId[]
+    const wallIds = Object.keys(json.levels[0].walls) as WallId[]
     const [wa, wb] = [wallIds[0]!, wallIds[1]!]
-    json.walls[wa].finishFront = 5 // non-string junk
-    json.walls[wa].paintFront = ''
-    json.walls[wb].finishFront = 'paint' // the absent-default normalizes away
-    json.walls[wb].finishBack = ''
-    const fid = Object.keys(json.furniture)[0]! as FurnitureId
-    json.furniture[fid].mirrored = 'yes'
+    json.levels[0].walls[wa].finishFront = 5 // non-string junk
+    json.levels[0].walls[wa].paintFront = ''
+    json.levels[0].walls[wb].finishFront = 'paint' // the absent-default normalizes away
+    json.levels[0].walls[wb].finishBack = ''
+    const fid = Object.keys(json.levels[0].furniture)[0]! as FurnitureId
+    json.levels[0].furniture[fid].mirrored = 'yes'
     const r = parseDocument(JSON.stringify(json))
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false)
-    expect('finishFront' in r.doc.walls[wa]!).toBe(false)
-    expect('paintFront' in r.doc.walls[wa]!).toBe(false)
-    expect('finishFront' in r.doc.walls[wb]!).toBe(false)
-    expect('finishBack' in r.doc.walls[wb]!).toBe(false)
-    expect('mirrored' in r.doc.furniture[fid]!).toBe(false)
+    expect('finishFront' in lv(r.doc).walls[wa]!).toBe(false)
+    expect('paintFront' in lv(r.doc).walls[wa]!).toBe(false)
+    expect('finishFront' in lv(r.doc).walls[wb]!).toBe(false)
+    expect('finishBack' in lv(r.doc).walls[wb]!).toBe(false)
+    expect('mirrored' in lv(r.doc).furniture[fid]!).toBe(false)
   })
 })
 
@@ -189,31 +200,31 @@ describe('v3: snapEnabled leaves the document; annotations arrive', () => {
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
     expect(Object.keys(r.doc.settings)).not.toContain('snapEnabled')
-    expect(r.doc.annotations).toEqual({})
+    expect(lv(r.doc).annotations).toEqual({})
   })
 
   it('v2 feature fields survive the v2→v3 migration (paint, finish, mirror, floor)', () => {
     const { doc } = parseDocument(v2Full)
-    const painted = Object.values(doc.walls).find((w) => w.paintFront)
+    const painted = Object.values(lv(doc).walls).find((w) => w.paintFront)
     expect(painted?.paintFront).toBe('sage')
     expect(painted?.paintBack).toBe('terracotta')
     // the single v2-era finish arrives per-side after the v4→v5 split
     expect(painted?.finishFront).toBe('brick')
     expect(painted?.finishBack).toBe('brick')
-    expect(Object.values(doc.furniture).some((f) => f.mirrored)).toBe(true)
-    expect(Object.values(doc.rooms).some((r) => r.floorMaterialId === 'darkFloor')).toBe(true)
+    expect(Object.values(lv(doc).furniture).some((f) => f.mirrored)).toBe(true)
+    expect(Object.values(lv(doc).rooms).some((r) => r.floorMaterialId === 'darkFloor')).toBe(true)
   })
 
   it('annotations roundtrip: dimension + label, clean and unhealed', () => {
     const { doc } = parseDocument(v2Basic)
-    doc.annotations['a_dim1' as never] = {
+    lv(doc).annotations['a_dim1' as never] = {
       id: 'a_dim1' as never,
       kind: 'dimension',
       a: { x: 0, y: 0 },
       b: { x: 4, y: 0 },
       offset: 0.5,
     }
-    doc.annotations['a_lab1' as never] = {
+    lv(doc).annotations['a_lab1' as never] = {
       id: 'a_lab1' as never,
       kind: 'label',
       x: 2,
@@ -225,11 +236,11 @@ describe('v3: snapEnabled leaves the document; annotations arrive', () => {
     const r = parseDocument(serializeDocument(doc, '2026-07-13T00:00:00.000Z'))
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false)
-    const dim = r.doc.annotations['a_dim1' as never]!
+    const dim = lv(r.doc).annotations['a_dim1' as never]!
     expect(dim.kind).toBe('dimension')
     expect(dim.kind === 'dimension' && dim.b.x).toBe(4)
     expect(dim.kind === 'dimension' && dim.offset).toBe(0.5)
-    const lab = r.doc.annotations['a_lab1' as never]!
+    const lab = lv(r.doc).annotations['a_lab1' as never]!
     expect(lab.kind === 'label' && lab.text).toBe('Kitchen nook')
     expect(lab.kind === 'label' && lab.fontSize).toBe(0.2)
   })
@@ -245,20 +256,20 @@ describe('v3: snapEnabled leaves the document; annotations arrive', () => {
       a_junk: { kind: 'sticker', x: 0, y: 0 },
     }
     const r = validateParsedObject(base)
-    const ok = r.doc.annotations['a_ok' as never]!
+    const ok = lv(r.doc).annotations['a_ok' as never]!
     expect('rotation' in ok).toBe(false) // invalid → field absent, silent
     expect(ok.kind === 'label' && ok.fontSize).toBe(1) // clamped into [0.05, 1]
-    const far = r.doc.annotations['a_far' as never]!
+    const far = lv(r.doc).annotations['a_far' as never]!
     expect(far.kind === 'dimension' && far.offset).toBe(20) // clamped
-    expect(r.doc.annotations['a_tiny' as never]).toBeUndefined()
-    expect(r.doc.annotations['a_blank' as never]).toBeUndefined()
-    expect(r.doc.annotations['a_junk' as never]).toBeUndefined()
+    expect(lv(r.doc).annotations['a_tiny' as never]).toBeUndefined()
+    expect(lv(r.doc).annotations['a_blank' as never]).toBeUndefined()
+    expect(lv(r.doc).annotations['a_junk' as never]).toBeUndefined()
     expect(r.warnings).toHaveLength(3) // one per pruned entity
   })
 
   it('valid annotations round a save/open trip without warnings or healing', () => {
     const { doc } = parseDocument(v2Basic)
-    doc.annotations['a_x' as never] = {
+    lv(doc).annotations['a_x' as never] = {
       id: 'a_x' as never,
       kind: 'label',
       x: 0,
@@ -275,7 +286,7 @@ describe('v4: area annotations + roomType / price / notes / materialOverrides', 
     const r = parseDocument(v3Full)
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
-    const anns = Object.values(r.doc.annotations)
+    const anns = Object.values(lv(r.doc).annotations)
     const dim = anns.find((a) => a.kind === 'dimension')
     expect(dim?.kind === 'dimension' && dim.offset).toBe(0.35)
     const lab = anns.find((a) => a.kind === 'label')
@@ -298,12 +309,12 @@ describe('v4: area annotations + roomType / price / notes / materialOverrides', 
 
   it('area annotations roundtrip; junk vertices drop; degenerate polygons prune', () => {
     const { doc } = parseDocument(v3Basic)
-    const id = addArea(doc, [vec(0, 0), vec(2, 0), vec(2, 2), vec(0, 2)])
+    const id = addArea(lvDoc(doc), [vec(0, 0), vec(2, 0), vec(2, 2), vec(0, 2)])
     expect(id).not.toBeNull()
     const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
-    const area = r.doc.annotations[id! as never]!
+    const area = lv(r.doc).annotations[id! as never]!
     expect(area.kind === 'area' && area.points).toHaveLength(4)
 
     const base = JSON.parse(v3Basic)
@@ -323,33 +334,33 @@ describe('v4: area annotations + roomType / price / notes / materialOverrides', 
       },
     }
     const v = validateParsedObject(base)
-    const mixed = v.doc.annotations['a_mixed' as never]!
+    const mixed = lv(v.doc).annotations['a_mixed' as never]!
     expect(mixed.kind === 'area' && mixed.points).toHaveLength(3) // junk vertices dropped
-    expect(v.doc.annotations['a_degenerate' as never]).toBeUndefined()
-    expect(v.doc.annotations['a_pointless' as never]).toBeUndefined()
-    expect(v.doc.annotations['a_collinear' as never]).toBeUndefined()
+    expect(lv(v.doc).annotations['a_degenerate' as never]).toBeUndefined()
+    expect(lv(v.doc).annotations['a_pointless' as never]).toBeUndefined()
+    expect(lv(v.doc).annotations['a_collinear' as never]).toBeUndefined()
     expect(v.warnings).toHaveLength(3)
   })
 
   it('addArea rejects degenerate traces (< 3 points, near-zero area)', () => {
     const { doc } = parseDocument(v3Basic)
-    expect(addArea(doc, [vec(0, 0), vec(1, 0)])).toBeNull()
-    expect(addArea(doc, [vec(0, 0), vec(1, 0), vec(2, 0)])).toBeNull() // collinear
+    expect(addArea(lvDoc(doc), [vec(0, 0), vec(1, 0)])).toBeNull()
+    expect(addArea(lvDoc(doc), [vec(0, 0), vec(1, 0), vec(2, 0)])).toBeNull() // collinear
   })
 
   it('batched v4 fields roundtrip; junk values normalize silently', () => {
     const { doc } = parseDocument(v3Full)
-    const room = Object.values(doc.rooms)[0]!
+    const room = Object.values(lv(doc).rooms)[0]!
     room.roomType = 'balcony'
-    const item = Object.values(doc.furniture)[0]!
+    const item = Object.values(lv(doc).furniture)[0]!
     item.price = 129.99
     item.notes = 'IKEA, 2024'
     item.materialOverrides = { fabric: '#aabbcc', legs: 'oakDark' }
     const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
-    expect(r.doc.rooms[room.id]!.roomType).toBe('balcony')
-    const f2 = r.doc.furniture[item.id]!
+    expect(lv(r.doc).rooms[room.id]!.roomType).toBe('balcony')
+    const f2 = lv(r.doc).furniture[item.id]!
     expect(f2.price).toBe(129.99)
     expect(f2.notes).toBe('IKEA, 2024')
     expect(f2.materialOverrides).toEqual({ fabric: '#aabbcc', legs: 'oakDark' })
@@ -357,14 +368,14 @@ describe('v4: area annotations + roomType / price / notes / materialOverrides', 
     const base = JSON.parse(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     const roomKey = room.id as string
     const itemKey = item.id as string
-    base.rooms[roomKey].roomType = ''
-    base.furniture[itemKey].price = 'free'
-    base.furniture[itemKey].notes = 42
-    base.furniture[itemKey].materialOverrides = { fabric: 7, legs: 'oakDark', '': 'x' }
+    base.levels[0].rooms[roomKey].roomType = ''
+    base.levels[0].furniture[itemKey].price = 'free'
+    base.levels[0].furniture[itemKey].notes = 42
+    base.levels[0].furniture[itemKey].materialOverrides = { fabric: 7, legs: 'oakDark', '': 'x' }
     const v = validateParsedObject(base)
     expect(v.warnings).toHaveLength(0) // field-level junk is silent
-    expect(v.doc.rooms[room.id]!.roomType).toBeUndefined()
-    const f3 = v.doc.furniture[item.id]!
+    expect(lv(v.doc).rooms[room.id]!.roomType).toBeUndefined()
+    const f3 = lv(v.doc).furniture[item.id]!
     expect(f3.price).toBeUndefined()
     expect(f3.notes).toBeUndefined()
     expect(f3.materialOverrides).toEqual({ legs: 'oakDark' }) // junk ENTRIES drop
@@ -372,12 +383,12 @@ describe('v4: area annotations + roomType / price / notes / materialOverrides', 
 
   it('roomType survives a room-splitting edit (as durable as name)', () => {
     const { doc } = parseDocument(v3Basic) // one 4×3 room
-    const room = Object.values(doc.rooms)[0]!
+    const room = Object.values(lv(doc).rooms)[0]!
     room.roomType = 'bedroom'
     room.name = 'Master'
-    addWallSegment(doc, vec(2, 0), vec(2, 3)) // split into two 2×3 rooms
-    reconcileRooms(doc)
-    const rooms = Object.values(doc.rooms)
+    addWallSegment(lvDoc(doc), vec(2, 0), vec(2, 3)) // split into two 2×3 rooms
+    reconcileRooms(lvDoc(doc))
+    const rooms = Object.values(lv(doc).rooms)
     expect(rooms).toHaveLength(2)
     // the identity carrier (Jaccard ≥ 0.3) keeps BOTH meta fields together
     const carrier = rooms.find((r) => r.roomType === 'bedroom')
@@ -391,14 +402,14 @@ describe('v5: per-side wall finish (finishFront/finishBack)', () => {
     const r = parseDocument(v4Full)
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
-    const living = Object.values(r.doc.rooms).find((room) => room.name === 'Living room')
+    const living = Object.values(lv(r.doc).rooms).find((room) => room.name === 'Living room')
     expect(living?.roomType).toBe('living')
     expect(living?.floorMaterialId).toBe('darkFloor')
-    const item = Object.values(r.doc.furniture).find((f) => f.price !== undefined)!
+    const item = Object.values(lv(r.doc).furniture).find((f) => f.price !== undefined)!
     expect(item.price).toBe(499)
     expect(item.notes).toBe('Golden notes')
     expect(item.materialOverrides).toEqual({ fabric: 'oak', legs: '#334455' })
-    expect(Object.values(r.doc.annotations).some((a) => a.kind === 'area')).toBe(true)
+    expect(Object.values(lv(r.doc).annotations).some((a) => a.kind === 'area')).toBe(true)
   })
 
   it("the golden's single finish:'brick' arrives split onto BOTH sides, old key gone", () => {
@@ -406,7 +417,7 @@ describe('v5: per-side wall finish (finishFront/finishBack)', () => {
     const brickKey = Object.keys(raw.walls).find((k) => raw.walls[k].finish === 'brick')!
     expect(brickKey).toBeDefined()
     const { doc } = parseDocument(v4Full)
-    const w = doc.walls[brickKey as WallId]!
+    const w = lv(doc).walls[brickKey as WallId]!
     expect(w.finishFront).toBe('brick')
     expect(w.finishBack).toBe('brick')
     expect('finish' in w).toBe(false)
@@ -422,25 +433,25 @@ describe('v5: per-side wall finish (finishFront/finishBack)', () => {
     const r = validateParsedObject(raw)
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false)
-    const w0 = r.doc.walls[keys[0]! as WallId]!
+    const w0 = lv(r.doc).walls[keys[0]! as WallId]!
     expect(w0.finishFront).toBe('weathered-brick-2030')
     expect(w0.finishBack).toBe('weathered-brick-2030')
     for (const k of keys.slice(1)) {
-      expect('finishFront' in r.doc.walls[k as WallId]!).toBe(false)
-      expect('finishBack' in r.doc.walls[k as WallId]!).toBe(false)
+      expect('finishFront' in lv(r.doc).walls[k as WallId]!).toBe(false)
+      expect('finishBack' in lv(r.doc).walls[k as WallId]!).toBe(false)
     }
   })
 
   it('per-side values roundtrip at v5 — different sides stay different', () => {
     const { doc } = parseDocument(v4Basic)
-    const wall = Object.values(doc.walls)[0]!
+    const wall = Object.values(lv(doc).walls)[0]!
     wall.finishFront = 'tile'
     wall.finishBack = 'concrete'
     const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
-    expect(r.doc.walls[wall.id]!.finishFront).toBe('tile')
-    expect(r.doc.walls[wall.id]!.finishBack).toBe('concrete')
+    expect(lv(r.doc).walls[wall.id]!.finishFront).toBe('tile')
+    expect(lv(r.doc).walls[wall.id]!.finishBack).toBe('concrete')
   })
 
   it('a v4 recovery blob decodes through the migration chokepoint', () => {
@@ -462,13 +473,13 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
     const r = parseDocument(v5Full)
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
-    const living = Object.values(r.doc.rooms).find((room) => room.name === 'Living room')
+    const living = Object.values(lv(r.doc).rooms).find((room) => room.name === 'Living room')
     expect(living?.roomType).toBe('living')
     expect(living?.floorMaterialId).toBe('parquetHerringbone')
-    const sided = Object.values(r.doc.walls).find((w) => w.finishFront)!
+    const sided = Object.values(lv(r.doc).walls).find((w) => w.finishFront)!
     expect(sided.finishFront).toBe('wallpaperStripe')
     expect(sided.finishBack).toBe('plaster') // different sides stay different
-    const item = Object.values(r.doc.furniture).find((f) => f.price !== undefined)!
+    const item = Object.values(lv(r.doc).furniture).find((f) => f.price !== undefined)!
     expect(item.price).toBe(499)
     expect(item.materialOverrides).toEqual({ fabric: 'oak', legs: '#334455' })
   })
@@ -488,7 +499,7 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
       w: 640,
       h: 480,
     }
-    const item = Object.values(doc.furniture)[0]!
+    const item = Object.values(lv(doc).furniture)[0]!
     item.assetId = 'i_art1' as never
     const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     expect(r.healed).toBe(false)
@@ -500,7 +511,7 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
       w: 640,
       h: 480,
     })
-    expect(r.doc.furniture[item.id]!.assetId).toBe('i_art1')
+    expect(lv(r.doc).furniture[item.id]!.assetId).toBe('i_art1')
   })
 
   it('junk asset ENTRIES drop silently (no warning, healed=false)', () => {
@@ -521,7 +532,7 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
 
   it('dangling assetId is KEPT (placeholder renders); a dangling attachment detaches at load', () => {
     const { doc } = parseDocument(v5Full)
-    const item = Object.values(doc.furniture)[0]!
+    const item = Object.values(lv(doc).furniture)[0]!
     item.assetId = 'i_gone' as never
     item.attachedOpeningId = 'o_gone' as never
     const before = { x: item.x, y: item.y }
@@ -529,12 +540,12 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false)
     // a stripped-recovery blob must not lose the image REFERENCE
-    expect(r.doc.furniture[item.id]!.assetId).toBe('i_gone')
+    expect(lv(r.doc).furniture[item.id]!.assetId).toBe('i_gone')
     // the load-time reconcile IS the commit-time detach for a gone window:
     // the field resolves away, the item stands at its stored transform
-    expect(r.doc.furniture[item.id]!.attachedOpeningId).toBeUndefined()
-    expect(r.doc.furniture[item.id]!.x).toBe(before.x)
-    expect(r.doc.furniture[item.id]!.y).toBe(before.y)
+    expect(lv(r.doc).furniture[item.id]!.attachedOpeningId).toBeUndefined()
+    expect(lv(r.doc).furniture[item.id]!.x).toBe(before.x)
+    expect(lv(r.doc).furniture[item.id]!.y).toBe(before.y)
   })
 
   it('previewAssetId/previewCustom (0.11.0 additive) roundtrip; junk drops; dangling kept', () => {
@@ -576,29 +587,29 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
 
   it('batched v6 fields roundtrip; junk values normalize silently', () => {
     const { doc } = parseDocument(v5Full)
-    const opening = Object.values(doc.openings)[0]!
+    const opening = Object.values(lv(doc).openings)[0]!
     opening.style = 'sliding' // 0.10.0 vocabulary — open registry today
-    const item = Object.values(doc.furniture)[0]!
+    const item = Object.values(lv(doc).furniture)[0]!
     item.lumen = 800
     item.lightOn = false // both boolean values must survive, not just true
     const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     expect(r.healed).toBe(false)
     expect(r.warnings).toHaveLength(0)
-    expect(r.doc.openings[opening.id]!.style).toBe('sliding')
-    expect(r.doc.furniture[item.id]!.lumen).toBe(800)
-    expect(r.doc.furniture[item.id]!.lightOn).toBe(false)
+    expect(lv(r.doc).openings[opening.id]!.style).toBe('sliding')
+    expect(lv(r.doc).furniture[item.id]!.lumen).toBe(800)
+    expect(lv(r.doc).furniture[item.id]!.lightOn).toBe(false)
 
     const base = JSON.parse(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     const oKey = opening.id as string
     const fKey = item.id as string
-    base.openings[oKey].style = ''
-    base.furniture[fKey].lumen = -5
-    base.furniture[fKey].lightOn = 'on'
-    base.furniture[fKey].assetId = 42
+    base.levels[0].openings[oKey].style = ''
+    base.levels[0].furniture[fKey].lumen = -5
+    base.levels[0].furniture[fKey].lightOn = 'on'
+    base.levels[0].furniture[fKey].assetId = 42
     const v = validateParsedObject(base)
     expect(v.warnings).toHaveLength(0)
-    expect('style' in v.doc.openings[opening.id]!).toBe(false)
-    const f = v.doc.furniture[item.id]!
+    expect('style' in lv(v.doc).openings[opening.id]!).toBe(false)
+    const f = lv(v.doc).furniture[item.id]!
     expect(f.lumen).toBeUndefined()
     expect(f.lightOn).toBeUndefined()
     expect(f.assetId).toBeUndefined()
@@ -606,9 +617,9 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
 
   it('load-time self-heal re-syncs attached furniture SILENTLY (review fix)', () => {
     const { doc } = parseDocument(v5Full)
-    const win = Object.values(doc.openings).find((o) => o.kind === 'window')!
+    const win = Object.values(lv(doc).openings).find((o) => o.kind === 'window')!
     // a curtain whose stored transform drifted (hand-edit / pre-clamp file)
-    doc.furniture['f_curt1' as never] = {
+    lv(doc).furniture['f_curt1' as never] = {
       id: 'f_curt1' as never,
       catalogItemId: 'curtain',
       x: 0,
@@ -621,7 +632,7 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
     const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false) // furniture sync is silent, like a migration
-    const curt = r.doc.furniture['f_curt1' as never]!
+    const curt = lv(r.doc).furniture['f_curt1' as never]!
     expect(curt.attachedOpeningId).toBe(win.id)
     // snapped onto the window's wall, no longer at the drifted origin
     expect(Math.hypot(curt.x, curt.y)).toBeGreaterThan(0.01)
@@ -639,5 +650,177 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
     const blob = decodeRecovery(json)
     expect(blob).not.toBeNull()
     expect(blob!.doc.schemaVersion).toBe(SCHEMA_VERSION)
+  })
+})
+
+describe('v7: storeys — the structural levels wrap (+ notes, floorElevation)', () => {
+  it('v6-full opens clean with every frozen v6 feature intact', () => {
+    const r = parseDocument(v6Full)
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.levels).toHaveLength(1)
+    const L = lv(r.doc)
+    const door = Object.values(L.openings).find((o) => o.kind === 'door' && o.style)!
+    expect(door.style).toBe('double')
+    const win = Object.values(L.openings).find((o) => o.kind === 'window' && o.style)!
+    expect(win.style).toBe('arched')
+    const art = Object.values(L.furniture).find((f) => f.assetId)!
+    expect(r.doc.assets[art.assetId!]).toBeDefined()
+    const curtain = Object.values(L.furniture).find((f) => f.attachedOpeningId)!
+    expect(curtain.attachedOpeningId).toBe(win.id)
+    const lamp = Object.values(L.furniture).find((f) => f.lumen !== undefined)!
+    expect(lamp.lumen).toBe(1400)
+    expect(lamp.lightOn).toBe(false)
+    expect(r.doc.previewCustom).toBe(true)
+    expect(r.doc.previewAssetId).toBeDefined()
+    expect(r.doc.assets[r.doc.previewAssetId!]).toBeDefined()
+  })
+
+  it('the v6→v7 wrap moves the six maps into levels[0], counts preserved, flat keys gone', () => {
+    const raw = JSON.parse(v6Full)
+    const { doc, warnings, healed } = parseDocument(v6Full)
+    expect(warnings).toHaveLength(0)
+    expect(healed).toBe(false)
+    expect(doc.levels).toHaveLength(1)
+    const L = lv(doc)
+    expect(Object.keys(L.walls)).toHaveLength(Object.keys(raw.walls).length)
+    expect(Object.keys(L.openings)).toHaveLength(Object.keys(raw.openings).length)
+    expect(Object.keys(L.rooms)).toHaveLength(Object.keys(raw.rooms).length)
+    expect(Object.keys(L.furniture)).toHaveLength(Object.keys(raw.furniture).length)
+    expect(Object.keys(L.annotations)).toHaveLength(Object.keys(raw.annotations).length)
+    expect(Object.keys(doc.assets)).toHaveLength(Object.keys(raw.assets).length)
+    for (const key of ['nodes', 'walls', 'openings', 'rooms', 'furniture', 'annotations']) {
+      expect(key in doc).toBe(false)
+    }
+  })
+
+  it('a v6 recovery blob decodes through the migration chokepoint', () => {
+    const json = JSON.stringify({
+      v: 1,
+      filePath: null,
+      docId: 'x',
+      savedAt: 1,
+      doc: JSON.parse(v6Basic),
+    })
+    const blob = decodeRecovery(json)
+    expect(blob).not.toBeNull()
+    expect(blob!.doc.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(blob!.doc.levels).toHaveLength(1)
+    expect(Object.keys(lv(blob!.doc).walls)).toHaveLength(4)
+  })
+
+  it('a two-storey document roundtrips: per-level maps, name, elevation override', () => {
+    const { doc } = parseDocument(v6Basic)
+    doc.levels.push({
+      id: 'l_second' as never,
+      name: 'Floor 2',
+      elevation: 3.1,
+      nodes: {},
+      walls: {},
+      openings: {},
+      rooms: {},
+      furniture: {},
+      annotations: {},
+    })
+    const up = makeLevelDoc(doc, doc.levels[1]!)
+    addWallSegment(up, vec(0, 0), vec(4, 0))
+    const r = parseDocument(serializeDocument(doc, '2026-07-18T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.levels).toHaveLength(2)
+    expect(r.doc.levels[1]!.name).toBe('Floor 2')
+    expect(r.doc.levels[1]!.elevation).toBe(3.1)
+    expect(Object.keys(r.doc.levels[0]!.walls)).toHaveLength(4)
+    expect(Object.keys(r.doc.levels[1]!.walls)).toHaveLength(1)
+    // ground level: name/elevation stay absent (files stay clean)
+    expect('name' in r.doc.levels[0]!).toBe(false)
+    expect('elevation' in r.doc.levels[0]!).toBe(false)
+  })
+
+  it('per-level referential integrity: an opening pointing at another level\'s wall prunes', () => {
+    const base = JSON.parse(serializeDocument(parseDocument(v6Basic).doc, '2026-07-18T00:00:00.000Z'))
+    const groundWallId = Object.keys(base.levels[0].walls)[0]!
+    base.levels.push({
+      id: 'l_up',
+      nodes: {},
+      walls: {},
+      openings: {
+        o_cross: { kind: 'door', wallId: groundWallId, t: 0.5, width: 0.9, height: 2 },
+      },
+      rooms: {},
+      furniture: {},
+      annotations: {},
+    })
+    const r = validateParsedObject(base)
+    expect(r.warnings.length).toBeGreaterThanOrEqual(1)
+    expect(Object.keys(r.doc.levels[1]!.openings)).toHaveLength(0)
+    expect(Object.keys(r.doc.levels[0]!.openings)).toHaveLength(0) // basic has none
+  })
+
+  it('a level-less v7 envelope mints one empty level (warned, healed)', () => {
+    const base = JSON.parse(serializeDocument(parseDocument(v6Basic).doc, '2026-07-18T00:00:00.000Z'))
+    base.levels = []
+    const r = validateParsedObject(base)
+    expect(r.doc.levels).toHaveLength(1)
+    expect(r.warnings.length).toBeGreaterThanOrEqual(1)
+    expect(r.healed).toBe(true)
+  })
+
+  it('junk level entries prune with a warning; duplicate level ids re-mint silently', () => {
+    const base = JSON.parse(serializeDocument(parseDocument(v6Basic).doc, '2026-07-18T00:00:00.000Z'))
+    const keep = base.levels[0]
+    base.levels = [keep, 'not a level', { ...keep }]
+    const r = validateParsedObject(base)
+    expect(r.doc.levels).toHaveLength(2) // junk entry pruned, twin kept
+    expect(r.warnings.some((w: string) => w.includes('level'))).toBe(true)
+    expect(r.doc.levels[0]!.id).not.toBe(r.doc.levels[1]!.id) // dupe id re-minted
+    expect(Object.keys(r.doc.levels[1]!.walls)).toHaveLength(4)
+  })
+
+  it('notes roundtrip; junk notes normalize silently', () => {
+    const { doc } = parseDocument(v6Basic)
+    doc.notes = 'Remember to check the loft headroom.'
+    const r = parseDocument(serializeDocument(doc, '2026-07-18T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.notes).toBe('Remember to check the loft headroom.')
+
+    const base = JSON.parse(serializeDocument(doc, '2026-07-18T00:00:00.000Z'))
+    base.notes = 42
+    const v = validateParsedObject(base)
+    expect(v.warnings).toHaveLength(0)
+    expect(v.doc.notes).toBeUndefined()
+  })
+
+  it('floorElevation roundtrips capped; zero/junk stays absent', () => {
+    const { doc } = parseDocument(v6Basic)
+    const room = Object.values(lv(doc).rooms)[0]!
+    room.floorElevation = 0.45
+    const r = parseDocument(serializeDocument(doc, '2026-07-18T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(Object.values(lv(r.doc).rooms)[0]!.floorElevation).toBe(0.45)
+
+    const base = JSON.parse(serializeDocument(doc, '2026-07-18T00:00:00.000Z'))
+    const key = Object.keys(base.levels[0].rooms)[0]!
+    base.levels[0].rooms[key].floorElevation = 99
+    let v = validateParsedObject(base)
+    expect(Object.values(lv(v.doc).rooms)[0]!.floorElevation).toBe(2) // capped
+    base.levels[0].rooms[key].floorElevation = 0
+    v = validateParsedObject(base)
+    expect('floorElevation' in Object.values(lv(v.doc).rooms)[0]!).toBe(false)
+    base.levels[0].rooms[key].floorElevation = 'high'
+    v = validateParsedObject(base)
+    expect('floorElevation' in Object.values(lv(v.doc).rooms)[0]!).toBe(false)
+  })
+
+  it('level elevation junk drops; extreme values clamp into [-100, 1000]', () => {
+    const base = JSON.parse(serializeDocument(parseDocument(v6Basic).doc, '2026-07-18T00:00:00.000Z'))
+    base.levels[0].elevation = 'penthouse'
+    let r = validateParsedObject(base)
+    expect('elevation' in r.doc.levels[0]!).toBe(false)
+    base.levels[0].elevation = 99999
+    r = validateParsedObject(base)
+    expect(r.doc.levels[0]!.elevation).toBe(1000)
   })
 })
