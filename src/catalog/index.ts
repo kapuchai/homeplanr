@@ -4,6 +4,7 @@ import { LIVING_ITEMS } from './items/living'
 import { MORE_ITEMS } from './items/more'
 import { EXPANSION_ITEMS } from './items/expansion'
 import { DECOR_ITEMS } from './items/decor'
+import { KITCHEN_ITEMS } from './items/kitchen'
 
 export type { CatalogItem, CatalogCategory, Dims, SymbolPrim, MaterialId } from './types'
 
@@ -13,6 +14,7 @@ const ALL: CatalogItem[] = [
   ...MORE_ITEMS,
   ...EXPANSION_ITEMS,
   ...DECOR_ITEMS,
+  ...KITCHEN_ITEMS,
 ]
 
 export const CATALOG: Record<string, CatalogItem> = Object.fromEntries(

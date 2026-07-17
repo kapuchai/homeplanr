@@ -77,6 +77,11 @@ export interface CatalogItem {
    */
   windowAttach?: boolean
   /**
+   * Same-family items edge-snap end-to-end with flush backs so runs click
+   * together seamlessly (familyEdgeCandidates). 0.9.0: 'counter'.
+   */
+  family?: string
+  /**
    * Initial elevation for wall-mounted items (meters above the floor) —
    * both placement paths copy it into the instance. Absent = 0 (on floor).
    */

@@ -137,6 +137,51 @@ export function alignmentGuideCandidates(
 }
 
 /**
+ * Same-family edge-kiss candidates (0.9.0 counters): for every neighbor
+ * the caller's predicate accepts, emit the dragged-item CENTER at both
+ * ends of the neighbor's run axis — end faces touching, BACK edges flush
+ * (runs of different depths align on the wall side), rotation adopted so
+ * the run continues in the neighbor's direction. Square-footprint
+ * neighbors (the corner piece) are axis-ambiguous and offer both arms.
+ * Callers pass a predicate instead of a family string so this module
+ * stays catalog-free.
+ */
+export function familyEdgeCandidates(
+  doc: ProjectDocument,
+  dragged: { hw: number; hh: number },
+  draggedIds: ReadonlySet<string>,
+  isNeighbor: (f: FurnitureInstance) => boolean,
+): SnapCandidate[] {
+  const out: SnapCandidate[] = []
+  for (const f of Object.values(doc.furniture)) {
+    if (draggedIds.has(f.id) || !isNeighbor(f)) continue
+    const axes: number[] = [f.rotation]
+    if (Math.abs(f.size.w - f.size.d) < 1e-6) axes.push(f.rotation + Math.PI / 2)
+    for (let ai = 0; ai < axes.length; ai++) {
+      const rot = axes[ai]!
+      const u = { x: Math.cos(rot), y: Math.sin(rot) }
+      const v = perp(u) // local +y (back) in world
+      const nHu = (ai === 0 ? f.size.w : f.size.d) / 2
+      const nHv = (ai === 0 ? f.size.d : f.size.w) / 2
+      const vOff = nHv - dragged.hh // back-flush
+      for (const side of [1, -1]) {
+        const center = add(
+          add({ x: f.x, y: f.y }, scale(u, side * (nHu + dragged.hw))),
+          scale(v, vOff),
+        )
+        out.push({
+          kind: 'familyEdge',
+          point: center,
+          rotation: rot,
+          refId: `${f.id}:${ai}:${side}`,
+        })
+      }
+    }
+  }
+  return out
+}
+
+/**
  * Room-drag snap candidates (0.8.0). The snap SUBJECT is the grab point,
  * and every candidate is prepositioned by FROZEN start offsets — the list
  * is constant for the whole gesture, so compute it ONCE at drag-arm.

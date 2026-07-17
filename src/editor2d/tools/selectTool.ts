@@ -7,6 +7,7 @@ import { closestPointOnSegment } from '../../geometry/segment'
 import { WINDOW_PICK_PX, resolveSnap, type SnapResult } from '../../geometry/snapping'
 import {
   alignmentGuideCandidates,
+  familyEdgeCandidates,
   gridCandidate,
   nodeCandidates,
   roomSnapCandidates,
@@ -547,6 +548,14 @@ export function createSelectTool(): Tool {
             ...(state.single && catalogItem?.wallSnap
               ? [wallBackCandidate(doc, ctx.derived(), rawCenter, item.size.d)].filter(
                   (c): c is NonNullable<typeof c> => c !== null,
+                )
+              : []),
+            ...(state.single && catalogItem?.family
+              ? familyEdgeCandidates(
+                  doc,
+                  { hw: item.size.w / 2, hh: item.size.d / 2 },
+                  new Set(state.ids),
+                  (f) => CATALOG[f.catalogItemId]?.family === catalogItem.family,
                 )
               : []),
           ]

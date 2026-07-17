@@ -2,7 +2,11 @@ import type { Tool, ToolContext } from './toolTypes'
 import type { Vec2 } from '../../geometry/vec'
 import { add, rotate } from '../../geometry/vec'
 import { WINDOW_PICK_PX, resolveSnap, type SnapResult } from '../../geometry/snapping'
-import { alignmentGuideCandidates, wallBackCandidate } from '../snap/candidates'
+import {
+  alignmentGuideCandidates,
+  familyEdgeCandidates,
+  wallBackCandidate,
+} from '../snap/candidates'
 import {
   findWindowNear,
   windowAttachTransform,
@@ -104,6 +108,14 @@ export function createPlaceFurnitureTool(): Tool {
       ...(item.wallSnap
         ? [wallBackCandidate(doc, ctx.derived(), world, item.dims.d)].filter(
             (c): c is NonNullable<typeof c> => c !== null,
+          )
+        : []),
+      ...(item.family
+        ? familyEdgeCandidates(
+            doc,
+            { hw: item.dims.w / 2, hh: item.dims.d / 2 },
+            new Set(),
+            (f) => CATALOG[f.catalogItemId]?.family === item.family,
           )
         : []),
     ]

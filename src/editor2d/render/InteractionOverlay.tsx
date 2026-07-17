@@ -206,7 +206,7 @@ export function InteractionOverlay() {
           vectorEffect="non-scaling-stroke"
         />,
       )
-    } else if (c.kind === 'wallPoint') {
+    } else if (c.kind === 'wallPoint' || c.kind === 'familyEdge') {
       els.push(
         <rect
           key="sw"

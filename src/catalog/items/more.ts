@@ -95,6 +95,7 @@ export const kitchenCounter: CatalogItem = {
   category: 'kitchen',
   dims: { w: 1.8, d: 0.6, h: 0.9 },
   wallSnap: true,
+  family: 'counter',
   materials: { carcass: 'whiteLacquer', top: 'woodDark', handle: 'metal' },
   build3d: (b, { w, d, h }) => {
     b.box('carcass', { size: [w - 0.04, d - 0.06, 0.1], at: [0, 0.03, 0] }) // kick

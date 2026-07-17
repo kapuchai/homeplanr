@@ -46,6 +46,16 @@ export type SnapCandidate =
       slideOrigin: Vec2
       slideDir: Vec2
     }
+  | {
+      kind: 'familyEdge'
+      /** Dragged-item CENTER where its end-face kisses the neighbor's,
+       * back edges flush (0.9.0 counter runs). */
+      point: Vec2
+      /** Adopted so the run continues in the neighbor's direction. */
+      rotation: number
+      /** neighbor id + axis + side — hysteresis identity. */
+      refId: string
+    }
   | { kind: 'angleRay'; origin: Vec2; dir: Vec2; label: string }
   | {
       kind: 'guideX'
@@ -68,6 +78,7 @@ export const SNAP_RADII_PX: Record<
   node: { capture: 10, release: 14 },
   wallPoint: { capture: 8, release: 12 },
   wallBack: { capture: 12, release: 18 },
+  familyEdge: { capture: 12, release: 18 },
   guideX: { capture: 6, release: 8 },
   guideY: { capture: 6, release: 8 },
 }
@@ -83,6 +94,7 @@ const PRIORITY: Record<SnapKind, number> = {
   node: 1,
   wallPoint: 2,
   wallBack: 3,
+  familyEdge: 3.5, // clicks runs together, but a wall capture still wins
   angleRay: 4,
   guideX: 5,
   guideY: 5,
@@ -127,6 +139,8 @@ const candidateIdentity = (c: SnapCandidate): string => {
       return `wallPoint:${c.wallId}`
     case 'wallBack':
       return `wallBack:${c.wallId}`
+    case 'familyEdge':
+      return `familyEdge:${c.refId}`
     case 'angleRay':
       return `angleRay:${c.label}`
     case 'guideX':
@@ -193,7 +207,14 @@ export function resolveSnap(
   }
   const scored: Scored[] = []
   for (const c of candidates) {
-    if (c.kind !== 'node' && c.kind !== 'wallPoint' && c.kind !== 'wallBack') continue
+    if (
+      c.kind !== 'node' &&
+      c.kind !== 'wallPoint' &&
+      c.kind !== 'wallBack' &&
+      c.kind !== 'familyEdge'
+    ) {
+      continue
+    }
     let cand = c
     // Straight-attachment (M6 gate): with an angle ray active, a wall's
     // snap point is the RAY∩SEGMENT intersection, not the sliding foot
@@ -228,6 +249,11 @@ export function resolveSnap(
   // --- node/wallPoint escape: a point-winner beats the ray outright ---
   if (winner && (winner.c.kind === 'node' || PRIORITY[winner.c.kind] < PRIORITY.angleRay)) {
     const result: SnapResult = { point: winner.c.point, primary: winner.c }
+    if (winner.c.kind === 'familyEdge') {
+      // exact kiss point + adopted run direction; no slide constraint
+      result.rotation = winner.c.rotation
+      return result
+    }
     if (winner.c.kind === 'wallBack') {
       result.rotation = winner.c.rotation
       const slide = {
