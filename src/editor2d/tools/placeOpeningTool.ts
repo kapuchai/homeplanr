@@ -3,7 +3,8 @@ import type { Vec2 } from '../../geometry/vec'
 import { add, normalize, perp, scale, sub } from '../../geometry/vec'
 import { closestPointOnSegment, distToSegment } from '../../geometry/segment'
 import { findOpeningSlot } from '../../model/mutations/openings'
-import { doorGlyph } from '../render/planGeometry'
+import { openingInk } from '../render/planGeometry'
+import { openingStyleSpec, type OpeningStyleSpec } from '../../catalog/openingStyles'
 import { DEFAULTS } from '../../model/types'
 import type { WallId } from '../../model/ids'
 
@@ -22,6 +23,13 @@ const swingFor = (world: Vec2, na: Vec2, dir: Vec2): 'front' | 'back' => {
   return v >= 0 ? 'front' : 'back'
 }
 
+/** The armed style spec (per-kind memory in toolParams; absent = standard). */
+const armedStyle = (ctx: ToolContext): OpeningStyleSpec => {
+  const params = ctx.ui().toolParams
+  const kind = params.openingKind
+  return openingStyleSpec(kind, kind === 'door' ? params.doorStyle : params.windowStyle)
+}
+
 export function createPlaceOpeningTool(): Tool {
   let hover: { wallId: WallId; u: number; valid: boolean } | null = null
 
@@ -29,7 +37,9 @@ export function createPlaceOpeningTool(): Tool {
     const doc = ctx.doc()
     const px = ctx.pxToWorld()
     const kind = ctx.ui().toolParams.openingKind
-    const width = kind === 'door' ? DEFAULTS.door.width : DEFAULTS.window.width
+    const spec = armedStyle(ctx)
+    const width =
+      spec.defaults?.width ?? (kind === 'door' ? DEFAULTS.door.width : DEFAULTS.window.width)
 
     // nearest wall within pick radius
     let best: { wallId: WallId; d: number; u: number } | null = null
@@ -61,19 +71,25 @@ export function createPlaceOpeningTool(): Tool {
     // ghost rectangle in world coords (wall-aligned)
     const half = w.thickness / 2 + 0.02
     const p = (uu: number, v: number) => add(add(na, scale(dir, uu)), scale(perp(dir), v))
-    // doors also preview the leaf + swing arc, swing side following the
-    // cursor exactly like the click will commit it (same cross product)
-    const door =
-      kind === 'door' && valid
-        ? doorGlyph(
-            p,
-            u - width / 2,
-            u + width / 2,
-            DEFAULTS.door.hinge,
-            swingFor(e.world, na, dir),
-            w.thickness / 2,
-          )
-        : undefined
+    // valid ghosts also preview the style-dispatched ink; door swing side
+    // follows the cursor exactly like the click will commit it (same cross
+    // product), and the pinned arc sweep flows through openingInk
+    const ink = valid
+      ? openingInk(
+          p,
+          u - width / 2,
+          u + width / 2,
+          w.thickness / 2,
+          kind === 'door'
+            ? {
+                kind: 'door',
+                hinge: DEFAULTS.door.hinge,
+                swing: swingFor(e.world, na, dir),
+                style: spec.id,
+              }
+            : { kind: 'window', style: spec.id },
+        )
+      : undefined
     ctx.interaction().set({
       preview: {
         kind: 'ghost',
@@ -84,7 +100,7 @@ export function createPlaceOpeningTool(): Tool {
           p(u - width / 2, half),
         ],
         valid,
-        ...(door ? { door } : {}),
+        ...(ink ? { openingInk: ink } : {}),
       },
       pills: [],
     })
@@ -109,6 +125,14 @@ export function createPlaceOpeningTool(): Tool {
       if (!wall || !na || !nb) return
       const L = Math.hypot(nb.x - na.x, nb.y - na.y)
       const kind = ctx.ui().toolParams.openingKind
+      // the armed style stamps itself + its dimension seeds (addOpening
+      // drops 'standard' — absent IS standard)
+      const spec = armedStyle(ctx)
+      const seeds = {
+        style: spec.id,
+        ...(spec.defaults?.width !== undefined ? { width: spec.defaults.width } : {}),
+        ...(spec.defaults?.height !== undefined ? { height: spec.defaults.height } : {}),
+      }
       if (kind === 'door') {
         const dir = normalize(sub(nb, na))
         ctx.actions().addOpening({
@@ -116,9 +140,18 @@ export function createPlaceOpeningTool(): Tool {
           wallId: hover.wallId,
           t: hover.u / L,
           swing: swingFor(e.world, na, dir),
+          ...seeds,
         })
       } else {
-        ctx.actions().addOpening({ kind: 'window', wallId: hover.wallId, t: hover.u / L })
+        ctx.actions().addOpening({
+          kind: 'window',
+          wallId: hover.wallId,
+          t: hover.u / L,
+          ...seeds,
+          ...(spec.defaults?.sillHeight !== undefined
+            ? { sillHeight: spec.defaults.sillHeight }
+            : {}),
+        })
       }
       // stays armed for repeated placement
     },

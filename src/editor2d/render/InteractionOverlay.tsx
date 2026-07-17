@@ -6,6 +6,7 @@ import { CATALOG } from '../../catalog'
 import { symbolFor } from '../../catalog/symbolFromParts'
 import { furnitureTransform } from './planGeometry'
 import { SymbolRenderer } from './SymbolRenderer'
+import { OpeningInkGlyph } from './OpeningInkGlyph'
 import { Pill } from './Pill'
 
 /**
@@ -138,19 +139,13 @@ export function InteractionOverlay() {
         vectorEffect="non-scaling-stroke"
       />,
     )
-    // door ghosts preview the leaf + swing arc (same doorGlyph as placed
-    // doors — the pinned sweep flags flow straight through)
-    if (preview.door) {
-      const { leaf, arc } = preview.door
+    // opening ghosts preview the style-dispatched ink (same openingInk as
+    // placed openings — the pinned door-arc sweep flags flow straight
+    // through; OpeningInkGlyph is the styling twin's ghost variant)
+    if (preview.openingInk) {
       els.push(
-        <g key="ghost-door" stroke={theme.accent} fill="none">
-          <line {...leaf} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
-          <path
-            d={`M ${arc.from.x} ${arc.from.y} A ${arc.r} ${arc.r} 0 0 ${arc.sweep} ${arc.to.x} ${arc.to.y}`}
-            strokeWidth={1}
-            strokeDasharray="4 3"
-            vectorEffect="non-scaling-stroke"
-          />
+        <g key="ghost-opening">
+          <OpeningInkGlyph prims={preview.openingInk} variant="ghost" />
         </g>,
       )
     }

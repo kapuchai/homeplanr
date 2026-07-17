@@ -8,6 +8,7 @@ import {
 } from '../geometry/polygon'
 import { docContentBounds } from '../editor2d/render/bounds'
 import {
+  arcPath,
   furnitureTransform,
   openingSymbol,
   polyPath,
@@ -55,6 +56,8 @@ const RASTER_MIN_PX = 512
 // physical stroke widths (m): hairline ≈ 1px, detail ≈ 0.8px at nominal zoom
 const HAIRLINE = 0.01
 const DETAIL = 0.008
+// dashed opening ink ≈ the editor's "4 3" px pattern at nominal zoom
+const INK_DASH = '0.04 0.03'
 // 'NotoSans' is the family exportController registers with jsPDF — svg2pdf
 // matches it for true-vector text with Cyrillic (B6). Browsers/viewers
 // don't know it and fall through to system-ui (SVG + PNG output unchanged).
@@ -73,8 +76,8 @@ const ESCAPES: Record<string, string> = {
 }
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ESCAPES[c]!)
 
-const lineEl = (l: Line, stroke: string, width: number): string =>
-  `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`
+const lineEl = (l: Line, stroke: string, width: number, dash?: string): string =>
+  `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" fill="none" stroke="${stroke}" stroke-width="${width}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`
 
 /** Serialize one catalog symbol prim with SymbolRenderer's role styling. */
 function primEl(p: SymbolPrim, theme: Theme2D): string {
@@ -195,17 +198,19 @@ export function renderPlanSvg(
       if (!model) continue
       const sym = openingSymbol(solid, wall, op, model)
       covers.push(`<path d="${polyPath(sym.coverRect)}" fill="${theme.paper}" stroke="none"/>`)
-      symbols.push(lineEl(sym.jambs[0], theme.text, HAIRLINE))
-      symbols.push(lineEl(sym.jambs[1], theme.text, HAIRLINE))
-      if (sym.windowLines) {
-        for (const l of sym.windowLines) symbols.push(lineEl(l, theme.text, HAIRLINE))
-      }
-      if (sym.door) {
-        const a = sym.door.arc
-        symbols.push(lineEl(sym.door.leaf, theme.text, HAIRLINE))
-        symbols.push(
-          `<path d="M ${a.from.x} ${a.from.y} A ${a.r} ${a.r} 0 0 ${a.sweep} ${a.to.x} ${a.to.y}" fill="none" stroke="${theme.text}" stroke-width="${DETAIL}"/>`,
-        )
+      // ink emitter — the export-side styling twin of OpeningInkGlyph
+      // (keep the two in agreement): lines at hairline, swing arcs at
+      // detail, dashed roles dashed
+      for (const prim of sym.ink) {
+        if (prim.kind === 'line') {
+          symbols.push(
+            lineEl(prim.line, theme.text, HAIRLINE, prim.dashed ? INK_DASH : undefined),
+          )
+        } else {
+          symbols.push(
+            `<path d="${arcPath(prim.arc)}" fill="none" stroke="${theme.text}" stroke-width="${DETAIL}"/>`,
+          )
+        }
       }
     }
   }

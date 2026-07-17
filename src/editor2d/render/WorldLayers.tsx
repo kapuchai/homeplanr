@@ -11,6 +11,7 @@ import { WALL_PAINTS } from '../../catalog/palette'
 import { CATALOG } from '../../catalog'
 import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
+import { OpeningInkGlyph } from './OpeningInkGlyph'
 import { DimensionsLayer } from './DimensionsLayer'
 import { AnnotationsLayer } from './AnnotationsLayer'
 import { furnitureTransform, openingSymbol, polyPath, roomFill, roomLabelLines, worldPoint } from './planGeometry'
@@ -139,13 +140,6 @@ function WallsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGe
 }
 
 function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: DerivedGeometry }) {
-  const theme = useThemeStore((s) => s.theme)
-  const hair = {
-    stroke: theme.text,
-    strokeWidth: 1,
-    vectorEffect: 'non-scaling-stroke' as const,
-    fill: 'none' as const,
-  }
   const els: React.ReactNode[] = []
   for (const solid of Object.values(derived.wallSolids)) {
     const wall = doc.walls[solid.wallId]
@@ -154,30 +148,14 @@ function OpeningsLayer({ doc, derived }: { doc: ProjectDocument; derived: Derive
       const model = doc.openings[op.openingId]
       if (!model) continue
       // all geometry (incl. the EMPIRICALLY PINNED door-arc sweep — see
-      // planGeometry + RUNBOOK) comes from the shared helper
+      // planGeometry + RUNBOOK) comes from the shared helper; styling
+      // through the OpeningInkGlyph twin
       const sym = openingSymbol(solid, wall, op, model)
       els.push(
-        <g key={`${op.openingId}-j`}>
-          <line {...sym.jambs[0]} {...hair} />
-          <line {...sym.jambs[1]} {...hair} />
+        <g key={op.openingId}>
+          <OpeningInkGlyph prims={sym.ink} variant="plan" />
         </g>,
       )
-      sym.windowLines?.forEach((l, i) => {
-        els.push(<line key={`${op.openingId}-w${i}`} {...l} {...hair} />)
-      })
-      if (sym.door) {
-        const { leaf, arc } = sym.door
-        els.push(
-          <g key={`${op.openingId}-d`}>
-            <line {...leaf} {...hair} />
-            <path
-              d={`M ${arc.from.x} ${arc.from.y} A ${arc.r} ${arc.r} 0 0 ${arc.sweep} ${arc.to.x} ${arc.to.y}`}
-              {...hair}
-              strokeWidth={0.75}
-            />
-          </g>,
-        )
-      }
     }
   }
   return <g>{els}</g>

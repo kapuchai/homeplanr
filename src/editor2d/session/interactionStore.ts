@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Vec2 } from '../../geometry/vec'
 import type { SnapResult } from '../../geometry/snapping'
+import type { OpeningPrim } from '../render/planGeometry'
 
 /**
  * Per-frame tool overlay view-model. Tools WRITE here on pointer moves;
@@ -40,14 +41,11 @@ export interface GhostPreview {
    */
   furniture?: { itemId: string; at: Vec2; rot: number; mirrored: boolean }
   /**
-   * Door ghosts: pre-click leaf + swing arc (world coords, produced by
-   * planGeometry.doorGlyph — the SAME code path as placed doors, so the
-   * pinned sweep flags cannot fork).
+   * Opening ghosts: pre-click style-dispatched ink (world coords, produced
+   * by planGeometry.openingInk — the SAME code path as placed openings, so
+   * the pinned door-arc sweep flags cannot fork).
    */
-  door?: {
-    leaf: { x1: number; y1: number; x2: number; y2: number }
-    arc: { from: Vec2; to: Vec2; r: number; sweep: 0 | 1 }
-  }
+  openingInk?: OpeningPrim[]
 }
 
 export interface MarqueePreview {

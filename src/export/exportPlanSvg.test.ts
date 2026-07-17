@@ -5,7 +5,7 @@ import { addOpening } from '../model/mutations/openings'
 import { addFurniture, transformFurniture } from '../model/mutations/furniture'
 import { getDerived, resetDerivedForTests } from '../store/derived'
 import { useAppSettings } from '../store/appSettings'
-import { openingSymbol } from '../editor2d/render/planGeometry'
+import { openingSymbol, type OpeningPrim } from '../editor2d/render/planGeometry'
 import { docContentBounds } from '../editor2d/render/bounds'
 import { polygonBounds } from '../geometry/polygon'
 import { vec } from '../geometry/vec'
@@ -20,6 +20,11 @@ import { addDimension, addLabel } from '../model/mutations/annotations'
 const theme = getTheme2d('light', 'blue')
 
 const count = (s: string, needle: string): number => s.split(needle).length - 1
+
+const inkLines = (ink: readonly OpeningPrim[], role: string) =>
+  ink.filter((p): p is Extract<OpeningPrim, { kind: 'line' }> => p.kind === 'line' && p.role === role)
+const inkArc = (ink: readonly OpeningPrim[]) =>
+  ink.find((p): p is Extract<OpeningPrim, { kind: 'arc' }> => p.kind === 'arc')!
 
 const wallBetween = (doc: ProjectDocument, a: { x: number; y: number }, b: { x: number; y: number }): Wall => {
   const hit = Object.values(doc.walls).find((w) => {
@@ -97,19 +102,22 @@ describe('openingSymbol — WorldLayers parity pin', () => {
     expectPt(sym.coverRect[2]!, 2.45, 0.077)
     expectPt(sym.coverRect[3]!, 1.55, 0.077)
     // jamb ticks across the wall at both ends of the gap
-    expectPt({ x: sym.jambs[0].x1, y: sym.jambs[0].y1 }, 1.55, -0.075)
-    expectPt({ x: sym.jambs[0].x2, y: sym.jambs[0].y2 }, 1.55, 0.075)
-    expectPt({ x: sym.jambs[1].x1, y: sym.jambs[1].y1 }, 2.45, -0.075)
-    expectPt({ x: sym.jambs[1].x2, y: sym.jambs[1].y2 }, 2.45, 0.075)
+    const jambs = inkLines(sym.ink, 'jamb')
+    expect(jambs).toHaveLength(2)
+    expectPt({ x: jambs[0]!.line.x1, y: jambs[0]!.line.y1 }, 1.55, -0.075)
+    expectPt({ x: jambs[0]!.line.x2, y: jambs[0]!.line.y2 }, 1.55, 0.075)
+    expectPt({ x: jambs[1]!.line.x1, y: jambs[1]!.line.y1 }, 2.45, -0.075)
+    expectPt({ x: jambs[1]!.line.x2, y: jambs[1]!.line.y2 }, 2.45, 0.075)
     // leaf open 90° from the hinge jamb corner, arc back to the far jamb
-    expect(sym.windowLines).toBeUndefined()
-    const door = sym.door!
-    expectPt({ x: door.leaf.x1, y: door.leaf.y1 }, 1.55, 0.075)
-    expectPt({ x: door.leaf.x2, y: door.leaf.y2 }, 1.55, 0.975)
-    expectPt(door.arc.from, 1.55, 0.975)
-    expectPt(door.arc.to, 2.45, 0.075)
-    expect(door.arc.r).toBeCloseTo(0.9, 9)
-    expect(door.arc.sweep).toBe(0)
+    expect(inkLines(sym.ink, 'glazing')).toHaveLength(0)
+    const leaf = inkLines(sym.ink, 'leaf')[0]!.line
+    const arc = inkArc(sym.ink).arc
+    expectPt({ x: leaf.x1, y: leaf.y1 }, 1.55, 0.075)
+    expectPt({ x: leaf.x2, y: leaf.y2 }, 1.55, 0.975)
+    expectPt(arc.from, 1.55, 0.975)
+    expectPt(arc.to, 2.45, 0.075)
+    expect(arc.r).toBeCloseTo(0.9, 9)
+    expect(arc.sweep).toBe(0)
   })
 
   it('reproduces the pre-refactor window triple lines', () => {
@@ -122,15 +130,15 @@ describe('openingSymbol — WorldLayers parity pin', () => {
     const solid = getDerived(doc).wallSolids[wall.id]!
     const realized = solid.openings[0]!
     const sym = openingSymbol(solid, wall, realized, doc.openings[realized.openingId]!)
-    expect(sym.door).toBeUndefined()
-    const lines = sym.windowLines!
+    expect(sym.ink.some((p) => p.kind === 'arc')).toBe(false)
+    const lines = inkLines(sym.ink, 'glazing')
     expect(lines).toHaveLength(3)
     const vs = [-0.0375, 0, 0.0375]
     lines.forEach((l, i) => {
-      expect(l.x1).toBeCloseTo(1.4, 9)
-      expect(l.x2).toBeCloseTo(2.6, 9)
-      expect(l.y1).toBeCloseTo(vs[i]!, 9)
-      expect(l.y2).toBeCloseTo(vs[i]!, 9)
+      expect(l.line.x1).toBeCloseTo(1.4, 9)
+      expect(l.line.x2).toBeCloseTo(2.6, 9)
+      expect(l.line.y1).toBeCloseTo(vs[i]!, 9)
+      expect(l.line.y2).toBeCloseTo(vs[i]!, 9)
     })
   })
 })
@@ -150,10 +158,10 @@ describe('door-arc sweep matrix (empirically pinned — see RUNBOOK)', () => {
       const solid = derived.wallSolids[wall.id]!
       const realized = solid.openings[0]!
       const sym = openingSymbol(solid, wall, realized, doc.openings[realized.openingId]!)
-      expect(sym.door!.arc.sweep).toBe(c.sweep)
+      expect(inkArc(sym.ink).arc.sweep).toBe(c.sweep)
       const svg = renderPlanSvg(doc, derived)!
       const arc = svg.match(/ A [\d.eE+-]+ [\d.eE+-]+ 0 0 ([01]) /)
-      expect(arc?.[1]).toBe(String(sym.door!.arc.sweep))
+      expect(arc?.[1]).toBe(String(inkArc(sym.ink).arc.sweep))
     })
   }
 })
@@ -229,10 +237,23 @@ describe('renderPlanSvg', () => {
     const sym = openingSymbol(solid, doorWall, realized, doc.openings[realized.openingId]!)
     const arcs = svg.match(/ A [\d.eE+-]+ [\d.eE+-]+ 0 0 [01] /g)
     expect(arcs).toHaveLength(1)
-    expect(arcs![0]).toContain(` 0 0 ${sym.door!.arc.sweep} `)
+    expect(arcs![0]).toContain(` 0 0 ${inkArc(sym.ink).arc.sweep} `)
     // ink strokes: 2 jambs × 2 openings + door leaf + door arc + 3 window
     // lines = 9 (furniture symbols use the symbol* tokens, not text ink)
     expect(count(svg, `stroke="${theme.text}"`)).toBe(9)
+  })
+
+  it('styled openings export (0.10.0): garage track dashed, passage arcless', () => {
+    const doc = emptyDocument('p_style', 'Style', '2026-07-17T00:00:00.000Z')
+    addWallSegment(doc, vec(0, 0), vec(8, 0))
+    const wall = Object.values(doc.walls)[0]!
+    addOpening(doc, { kind: 'door', wallId: wall.id, t: 0.3, width: 2.4, style: 'garage' })
+    addOpening(doc, { kind: 'door', wallId: wall.id, t: 0.75, width: 1.2, style: 'passage' })
+    const svg = renderPlanSvg(doc, getDerived(doc))!
+    // no swing arcs at all (garage + passage are arcless)
+    expect(svg.match(/ A [\d.eE+-]+ [\d.eE+-]+ 0 0 [01] /g)).toBeNull()
+    // dashed ink: 3 garage track lines + 2 passage face lines
+    expect(count(svg, 'stroke-dasharray="0.04 0.03"')).toBe(5)
   })
 
   it('renders room fill + name + area label (counter-flipped)', () => {
