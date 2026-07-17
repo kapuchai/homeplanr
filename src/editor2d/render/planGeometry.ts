@@ -1,10 +1,11 @@
 import type { Vec2 } from '../../geometry/vec'
 import { add, perp, scale } from '../../geometry/vec'
 import type { RealizedOpening, WallSolid } from '../../geometry/wallSolids'
-import type { Opening, Wall } from '../../model/types'
+import type { Opening, Room, Wall } from '../../model/types'
 import type { DerivedRoom } from '../../store/derived'
 import type { Theme2D } from '../../theme/theme2d'
 import { FLOOR_IDS, floorSpec } from '../../catalog/palette'
+import { roomTypeSpec } from '../../catalog/roomTypes'
 
 /**
  * Pure plan-render geometry SHARED by the 2D editor (WorldLayers) and the
@@ -59,6 +60,23 @@ function floorTint(floorId: string, theme: Theme2D): string {
   const out = '#' + mixed
   byId.set(floorId, out)
   return out
+}
+
+/**
+ * Room label lines (0.8.0) — ONE source for the WorldLayers / exportPlanSvg
+ * styling twins (they must never fork). Title = name, else the KNOWN room
+ * type's display name, else the 'Room' sentinel; the small type line
+ * appears only when a name AND a known type would otherwise both be lost.
+ * Unknown/absent roomType ids render no badge (open-registry fallback).
+ */
+export function roomLabelLines(room: Room): { title: string; typeLine: string | null } {
+  const typeName = roomTypeSpec(room.roomType)?.name ?? null
+  if (room.name) {
+    // a name that IS the type name (room "Bathroom" typed bathroom) must
+    // not print twice
+    return { title: room.name, typeLine: typeName !== room.name ? typeName : null }
+  }
+  return { title: typeName ?? 'Room', typeLine: null }
 }
 
 export function roomFill(room: DerivedRoom, theme: Theme2D): string {

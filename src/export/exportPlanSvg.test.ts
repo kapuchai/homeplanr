@@ -246,6 +246,31 @@ describe('renderPlanSvg', () => {
     expect(count(svg, 'scale(1 -1)">')).toBeGreaterThanOrEqual(1)
   })
 
+  it('room type line follows the WorldLayers twin rules (0.8.0)', () => {
+    const doc = roomFixture()
+    const room = Object.values(doc.rooms)[0]!
+    // named + known type → name title + small type line
+    room.name = 'Master'
+    room.roomType = 'bedroom'
+    let svg = renderPlanSvg(doc, getDerived(doc))!
+    expect(svg).toContain('>Master</text>')
+    expect(svg).toContain('>Bedroom</text>')
+    // unnamed + known type → the type IS the title, no extra line
+    delete room.name
+    svg = renderPlanSvg(doc, getDerived(doc))!
+    expect(count(svg, '>Bedroom</text>')).toBe(1)
+    // unknown type → open-registry fallback: sentinel title, no badge
+    room.roomType = 'observatory-2030'
+    svg = renderPlanSvg(doc, getDerived(doc))!
+    expect(svg).toContain('>Room</text>')
+    expect(svg).not.toContain('observatory-2030')
+    // name that IS the type name never prints twice
+    room.name = 'Bathroom'
+    room.roomType = 'bathroom'
+    svg = renderPlanSvg(doc, getDerived(doc))!
+    expect(count(svg, '>Bathroom</text>')).toBe(1)
+  })
+
   it('serializes furniture prims 1:1 with symbolFor', () => {
     const item = CATALOG['sofa-3']!
     const doc = emptyDocument('p_sofa', 'Sofa', '2026-07-12T00:00:00.000Z')

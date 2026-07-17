@@ -7,6 +7,7 @@ import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { area } from '../geometry/polygon'
 import { FLOOR_GROUPS, FLOOR_MATERIALS, WALL_FINISHES, WALL_PAINTS } from '../catalog/palette'
+import { ROOM_TYPES, roomTypeSpec } from '../catalog/roomTypes'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
 import { LABEL_PLACEHOLDER } from '../editor2d/tools/annotateTextTool'
@@ -743,6 +744,28 @@ export function PropertiesPanel() {
           placeholder={t('props.roomNamePlaceholder')}
           onCommit={(v) => a.renameRoom(room.id, v)}
         />
+        <div className="prop-row chip-row">
+          <span>{t('props.roomType')}</span>
+          <div className="chips">
+            <button
+              type="button"
+              className={`chip${room.roomType === undefined ? ' active' : ''}`}
+              onClick={() => a.setRoomType(room.id, undefined)}
+            >
+              {t('props.roomTypeNone')}
+            </button>
+            {ROOM_TYPES.map((rt) => (
+              <button
+                key={rt.id}
+                type="button"
+                className={`chip${room.roomType === rt.id ? ' active' : ''}`}
+                onClick={() => a.setRoomType(room.id, rt.id)}
+              >
+                {rt.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="prop-row floor-picker">
           <span>{t('props.floor')}</span>
           <div className="floor-groups">
@@ -821,6 +844,45 @@ export function PropertiesPanel() {
         value={s.defaultWallHeight}
         onCommit={(v) => a.updateSettings({ defaultWallHeight: v })}
       />
+      {(() => {
+        // plan statistics (0.8.0 roomType semantics): per-type areas in the
+        // registry order + an unspecified bucket; total from derived areas
+        const drs = Object.values(getDerived(doc).rooms)
+        if (!drs.length) return null
+        const total = drs.reduce((acc, r) => acc + r.areaM2, 0)
+        const byType = new Map<string, { count: number; area: number }>()
+        for (const r of drs) {
+          const key = roomTypeSpec(r.room.roomType)?.id ?? ''
+          const e = byType.get(key) ?? { count: 0, area: 0 }
+          e.count += 1
+          e.area += r.areaM2
+          byType.set(key, e)
+        }
+        const rows = [
+          ...ROOM_TYPES.filter((rt) => byType.has(rt.id)).map((rt) => ({
+            label: rt.name,
+            ...byType.get(rt.id)!,
+          })),
+          ...(byType.has('')
+            ? [{ label: t('props.statsUnspecified'), ...byType.get('')! }]
+            : []),
+        ]
+        return (
+          <div className="plan-stats">
+            <h4>{t('props.stats')}</h4>
+            <Row>
+              <span>{t('props.statsRooms', { count: drs.length })}</span>
+              <span className="readonly">{formatArea(total, units)}</span>
+            </Row>
+            {rows.map((row) => (
+              <div className="prop-row stat-row" key={row.label}>
+                <span>{row.count > 1 ? `${row.label} × ${row.count}` : row.label}</span>
+                <span className="readonly">{formatArea(row.area, units)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
       <p className="hint">{t('props.hint.project')}</p>
     </aside>
   )

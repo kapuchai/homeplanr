@@ -13,7 +13,7 @@ import { symbolFor } from '../../catalog/symbolFromParts'
 import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { DimensionsLayer } from './DimensionsLayer'
 import { AnnotationsLayer } from './AnnotationsLayer'
-import { furnitureTransform, openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
+import { furnitureTransform, openingSymbol, polyPath, roomFill, roomLabelLines, worldPoint } from './planGeometry'
 import { resizeHandlePositions, rotateHandlePos, roomPivot, roomRotateHandlePos } from '../tools/handles'
 import { dimensionSpan, labelBox } from '../hit/hitTest'
 import { useThemeStore } from '../../theme/themeStore'
@@ -75,6 +75,8 @@ function RoomLabels({ derived }: { derived: DerivedGeometry }) {
         // hide labels for tiny rooms at the current zoom
         if (k * Math.sqrt(r.areaM2) < 48) return null
         const area = formatArea(r.areaM2, units)
+        // shared with exportPlanSvg (styling twins — planGeometry owns it)
+        const { title, typeLine } = roomLabelLines(r.room)
         return (
           <g
             key={r.roomId}
@@ -82,11 +84,16 @@ function RoomLabels({ derived }: { derived: DerivedGeometry }) {
             style={{ pointerEvents: 'none' }}
           >
             <text textAnchor="middle" fontSize={11} fill={theme.text} fontWeight={500}>
-              {r.room.name ?? 'Room'}
+              {title}
             </text>
             <text textAnchor="middle" y={13} fontSize={10} fill={theme.textMuted}>
               {area}
             </text>
+            {typeLine && (
+              <text textAnchor="middle" y={25} fontSize={9} fill={theme.textMuted}>
+                {typeLine}
+              </text>
+            )}
           </g>
         )
       })}

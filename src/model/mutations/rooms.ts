@@ -4,11 +4,12 @@ import { detectFaces } from '../../geometry/faces'
 import { pointInPolygonWithHoles } from '../../geometry/polygon'
 import { add, normalize, perp, scale, sub } from '../../geometry/vec'
 import { applyWallPaint } from './walls'
+import { roomTypeSpec } from '../../catalog/roomTypes'
 
 /**
- * Room reconciliation: keeps room identity (id, name, floorMaterialId)
- * stable across topology edits by matching detected faces to existing rooms
- * via Jaccard similarity over their wall-ID fingerprints
+ * Room reconciliation: keeps room identity (id, name, floorMaterialId,
+ * roomType) stable across topology edits by matching detected faces to
+ * existing rooms via Jaccard similarity over their wall-ID fingerprints
  * (wallCycle ∪ holeCycles). Greedy best-pair-first, threshold 0.3;
  * deterministic ordering (score desc, face area desc, room id asc).
  *
@@ -108,6 +109,24 @@ export function setRoomFloorMaterial(
   if (!room) return
   if (materialId) room.floorMaterialId = materialId
   else delete room.floorMaterialId
+}
+
+/**
+ * Set/clear the room type (0.8.0 — the v4 field gets semantics). Setting a
+ * KNOWN type also seeds its suggested floor material, but ONLY when the
+ * room has no explicit floorMaterialId — a user's floor choice is never
+ * overwritten (and clearing the type never touches the floor).
+ */
+export function setRoomType(doc: ProjectDocument, id: RoomId, roomType: string | undefined): void {
+  const room = doc.rooms[id]
+  if (!room) return
+  if (roomType) {
+    if (room.roomType !== roomType) room.roomType = roomType
+    const suggested = roomTypeSpec(roomType)?.suggestedFloorId
+    if (suggested && room.floorMaterialId === undefined) room.floorMaterialId = suggested
+  } else if (room.roomType !== undefined) {
+    delete room.roomType
+  }
 }
 
 /**

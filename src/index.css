@@ -788,6 +788,58 @@ textarea,
   margin-bottom: 2px;
 }
 
+/* ---- 0.8.0 M8: room type chips + plan statistics ---- */
+.chip-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  padding: calc(var(--ui-scale) * 3px) calc(var(--ui-scale) * 8px);
+  font-size: calc(var(--ui-scale) * 11px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--muted);
+}
+
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.plan-stats {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.plan-stats h4 {
+  margin: 0 0 6px;
+  font-size: calc(var(--ui-scale) * 11px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--faint);
+}
+
+.plan-stats .stat-row span:first-child {
+  color: var(--muted);
+}
+
 
 /* ---- M5-R catalog card thumbnails: 64px isometric renders ---- */
 .catalog-card {

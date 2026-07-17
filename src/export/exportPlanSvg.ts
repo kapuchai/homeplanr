@@ -12,6 +12,7 @@ import {
   openingSymbol,
   polyPath,
   roomFill,
+  roomLabelLines,
   type Line,
 } from '../editor2d/render/planGeometry'
 import { dimensionLabels, openingWidthLabels } from '../editor2d/measure/liveMeasurements'
@@ -60,6 +61,7 @@ const DETAIL = 0.008
 const FONT = 'NotoSans, system-ui, sans-serif'
 const NAME_SIZE = 0.11
 const AREA_SIZE = 0.1
+const TYPE_SIZE = 0.09
 const DIM_SIZE = 0.1
 
 const ESCAPES: Record<string, string> = {
@@ -230,10 +232,15 @@ export function renderPlanSvg(
 
   // labels counter-flip (scale(1 -1)) so text reads upright in the y-up view
   for (const r of Object.values(derived.rooms)) {
+    // title/type lines shared with WorldLayers (styling twins — planGeometry)
+    const { title, typeLine } = roomLabelLines(r.room)
     parts.push(
       `<g transform="translate(${r.labelAnchor.x} ${r.labelAnchor.y}) scale(1 -1)">` +
-        `<text text-anchor="middle" font-family="${FONT}" font-size="${NAME_SIZE}" font-weight="500" fill="${theme.text}">${esc(r.room.name ?? 'Room')}</text>` +
+        `<text text-anchor="middle" font-family="${FONT}" font-size="${NAME_SIZE}" font-weight="500" fill="${theme.text}">${esc(title)}</text>` +
         `<text text-anchor="middle" y="0.13" font-family="${FONT}" font-size="${AREA_SIZE}" fill="${theme.textMuted}">${esc(formatArea(r.areaM2, units))}</text>` +
+        (typeLine
+          ? `<text text-anchor="middle" y="0.25" font-family="${FONT}" font-size="${TYPE_SIZE}" fill="${theme.textMuted}">${esc(typeLine)}</text>`
+          : '') +
         `</g>`,
     )
   }

@@ -13,7 +13,7 @@ import {
 } from './walls'
 import { addOpening, updateOpening } from './openings'
 import { runPipeline } from './pipeline'
-import { paintRoomWalls, renameRoom } from './rooms'
+import { paintRoomWalls, renameRoom, setRoomType } from './rooms'
 import { addDimension, addLabel, updateAnnotation } from './annotations'
 import { pasteSubgraph } from './paste'
 import { captureRigStarts, collectRoomRig, tearRoomRig, transformRigRigid } from './roomRig'
@@ -1332,5 +1332,36 @@ describe('0.8.0 M1: room rig — collect / tear / rigid transform', () => {
     expect(d.rooms[room.id]?.name).toBe('A')
     expect(roomCount(d)).toBe(1)
     checkInvariants(d)
+  })
+})
+
+describe('0.8.0 M8: setRoomType + floor suggestion', () => {
+  it('sets/clears the type; seeds the suggested floor ONLY when none was chosen', () => {
+    const d = doc()
+    square(d)
+    const room = firstRoom(d)
+    setRoomType(d, room.id, 'bathroom')
+    expect(room.roomType).toBe('bathroom')
+    expect(room.floorMaterialId).toBe('ceramicFloor') // seeded (was absent)
+    setRoomType(d, room.id, 'bedroom')
+    expect(room.roomType).toBe('bedroom')
+    expect(room.floorMaterialId).toBe('ceramicFloor') // NEVER overwritten
+    setRoomType(d, room.id, undefined)
+    expect('roomType' in room).toBe(false)
+    expect(room.floorMaterialId).toBe('ceramicFloor') // clearing keeps the floor
+  })
+
+  it('an explicit user floor blocks the suggestion; unknown types seed nothing', () => {
+    const d = doc()
+    square(d)
+    const room = firstRoom(d)
+    room.floorMaterialId = 'marble'
+    setRoomType(d, room.id, 'kitchen')
+    expect(room.floorMaterialId).toBe('marble')
+    delete room.floorMaterialId
+    delete room.roomType
+    setRoomType(d, room.id, 'observatory-2030') // open registry: stored as-is
+    expect(room.roomType).toBe('observatory-2030')
+    expect('floorMaterialId' in room).toBe(false) // no suggestion for unknown
   })
 })
