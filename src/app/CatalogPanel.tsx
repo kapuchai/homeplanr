@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { CATALOG, CATALOG_BY_CATEGORY, CATEGORY_ORDER, type CatalogItem } from '../catalog'
+import { searchCatalog } from '../catalog/search'
 import { symbolFor } from '../catalog/symbolFromParts'
 import { ensureThumbnails, getThumbnail } from '../catalog/thumbnails'
 import { SymbolRenderer } from '../editor2d/render/SymbolRenderer'
@@ -165,12 +166,8 @@ export function CatalogPanel() {
     void ensureThumbnails(Object.values(CATALOG), () => bump())
   }, [])
 
-  const q = query.trim().toLowerCase()
-  const matches = q
-    ? Object.values(CATALOG).filter(
-        (item) => item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q),
-      )
-    : null
+  // ranked search (0.9.0): name-prefix > substring > keyword > category
+  const matches = query.trim() ? searchCatalog(query) : null
 
   return (
     <aside className="catalog-panel">
