@@ -7,6 +7,7 @@ import {
   openExport,
   openOptions,
   optionsDialog,
+  seedAppSettings,
   show3d,
 } from './helpers'
 
@@ -66,6 +67,19 @@ test('3D isometric view — studio template', async ({ page }) => {
   await cameraPreset(page, 'Iso')
   // WebGL output wobbles more than DOM renders — wider tolerance
   await expect(gl).toHaveScreenshot('3d-iso.png', { maxDiffPixelRatio: 0.03 })
+})
+
+test('3D realistic lighting — evening sun (0.12.0)', async ({ page, context }) => {
+  // deterministic sun: fixed time/season/location (appSettings defaults =
+  // Helsinki equinox); the toggle stays OFF by default so 3d-iso above
+  // keeps pinning the classic path
+  await seedAppSettings(context, { realisticLighting: true, timeOfDay: 17.5 })
+  await page.goto('/')
+  await newFromTemplate(page)
+  const gl = await show3d(page)
+  await cameraPreset(page, 'Iso')
+  await page.waitForTimeout(500)
+  await expect(gl).toHaveScreenshot('3d-realistic-evening.png', { maxDiffPixelRatio: 0.03 })
 })
 
 test('options dialog', async ({ page }) => {

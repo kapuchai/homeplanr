@@ -45,7 +45,7 @@ import {
   sceneMaterial,
   wallFaceMaterial,
 } from './sceneMaterials'
-import { EMITTER_DEFAULT_COLOR } from '../catalog/palette'
+import { EMITTER_DEFAULT_COLOR, SCENE_MATERIALS } from '../catalog/palette'
 import { useArtMaterial } from './artTexture'
 import { WalkControls } from './walk/WalkControls'
 import { useWalkStore } from './walk/walkStore'
@@ -183,15 +183,26 @@ function FloorMesh({
  * Per-room ceiling slab (0.11.0) at the room's lowest wall height.
  * Single-sided facing DOWN — backface-culled from above, so top and
  * high-orbit views see into rooms with zero occluder logic while walk
- * mode gets a ceiling. castShadow stays false BY DESIGN: hemisphere/
- * ambient/IBL are unshadowed in three.js, so only the directional
- * caster could darken a covered room — an uncasting ceiling keeps
- * interiors exactly as bright as today (revisit with 0.12.0 lighting).
+ * mode gets a ceiling. Shadow flags are MODE-SPLIT (0.12.0): classic
+ * keeps castShadow=false so the unshadowed hemi/ambient/IBL scene stays
+ * exactly as bright as pre-0.12.0; realistic lighting turns cast+receive
+ * ON so the sun cannot pour through roofs (rooms light through their
+ * window carves) and interior lamps shade the slab. The single-sided
+ * geometry still casts from above because three's shadow pass renders
+ * the REVERSE side by default (shadowSide mapping Front→Back).
  */
 function CeilingMesh({ room, z }: { room: DerivedRoom; z: number }) {
+  const realistic = useAppSettings((s) => s.realisticLighting)
   const geo = useMemo(() => toBufferGeometry(buildCeilingMeshData(room.floor, z)), [room, z])
   useEffect(() => () => geo.dispose(), [geo])
-  return <mesh geometry={geo} material={sceneMaterial('ceiling')} />
+  return (
+    <mesh
+      geometry={geo}
+      material={sceneMaterial('ceiling')}
+      castShadow={realistic}
+      receiveShadow={realistic}
+    />
+  )
 }
 
 /** Window/door frame strip thickness (m). */
@@ -894,10 +905,16 @@ function SunSky({ box }: { box: SceneBBox }) {
 function ThemeBridge3D() {
   const invalidate = useThree((s) => s.invalidate)
   const theme3d = useThemeStore((s) => s.theme3d)
+  const realistic = useAppSettings((s) => s.realisticLighting)
   useEffect(() => {
-    sceneMaterial('ground').color.set(theme3d.ground)
+    // realistic lighting: the ground is a WORLD surface — neutral albedo
+    // lit by the sun/moon, identical in both UI themes (the same rule as
+    // the sky); classic keeps the per-theme tint
+    sceneMaterial('ground').color.set(
+      realistic ? SCENE_MATERIALS.ground.color : theme3d.ground,
+    )
     invalidate()
-  }, [theme3d, invalidate])
+  }, [theme3d, realistic, invalidate])
   return null
 }
 
