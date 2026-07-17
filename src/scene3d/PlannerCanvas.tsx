@@ -51,6 +51,7 @@ import { worldToPlan } from './walk/walkMath'
 import { hiddenWallIds, sameWallSet } from './wallOcclusion'
 import { DEG, solarPosition } from './sun'
 import { lightingRamp } from '../theme/sunRamp'
+import { SunArc } from './SunArc'
 import type { WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import { captureAndSave, type CaptureApi } from './screenshot'
@@ -959,6 +960,7 @@ export function PlannerCanvas() {
     return () => document.body.classList.remove('pointer-locked')
   }, [walkLocked])
   const wallHideMode = useAppSettings((s) => s.wallHideMode)
+  const realisticLighting = useAppSettings((s) => s.realisticLighting)
   const [hiddenWalls, setHiddenWalls] = useState<Set<WallId>>(() => new Set())
   const occluderAnchor = useMemo(() => ({ x: box.cx, y: box.cy }), [box])
   // node → incident walls, for the patch-follows-walls occluder rule: a
@@ -1131,6 +1133,7 @@ export function PlannerCanvas() {
         </group>
       </Canvas>
       </GlErrorBoundary>
+      {realisticLighting && walkMode !== 'walking' && <SunArc />}
       <div className="view3d-controls segmented small">
         {(
           [

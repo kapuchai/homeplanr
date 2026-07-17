@@ -385,6 +385,11 @@ export const en = {
   'view3d.walkTitle': 'Walk around (Esc exits)',
   'view3d.saveImage': 'Save image',
   'view3d.saveImageTitle': 'Save the current 3D view as a PNG',
+  'view3d.timeOfDay': 'Time of day',
+  'view3d.timeMorning': 'Morning',
+  'view3d.timeNoon': 'Noon',
+  'view3d.timeEvening': 'Evening',
+  'view3d.timeNight': 'Night',
 
   // ---- status strip / empty state ----
   'status.autosaveFailed': 'Autosave failed — Ctrl+S to retry, or check the file location',
