@@ -4,7 +4,13 @@ import { hitTestAll, hitTestRect } from '../hit/hitTest'
 import type { Vec2 } from '../../geometry/vec'
 import { add, dist, dot, normalize, perp, rotate, scale, sub } from '../../geometry/vec'
 import { closestPointOnSegment } from '../../geometry/segment'
-import { WINDOW_PICK_PX, resolveSnap, type SnapResult } from '../../geometry/snapping'
+import {
+  OPENING_FLUSH_SNAP_PX,
+  WINDOW_PICK_PX,
+  resolveSnap,
+  type SnapResult,
+} from '../../geometry/snapping'
+import { findOpeningSlot } from '../../model/mutations/openings'
 import {
   alignmentGuideCandidates,
   familyEdgeCandidates,
@@ -669,7 +675,23 @@ export function createSelectTool(): Tool {
           const nb = wall && doc.nodes[wall.b]
           if (!op || !wall || !na || !nb) return
           const { t } = closestPointOnSegment(e.world, na, nb)
-          ctx.actions().updateOpening(state.openingId, { t }, { mode: 'live' })
+          // flush-snap (0.10.0): the slot oracle snaps onto gap edges
+          // within radius; self is excluded from its own obstacles. Ctrl
+          // suspends like every other snap. Null (no gap) falls back to
+          // the raw projection — live revalidation still clamps.
+          const L = dist(na, nb)
+          const snap = useAppSettings.getState().snapEnabled && !e.mods.ctrl
+          const slot = snap
+            ? findOpeningSlot(doc, op.wallId, t * L, op.width, {
+                exclude: op.id,
+                snapRadius: OPENING_FLUSH_SNAP_PX * ctx.pxToWorld(),
+              })
+            : null
+          ctx.actions().updateOpening(
+            state.openingId,
+            { t: slot !== null ? slot / L : t },
+            { mode: 'live' },
+          )
           ctx.interaction().set({
             pills: openingDragPills(measureInput(ctx), state.openingId, e.world),
           })

@@ -11,7 +11,7 @@ import {
   splitWall,
   updateWall,
 } from './walls'
-import { addOpening, updateOpening } from './openings'
+import { addOpening, findOpeningSlot, updateOpening } from './openings'
 import { runPipeline } from './pipeline'
 import { paintRoomWalls, renameRoom, setRoomType } from './rooms'
 import { addDimension, addLabel, updateAnnotation } from './annotations'
@@ -298,6 +298,40 @@ describe('0.10.0 M1: opening style plumbing', () => {
     moveNode(d, d.walls[r.wallId!]!.b, vec(2, 0))
     expect(d.openings[id]).toBeDefined()
     expect(d.openings[id]!.style).toBe('double')
+  })
+
+  it('flush-snap: within radius the slot lands at the legal minimum separation', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(8, 0))
+    const a = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.5 })! // [3.55, 4.45]
+    // request a 0.9 door centered 0.15m right of a's edge-contact position
+    const contact = 4.45 + 0.01 + 0.45 // neighbor edge + margin + half = 4.91
+    expect(findOpeningSlot(d, r.wallId!, contact + 0.15, 0.9, { snapRadius: 0.2 })).toBeCloseTo(
+      contact,
+      9,
+    )
+    // outside the radius: no snap — the requested center is already legal
+    expect(findOpeningSlot(d, r.wallId!, contact + 0.5, 0.9, { snapRadius: 0.2 })).toBeCloseTo(
+      contact + 0.5,
+      9,
+    )
+    // no radius: bit-identical pre-0.10.0 behavior
+    expect(findOpeningSlot(d, r.wallId!, contact + 0.15, 0.9)).toBeCloseTo(contact + 0.15, 9)
+    // the snapped position keeps EXACTLY the core margin to the neighbor
+    const aEnd = d.openings[a]!.t * 8 + 0.45
+    expect(contact - 0.45 - aEnd).toBeCloseTo(0.01, 9)
+  })
+
+  it('flush-snap exclude: a dragged opening ignores itself as an obstacle', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(8, 0))
+    const id = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.5 })!
+    // without exclude, the opening's own interval blocks a nearby request
+    const u = d.openings[id]!.t * 8
+    const blocked = findOpeningSlot(d, r.wallId!, u, 0.9)
+    expect(blocked === null || Math.abs(blocked - u) > 0.4).toBe(true)
+    // with exclude, the same request resolves in place
+    expect(findOpeningSlot(d, r.wallId!, u, 0.9, { exclude: id })).toBeCloseTo(u, 9)
   })
 
   it('pasteSubgraph carries opening style', () => {

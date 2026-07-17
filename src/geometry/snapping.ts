@@ -90,6 +90,10 @@ export const ANGLE_RAY_CAPTURE = (7.5 * Math.PI) / 180
  * window — used by the place ghost AND the drag-drop re-target. */
 export const WINDOW_PICK_PX = 24
 
+/** px radius inside which a dragged/placed opening snaps flush against a
+ * gap edge (adjacent opening or core end) — 0.10.0 flush-snap. */
+export const OPENING_FLUSH_SNAP_PX = 8
+
 const PRIORITY: Record<SnapKind, number> = {
   node: 1,
   wallPoint: 2,

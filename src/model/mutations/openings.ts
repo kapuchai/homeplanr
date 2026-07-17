@@ -38,12 +38,19 @@ export type AddOpeningParams =
  * leaves inside `core` (margins applied); returns the legal center-u closest
  * to `u`, or null when no gap can take it. The shared slotting core of
  * findOpeningSlot and revalidateOpenings' demoted pass.
+ *
+ * `snapRadius` (0.10.0 flush-snap): when the requested center lies within
+ * this distance of the chosen gap's edge-contact position (s+half /
+ * e−half), snap exactly onto it — flush against the neighbor at the legal
+ * openingCoreMargin separation. The margin stays law; the demoted pass
+ * never snaps.
  */
 function fitIntoGaps(
   core: readonly [number, number],
   occupied: readonly (readonly [number, number])[],
   u: number,
   width: number,
+  snapRadius = 0,
 ): number | null {
   const m = DEFAULTS.openingCoreMargin
   const half = width / 2
@@ -59,6 +66,7 @@ function fitIntoGaps(
 
   let best: number | null = null
   let bestDist = Infinity
+  let bestGap: [number, number] | null = null
   for (const [s, e] of gaps) {
     if (e - s < width - 1e-9) continue // float-noise tolerance on gap width
     const c = Math.min(Math.max(u, s + half), e - half)
@@ -66,6 +74,14 @@ function fitIntoGaps(
     if (d < bestDist) {
       bestDist = d
       best = c
+      bestGap = [s, e]
+    }
+  }
+  if (best !== null && bestGap && snapRadius > 0) {
+    const [s, e] = bestGap
+    const edges = [s + half, e - half].filter((c) => Math.abs(c - u) <= snapRadius)
+    if (edges.length) {
+      best = edges.reduce((a, b) => (Math.abs(a - u) <= Math.abs(b - u) ? a : b))
     }
   }
   return best
@@ -85,12 +101,17 @@ const DEMOTED_FIT_TOLERANCE = 0.1
  * as possible to the requested center `u`. Existing openings are fixed
  * obstacles — a new opening NEVER evicts existing content. Returns null when
  * no gap can take it. (Also the place-opening tool's ghost-validity oracle.)
+ *
+ * `opts.exclude` drops one opening from the obstacle list (dragging an
+ * EXISTING opening must not collide with itself); `opts.snapRadius` turns
+ * on flush-snap against gap edges (see fitIntoGaps).
  */
 export function findOpeningSlot(
   doc: ProjectDocument,
   wallId: WallId,
   u: number,
   width: number,
+  opts: { exclude?: OpeningId; snapRadius?: number } = {},
 ): number | null {
   const w = doc.walls[wallId]
   const na = w && doc.nodes[w.a]
@@ -103,11 +124,11 @@ export function findOpeningSlot(
 
   // occupied intervals (current doc is legal — no overlaps)
   const occupied = Object.values(doc.openings)
-    .filter((o) => o.wallId === wallId)
+    .filter((o) => o.wallId === wallId && o.id !== opts.exclude)
     .map((o) => [o.t * L - o.width / 2, o.t * L + o.width / 2] as const)
     .sort((a, b) => a[0] - b[0])
 
-  return fitIntoGaps(core, occupied, u, width)
+  return fitIntoGaps(core, occupied, u, width, opts.snapRadius ?? 0)
 }
 
 export function addOpening(

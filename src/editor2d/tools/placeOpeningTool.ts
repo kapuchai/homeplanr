@@ -5,6 +5,8 @@ import { closestPointOnSegment, distToSegment } from '../../geometry/segment'
 import { findOpeningSlot } from '../../model/mutations/openings'
 import { openingInk } from '../render/planGeometry'
 import { openingStyleSpec, type OpeningStyleSpec } from '../../catalog/openingStyles'
+import { OPENING_FLUSH_SNAP_PX } from '../../geometry/snapping'
+import { useAppSettings } from '../../store/appSettings'
 import { DEFAULTS } from '../../model/types'
 import type { WallId } from '../../model/ids'
 
@@ -33,7 +35,7 @@ const armedStyle = (ctx: ToolContext): OpeningStyleSpec => {
 export function createPlaceOpeningTool(): Tool {
   let hover: { wallId: WallId; u: number; valid: boolean } | null = null
 
-  const ghost = (ctx: ToolContext, e: { world: Vec2 }) => {
+  const ghost = (ctx: ToolContext, e: { world: Vec2; mods?: { ctrl: boolean } }) => {
     const doc = ctx.doc()
     const px = ctx.pxToWorld()
     const kind = ctx.ui().toolParams.openingKind
@@ -63,7 +65,13 @@ export function createPlaceOpeningTool(): Tool {
     const na = doc.nodes[w.a]!
     const nb = doc.nodes[w.b]!
     const dir = normalize(sub(nb, na))
-    const slot = findOpeningSlot(doc, best.wallId, best.u, width)
+    // flush-snap (0.10.0) rides the same oracle call the commit re-runs —
+    // a snapped ghost position is legal by construction, so the commit
+    // keeps it. Ctrl suspends like every other snap.
+    const snap = useAppSettings.getState().snapEnabled && !e.mods?.ctrl
+    const slot = findOpeningSlot(doc, best.wallId, best.u, width, {
+      snapRadius: snap ? OPENING_FLUSH_SNAP_PX * px : 0,
+    })
     const u = slot ?? best.u
     const valid = slot !== null
     hover = { wallId: best.wallId, u, valid }
