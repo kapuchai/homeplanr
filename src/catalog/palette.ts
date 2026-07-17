@@ -37,27 +37,45 @@ export const SCENE_MATERIALS = {
 } as const
 
 /** Floor registry — the single source; sceneMaterials/PropertiesPanel/2D tint all read this. */
-export type FloorTextureKind = 'plank' | 'tile' | 'stone' | null
+export type FloorTextureKind = 'plank' | 'tile' | 'stone' | 'herringbone' | 'plaster' | null
+export type FloorGroupId = 'wood' | 'tile' | 'stone' | 'smooth'
 export interface FloorSpec {
   id: string
   name: string
   color: string
   roughness: number
   texture: FloorTextureKind
+  /** Picker section (0.8.0 grouped picker). */
+  group: FloorGroupId
 }
+
+/** Picker section order + display names (raw, catalog convention). */
+export const FLOOR_GROUPS: readonly { id: FloorGroupId; name: string }[] = [
+  { id: 'wood', name: 'Wood' },
+  { id: 'tile', name: 'Tile' },
+  { id: 'stone', name: 'Stone' },
+  { id: 'smooth', name: 'Smooth & soft' },
+]
+
 // The first four ids predate v0.2.0 and are referenced by existing documents — never rename.
 export const FLOOR_MATERIALS: readonly FloorSpec[] = [
-  { id: 'woodFloor', name: 'Wood', color: '#d3b891', roughness: 0.55, texture: 'plank' },
-  { id: 'parquetLight', name: 'Light parquet', color: '#e0c9a2', roughness: 0.5, texture: 'plank' },
-  { id: 'laminateGray', name: 'Gray laminate', color: '#b9b0a4', roughness: 0.45, texture: 'plank' },
-  { id: 'darkFloor', name: 'Dark wood', color: '#8a6a48', roughness: 0.55, texture: 'plank' },
-  { id: 'ceramicFloor', name: 'White tile', color: '#e8e8e4', roughness: 0.25, texture: 'tile' },
-  { id: 'tileGray', name: 'Gray tile', color: '#c9c9c4', roughness: 0.25, texture: 'tile' },
-  { id: 'terracotta', name: 'Terracotta', color: '#c07a56', roughness: 0.6, texture: 'tile' },
-  { id: 'marble', name: 'Marble', color: '#e9e7e2', roughness: 0.15, texture: 'stone' },
-  { id: 'stoneGray', name: 'Stone', color: '#a8a49c', roughness: 0.7, texture: 'stone' },
-  { id: 'concrete', name: 'Concrete', color: '#b5b3ae', roughness: 0.85, texture: null },
-  { id: 'carpetFloor', name: 'Carpet', color: '#b8b2a4', roughness: 1.0, texture: null },
+  { id: 'woodFloor', name: 'Wood', color: '#d3b891', roughness: 0.55, texture: 'plank', group: 'wood' },
+  { id: 'parquetLight', name: 'Light parquet', color: '#e0c9a2', roughness: 0.5, texture: 'plank', group: 'wood' },
+  { id: 'parquetHerringbone', name: 'Herringbone parquet', color: '#cdb088', roughness: 0.5, texture: 'herringbone', group: 'wood' },
+  { id: 'laminateGray', name: 'Gray laminate', color: '#b9b0a4', roughness: 0.45, texture: 'plank', group: 'wood' },
+  { id: 'laminateOak', name: 'Oak laminate', color: '#d9bd93', roughness: 0.45, texture: 'plank', group: 'wood' },
+  { id: 'laminateWalnut', name: 'Walnut laminate', color: '#9a7454', roughness: 0.45, texture: 'plank', group: 'wood' },
+  { id: 'darkFloor', name: 'Dark wood', color: '#8a6a48', roughness: 0.55, texture: 'plank', group: 'wood' },
+  { id: 'ceramicFloor', name: 'White tile', color: '#e8e8e4', roughness: 0.25, texture: 'tile', group: 'tile' },
+  { id: 'tileGray', name: 'Gray tile', color: '#c9c9c4', roughness: 0.25, texture: 'tile', group: 'tile' },
+  { id: 'terracotta', name: 'Terracotta', color: '#c07a56', roughness: 0.6, texture: 'tile', group: 'tile' },
+  { id: 'marble', name: 'Marble', color: '#e9e7e2', roughness: 0.15, texture: 'stone', group: 'stone' },
+  { id: 'stoneGray', name: 'Stone', color: '#a8a49c', roughness: 0.7, texture: 'stone', group: 'stone' },
+  { id: 'concrete', name: 'Concrete', color: '#b5b3ae', roughness: 0.85, texture: null, group: 'smooth' },
+  { id: 'plasterFloor', name: 'Plaster', color: '#ded8cc', roughness: 0.8, texture: 'plaster', group: 'smooth' },
+  { id: 'linoleumBeige', name: 'Beige linoleum', color: '#d6c9a8', roughness: 0.35, texture: null, group: 'smooth' },
+  { id: 'linoleumGray', name: 'Gray linoleum', color: '#b3b6b3', roughness: 0.35, texture: null, group: 'smooth' },
+  { id: 'carpetFloor', name: 'Carpet', color: '#b8b2a4', roughness: 1.0, texture: null, group: 'smooth' },
 ]
 
 export const FLOOR_IDS: ReadonlySet<string> = new Set(FLOOR_MATERIALS.map((f) => f.id))

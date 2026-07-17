@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  FLOOR_GROUPS,
   FLOOR_IDS,
   FLOOR_MATERIALS,
   WALL_FINISHES,
@@ -71,5 +72,23 @@ describe('FLOOR_MATERIALS registry', () => {
     }
     expect(floorSpec('nope-2030').id).toBe('woodFloor')
     expect(floorSpec(undefined).id).toBe('woodFloor')
+  })
+
+  it('every entry belongs to a declared picker group; every group is non-empty', () => {
+    const groupIds = new Set(FLOOR_GROUPS.map((g) => g.id))
+    for (const f of FLOOR_MATERIALS) {
+      expect(groupIds.has(f.group), `${f.id} group ${f.group}`).toBe(true)
+    }
+    for (const g of FLOOR_GROUPS) {
+      expect(FLOOR_MATERIALS.some((f) => f.group === g.id), `empty group ${g.id}`).toBe(true)
+    }
+  })
+
+  it('0.8.0 additions are present with valid textures', () => {
+    for (const id of ['parquetHerringbone', 'laminateOak', 'laminateWalnut', 'plasterFloor', 'linoleumBeige', 'linoleumGray']) {
+      expect(FLOOR_IDS.has(id), id).toBe(true)
+    }
+    expect(floorSpec('parquetHerringbone').texture).toBe('herringbone')
+    expect(floorSpec('plasterFloor').texture).toBe('plaster')
   })
 })

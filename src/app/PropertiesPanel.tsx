@@ -6,7 +6,7 @@ import { formatArea, formatLength, fromDisplayLength, lengthUnitLabel, toDisplay
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { area } from '../geometry/polygon'
-import { FLOOR_MATERIALS, WALL_FINISHES, WALL_PAINTS } from '../catalog/palette'
+import { FLOOR_GROUPS, FLOOR_MATERIALS, WALL_FINISHES, WALL_PAINTS } from '../catalog/palette'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
 import { LABEL_PLACEHOLDER } from '../editor2d/tools/annotateTextTool'
@@ -743,23 +743,32 @@ export function PropertiesPanel() {
           placeholder={t('props.roomNamePlaceholder')}
           onCommit={(v) => a.renameRoom(room.id, v)}
         />
-        <Row>
+        <div className="prop-row floor-picker">
           <span>{t('props.floor')}</span>
-          <div className="swatches">
-            {FLOOR_MATERIALS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                title={f.name}
-                aria-label={f.name}
-                aria-pressed={(room.floorMaterialId ?? 'woodFloor') === f.id}
-                className={`swatch${(room.floorMaterialId ?? 'woodFloor') === f.id ? ' active' : ''}`}
-                style={{ background: f.color }}
-                onClick={() => a.setRoomFloorMaterial(room.id, f.id)}
-              />
+          <div className="floor-groups">
+            {FLOOR_GROUPS.map((g) => (
+              // grouped sections (the CatalogPanel details/summary pattern) —
+              // the flat 11-swatch row stopped scaling at 17 materials
+              <details key={g.id} open>
+                <summary>{g.name}</summary>
+                <div className="swatches">
+                  {FLOOR_MATERIALS.filter((f) => f.group === g.id).map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      title={f.name}
+                      aria-label={f.name}
+                      aria-pressed={(room.floorMaterialId ?? 'woodFloor') === f.id}
+                      className={`swatch${(room.floorMaterialId ?? 'woodFloor') === f.id ? ' active' : ''}`}
+                      style={{ background: f.color }}
+                      onClick={() => a.setRoomFloorMaterial(room.id, f.id)}
+                    />
+                  ))}
+                </div>
+              </details>
             ))}
           </div>
-        </Row>
+        </div>
         <PaintSwatchRow
           label={t('props.wallPaint')}
           current={null}

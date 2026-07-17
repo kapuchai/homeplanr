@@ -747,6 +747,47 @@ textarea,
   border: 1px dashed var(--muted);
 }
 
+/* ---- 0.8.0 M7: grouped floor picker (details/summary sections) ---- */
+.floor-picker {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.floor-picker .floor-groups {
+  width: 100%;
+}
+
+.floor-picker summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+  font-size: calc(var(--ui-scale) * 10.5px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--faint);
+  user-select: none;
+}
+
+.floor-picker summary::before {
+  content: '▸';
+  font-size: calc(var(--ui-scale) * 9px);
+  transition: transform var(--dur-1) var(--ease-out);
+}
+
+.floor-picker details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.floor-picker .swatches {
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
 
 /* ---- M5-R catalog card thumbnails: 64px isometric renders ---- */
 .catalog-card {
