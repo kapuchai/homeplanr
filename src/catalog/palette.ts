@@ -30,6 +30,9 @@ export const PALETTE: Record<MaterialId, MaterialSpec> = {
   foliage: { color: '#6b8f5f', roughness: 0.95, metalness: 0 },
   // v6 wall-art print surface; per-instance images replace it at render
   canvas: { color: '#e9e4d8', roughness: 0.95, metalness: 0 },
+  // fully metallic + near-smooth: the RoomEnvironment IBL gives the shine
+  // (no real reflections — accepted)
+  mirror: { color: '#e8f0f2', roughness: 0.06, metalness: 1 },
 }
 
 /** Scene-level materials (not per-item slots). */

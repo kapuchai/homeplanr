@@ -143,7 +143,9 @@ export + 3D screenshot, file association + single instance, Linux
   spans; an item blocks iff its vertical extent intersects the body band
   (BODY_BAND_LO..HI, 0.3–1.2m) OR the eye band (EYE_HEIGHT ± 0.2m — else
   the camera clips through head-height cabinets). Constants exported +
-  test-pinned; `mirrored` never affects the footprint rect.
+  test-pinned; `mirrored` never affects the footprint rect. **Catalog
+  `passable` items (0.9.0: curtains, blinds) are skipped entirely** —
+  fabric yields regardless of bands; unknown catalog ids block normally.
 - **Paste demotion** (0.4.0): `pasteSubgraph` passes every minted id as the
   pipeline's `demoted` set — a demoted node/wall never survives a weld/
   dedupe against a kept one (split fragments INHERIT demotion via

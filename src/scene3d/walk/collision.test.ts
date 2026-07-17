@@ -243,6 +243,39 @@ describe('collision core (12 pinned cases)', () => {
     expect(deepest(set, vec(15, 0))).toBeNull() // overhead shelf
   })
 
+  it('(F1b) catalog passable items (curtains, blinds) never block; art/mirrors do', () => {
+    const { set } = setup((d) => {
+      // full-height fabric spans BOTH bands — passable wins over geometry
+      addFurniture(d, { catalogItemId: 'curtain', x: 0, y: 0, size: { w: 1.6, d: 0.2, h: 2.4 } })
+      addFurniture(d, {
+        catalogItemId: 'blinds',
+        x: 5,
+        y: 0,
+        size: { w: 1.3, d: 0.2, h: 1.4 },
+        elevation: 0.85,
+      })
+      // same wall-hugging shape WITHOUT the flag: blocks via the eye band
+      addFurniture(d, {
+        catalogItemId: 'art-portrait',
+        x: 10,
+        y: 0,
+        size: { w: 0.5, d: 0.2, h: 0.7 },
+        elevation: 1.15,
+      })
+      addFurniture(d, {
+        catalogItemId: 'mirror-full',
+        x: 15,
+        y: 0,
+        size: { w: 0.5, d: 0.2, h: 1.8 },
+      })
+    })
+    expect(set.obstacles).toHaveLength(2) // art + mirror only
+    expect(deepest(set, vec(0, 0))).toBeNull() // walk through curtains
+    expect(deepest(set, vec(5, 0))).toBeNull() // and blinds
+    expect(deepest(set, vec(10, 0))).not.toBeNull() // art blocks (eye band)
+    expect(deepest(set, vec(15, 0))).not.toBeNull() // floor mirror blocks
+  })
+
   it('(F2) band edges are exclusive: h=0.3 on the floor and a 1.2–1.35m sliver both pass', () => {
     const { set } = setup((d) => {
       addFurniture(d, { catalogItemId: 'low', x: 0, y: 0, size: { w: 1, d: 1, h: 0.3 } })

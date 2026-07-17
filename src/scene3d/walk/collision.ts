@@ -5,6 +5,7 @@ import { dist, len } from '../../geometry/vec'
 import { closestPointOnSegment } from '../../geometry/segment'
 import { pointInPolygon, polygonBounds, signedArea } from '../../geometry/polygon'
 import { GEOM_EPS } from '../../geometry/constants'
+import { CATALOG } from '../../catalog'
 
 /**
  * Walk-mode collision core — PURE plan-space (x right, y down, meters) 2D
@@ -131,7 +132,10 @@ export function buildCollisionSet(doc: ProjectDocument, derived: DerivedGeometry
 
   // Furniture in the body or eye band — exact rotated footprints as rects.
   // `mirrored` reflects the mesh only; the w×d footprint is axis-symmetric.
+  // Catalog `passable` items (curtains, blinds) never block regardless of
+  // bands — fabric yields; unknown catalog ids fall through to blocking.
   for (const f of Object.values(doc.furniture)) {
+    if (CATALOG[f.catalogItemId]?.passable) continue
     const lo = f.elevation
     const hi = f.elevation + f.size.h
     const inBody = lo < BODY_BAND_HI && hi > BODY_BAND_LO

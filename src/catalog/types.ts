@@ -23,6 +23,7 @@ export type MaterialId =
   | 'screenBlack'
   | 'foliage'
   | 'canvas'
+  | 'mirror'
 
 export type CatalogCategory =
   | 'living'
@@ -63,6 +64,12 @@ export interface CatalogItem {
   dims: Dims
   /** Back-against-wall capture + auto-rotate applies to this item. */
   wallSnap: boolean
+  /**
+   * Walk mode passes through this item (curtains, blinds — fabric yields;
+   * matters for balcony-door curtains). Absent = blocks by the band
+   * geometry (walk/collision.ts).
+   */
+  passable?: boolean
   /**
    * Initial elevation for wall-mounted items (meters above the floor) —
    * both placement paths copy it into the instance. Absent = 0 (on floor).
