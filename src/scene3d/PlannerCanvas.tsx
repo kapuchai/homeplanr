@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import {
   PMREMGenerator,
   ACESFilmicToneMapping,
+  Shape,
   type BufferGeometry,
   type MeshStandardMaterial,
 } from 'three'
@@ -46,7 +47,8 @@ import { worldToPlan } from './walk/walkMath'
 import { captureAndSave, type CaptureApi } from './screenshot'
 import { CATALOG } from '../catalog'
 import { realizeItem } from '../catalog/realize'
-import type { WallSolid, PatchSolid } from '../geometry/wallSolids'
+import type { WallSolid, PatchSolid, RealizedOpening } from '../geometry/wallSolids'
+import { openingStyleSpec } from '../catalog/openingStyles'
 import type { FurnitureInstance, ProjectDocument, Wall } from '../model/types'
 import type { MaterialId } from '../catalog/types'
 import { t } from '../i18n'
@@ -141,6 +143,114 @@ function FloorMesh({
   )
 }
 
+/** Window/door frame strip thickness (m). */
+const FRAME = 0.05
+/** Interior mullion pitch for panorama windows (m). */
+const MULLION_PITCH = 0.9
+
+/**
+ * One window in the wall-local frame (x = along wall, y = +perp = front,
+ * z = up), group already at (center-u, 0, z0). Style-dispatched (0.10.0):
+ * standard/fullheight = glass + 4 border strips (fullheight differs only
+ * by its carved extents); panorama adds interior mullions; arched keeps
+ * the RECTANGULAR carve and renders an elliptical arch frame + wall-toned
+ * spandrel band inside it (the honest v1 arch — see the release file).
+ */
+function WindowFixture({ op, wall, style }: { op: RealizedOpening; wall: Wall; style: string }) {
+  const w = op.u1 - op.u0
+  const h = op.z1 - op.z0
+  const arched = style === 'arched'
+  // arch: rise capped so wide/short windows get a segmental (elliptical)
+  // arch; 0.02 of band above the peak avoids a degenerate touch point
+  const rise = arched ? Math.min(w / 2, h * 0.45) : 0
+  const ry = Math.max(rise - 0.02, 0.05)
+  const springH = h - rise
+  const spandrel = useMemo(() => {
+    if (!arched) return null
+    const s = new Shape()
+    s.moveTo(-w / 2, 0)
+    for (let i = 1; i <= 24; i++) {
+      const th = Math.PI - (Math.PI * i) / 24
+      s.lineTo((w / 2 - FRAME / 2) * Math.cos(th), ry * Math.sin(th))
+    }
+    s.lineTo(w / 2, 0)
+    s.lineTo(w / 2, rise)
+    s.lineTo(-w / 2, rise)
+    s.closePath()
+    return s
+  }, [arched, w, rise, ry])
+  const mullions = style === 'panorama' ? Math.max(1, Math.ceil(w / MULLION_PITCH) - 1) : 0
+  const sideH = arched ? springH : h
+  return (
+    <>
+      {/* glass */}
+      <mesh position={[0, 0, h / 2]} material={itemMaterial('glass')}>
+        <boxGeometry args={[w - 0.06, 0.02, h - 0.06]} />
+      </mesh>
+      {/* frame: bottom + side strips (sides stop at the spring line when arched) */}
+      <mesh position={[0, 0, FRAME / 2]} castShadow material={itemMaterial('whiteLacquer')}>
+        <boxGeometry args={[w, FRAME, FRAME]} />
+      </mesh>
+      <mesh
+        position={[-(w / 2 - FRAME / 2), 0, sideH / 2]}
+        castShadow
+        material={itemMaterial('whiteLacquer')}
+      >
+        <boxGeometry args={[FRAME, FRAME, sideH]} />
+      </mesh>
+      <mesh
+        position={[w / 2 - FRAME / 2, 0, sideH / 2]}
+        castShadow
+        material={itemMaterial('whiteLacquer')}
+      >
+        <boxGeometry args={[FRAME, FRAME, sideH]} />
+      </mesh>
+      {arched ? (
+        <>
+          {/* elliptical arch frame: torus scaled vertically BEFORE the
+              rotation into the wall plane (three applies R·S) */}
+          <mesh
+            position={[0, 0, springH]}
+            rotation-x={Math.PI / 2}
+            scale={[1, ry / (w / 2 - FRAME / 2), 1]}
+            castShadow
+            material={itemMaterial('whiteLacquer')}
+          >
+            <torusGeometry args={[w / 2 - FRAME / 2, FRAME / 2, 12, 32, Math.PI]} />
+          </mesh>
+          {/* wall-toned spandrel band filling the rect carve above the arch */}
+          {spandrel && (
+            <mesh
+              position={[0, (wall.thickness - 0.02) / 2, springH]}
+              rotation-x={Math.PI / 2}
+              material={sceneMaterial('wallPaint')}
+            >
+              <extrudeGeometry
+                args={[spandrel, { depth: wall.thickness - 0.02, bevelEnabled: false }]}
+              />
+            </mesh>
+          )}
+        </>
+      ) : (
+        <mesh position={[0, 0, h - FRAME / 2]} castShadow material={itemMaterial('whiteLacquer')}>
+          <boxGeometry args={[w, FRAME, FRAME]} />
+        </mesh>
+      )}
+      {/* panorama: interior mullions at an even pitch */}
+      {Array.from({ length: mullions }, (_, i) => (
+        <mesh
+          key={i}
+          position={[-w / 2 + ((i + 1) * w) / (mullions + 1), 0, h / 2]}
+          castShadow
+          material={itemMaterial('whiteLacquer')}
+        >
+          <boxGeometry args={[FRAME, FRAME, h - 0.06]} />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
 /** Door leaves + window glass/frames from the REALIZED intervals. */
 function OpeningFixtures({ doc, solid }: { doc: ProjectDocument; solid: WallSolid }) {
   const wall = doc.walls[solid.wallId]
@@ -151,6 +261,8 @@ function OpeningFixtures({ doc, solid }: { doc: ProjectDocument; solid: WallSoli
       {solid.openings.map((op) => {
         const w = op.u1 - op.u0
         const cx = (op.u0 + op.u1) / 2
+        const model = doc.openings[op.openingId]
+        const style = openingStyleSpec(op.kind, model?.style).id
         if (op.kind === 'door') {
           return (
             <group key={op.openingId}>
@@ -161,26 +273,9 @@ function OpeningFixtures({ doc, solid }: { doc: ProjectDocument; solid: WallSoli
             </group>
           )
         }
-        const h = op.z1 - op.z0
         return (
           <group key={op.openingId} position={[cx, 0, op.z0]}>
-            {/* glass */}
-            <mesh position={[0, 0, h / 2]} material={itemMaterial('glass')}>
-              <boxGeometry args={[w - 0.06, 0.02, h - 0.06]} />
-            </mesh>
-            {/* frame: simple border strips */}
-            <mesh position={[0, 0, 0.025]} castShadow material={itemMaterial('whiteLacquer')}>
-              <boxGeometry args={[w, 0.05, 0.05]} />
-            </mesh>
-            <mesh position={[0, 0, h - 0.025]} castShadow material={itemMaterial('whiteLacquer')}>
-              <boxGeometry args={[w, 0.05, 0.05]} />
-            </mesh>
-            <mesh position={[-(w / 2 - 0.025), 0, h / 2]} castShadow material={itemMaterial('whiteLacquer')}>
-              <boxGeometry args={[0.05, 0.05, h]} />
-            </mesh>
-            <mesh position={[w / 2 - 0.025, 0, h / 2]} castShadow material={itemMaterial('whiteLacquer')}>
-              <boxGeometry args={[0.05, 0.05, h]} />
-            </mesh>
+            <WindowFixture op={op} wall={wall} style={style} />
           </group>
         )
       })}
