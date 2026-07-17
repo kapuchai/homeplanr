@@ -14,7 +14,7 @@ import { SymbolRenderer, UnknownSymbol } from './SymbolRenderer'
 import { DimensionsLayer } from './DimensionsLayer'
 import { AnnotationsLayer } from './AnnotationsLayer'
 import { furnitureTransform, openingSymbol, polyPath, roomFill, worldPoint } from './planGeometry'
-import { resizeHandlePositions, rotateHandlePos } from '../tools/handles'
+import { resizeHandlePositions, rotateHandlePos, roomPivot, roomRotateHandlePos } from '../tools/handles'
 import { dimensionSpan, labelBox } from '../hit/hitTest'
 import { useThemeStore } from '../../theme/themeStore'
 
@@ -285,6 +285,38 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
         </g>
       )
     })
+  // room rotate handle (0.8.0): sole-selected room only; anchored above
+  // roomPivot — the SAME point the rotation math pivots on (handles.ts).
+  // Shown regardless of the label cull: selection implies intent.
+  const soleRoom = selection.length === 1 ? derived.rooms[selection[0]! as never] : undefined
+  const roomHandle = soleRoom
+    ? (() => {
+        const pivot = roomPivot(soleRoom)
+        const pos = roomRotateHandlePos(pivot, 1 / k)
+        return (
+          <g key="room-h">
+            <line
+              x1={pivot.x}
+              y1={pivot.y}
+              x2={pos.x}
+              y2={pos.y}
+              stroke={theme.accent}
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+            <circle
+              cx={pos.x}
+              cy={pos.y}
+              r={7 / k}
+              fill={theme.handleFill}
+              stroke={theme.accent}
+              strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+            />
+          </g>
+        )
+      })()
+    : null
   // corner resize handles (M9): single selected furniture only
   const single = selection.length === 1 ? doc.furniture[selection[0]! as never] : undefined
   const resizeHandles = single
@@ -430,6 +462,7 @@ function SelectionLayer({ doc, derived }: { doc: ProjectDocument; derived: Deriv
       {selection.map((id) => outline(id, theme.accent, 1.5))}
       {sideBadges}
       {handles}
+      {roomHandle}
       {resizeHandles}
     </g>
   )

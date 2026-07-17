@@ -1795,3 +1795,105 @@ describe('0.8.0 M3: room drag snapping', () => {
     expect(nodeAt(vec(4.03, 0.04))).toBeDefined() // raw drop position kept
   })
 })
+
+describe('0.8.0 M4: room rotation', () => {
+  const store = () => useDocStore.getState()
+  const nodeAt = (p: Vec2) =>
+    Object.values(store().doc.nodes).find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 1e-4)
+  const wallBetween = (p: Vec2, q: Vec2) =>
+    Object.values(store().doc.walls).find((w) => {
+      const na = store().doc.nodes[w.a]!
+      const nb = store().doc.nodes[w.b]!
+      return (
+        (Math.hypot(na.x - p.x, na.y - p.y) < 1e-4 && Math.hypot(nb.x - q.x, nb.y - q.y) < 1e-4) ||
+        (Math.hypot(na.x - q.x, na.y - q.y) < 1e-4 && Math.hypot(nb.x - p.x, nb.y - p.y) < 1e-4)
+      )
+    })
+  const rect = () =>
+    store().addWallChain([vec(0, 0), vec(4, 0), vec(4, 2), vec(0, 2), vec(0, 0)])
+
+  it('R rotates a sole-selected room 90° about its pivot — one undo entry', () => {
+    rect()
+    const bottom = wallBetween(vec(0, 0), vec(4, 0))!
+    const doorId = store().addOpening({ kind: 'door', wallId: bottom.id, t: 0.25 })!
+    const sofa = addSofa(1, 1)
+    click(vec(3.2, 1.6)) // room floor, clear of the sofa
+    const base = past()
+    handleKey(key('r'), ctx, registry)
+    expect(past()).toBe(base + 1)
+    // 4x2 rect about pivot (2,1) → corners (3,-1),(3,3),(1,3),(1,-1)
+    for (const p of [vec(3, -1), vec(3, 3), vec(1, 3), vec(1, -1)]) {
+      expect(nodeAt(p), `corner ${p.x},${p.y}`).toBeDefined()
+    }
+    expect(store().doc.openings[doorId]).toBeDefined()
+    expect(store().doc.openings[doorId]!.wallId).toBe(bottom.id)
+    expect(store().doc.openings[doorId]!.t).toBeCloseTo(0.25, 6)
+    const f = store().doc.furniture[sofa]!
+    expect(f.x).toBeCloseTo(2, 6)
+    expect(f.y).toBeCloseTo(0, 6)
+    expect(f.rotation).toBeCloseTo(Math.PI / 2, 9)
+    safeUndo()
+    expect(nodeAt(vec(0, 0))).toBeDefined()
+  })
+
+  it('Shift+R rotates −90°', () => {
+    rect()
+    click(vec(1, 1))
+    handleKey(key('R', { shiftKey: true }), ctx, registry)
+    // −90°: (0,0) rel (−2,−1) → (y,−x) = (−1,2) → (1,3)… full set mirrored
+    for (const p of [vec(1, 3), vec(1, -1), vec(3, -1), vec(3, 3)]) {
+      expect(nodeAt(p), `corner ${p.x},${p.y}`).toBeDefined()
+    }
+  })
+
+  it('handle drag: 47° raw snaps to the 45° detent; Ctrl keeps it free', () => {
+    rect()
+    click(vec(1, 1))
+    // pivot (2,1); handle at (2, 0.64) at k=100
+    const grabAt = (deg: number, r = 0.36) =>
+      vec(2 + r * Math.cos(((deg - 90) * Math.PI) / 180), 1 + r * Math.sin(((deg - 90) * Math.PI) / 180))
+    tool().onPointerDown(pe(vec(2, 0.64)), ctx)
+    tool().onPointerMove(pe(grabAt(47)), ctx)
+    tool().onPointerUp(pe(grabAt(47)), ctx)
+    // detent: 47° → 45°; corner (0,0) rel (−2,−1) rot45 → (2−0.7071, 1−2.1213)
+    expect(nodeAt(vec(2 - 0.70711, 1 - 2.12132))).toBeDefined()
+    safeUndo()
+    // Ctrl-free: exact 47°
+    click(vec(1, 1))
+    tool().onPointerDown(pe(vec(2, 0.64)), ctx)
+    tool().onPointerMove(pe(grabAt(47), { ctrl: true }), ctx)
+    tool().onPointerUp(pe(grabAt(47), { ctrl: true }), ctx)
+    const c = Math.cos((47 * Math.PI) / 180)
+    const s = Math.sin((47 * Math.PI) / 180)
+    expect(nodeAt(vec(2 + (-2 * c - -1 * s), 1 + (-2 * s + -1 * c)))).toBeDefined()
+  })
+
+  it('a plain handle click leaves no undo entry and no doc change', () => {
+    rect()
+    click(vec(1, 1))
+    const base = past()
+    tool().onPointerDown(pe(vec(2, 0.64)), ctx)
+    tool().onPointerUp(pe(vec(2, 0.64)), ctx)
+    expect(past()).toBe(base)
+    expect(nodeAt(vec(0, 0))).toBeDefined()
+    expect(walls()).toBe(4)
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('rotating a square room beside its neighbor stays topology-stable via R', () => {
+    store().addWallChain([vec(0, 0), vec(4, 0), vec(8, 0), vec(8, 4), vec(4, 4), vec(0, 4), vec(0, 0)])
+    store().addWallSegment(vec(4, 0), vec(4, 4))
+    const divider = wallBetween(vec(4, 0), vec(4, 4))!
+    const doorId = store().addOpening({ kind: 'door', wallId: divider.id, t: 0.5 })!
+    click(vec(6, 2)) // select the right room
+    const base = past()
+    handleKey(key('r'), ctx, registry)
+    expect(past()).toBe(base + 1)
+    expect(walls()).toBe(7) // square maps onto itself; tear rewelds
+    expect(rooms()).toBe(2)
+    expect(store().doc.openings[doorId]).toBeDefined()
+    expect(store().doc.openings[doorId]!.wallId).toBe(divider.id)
+    safeUndo()
+    expect(walls()).toBe(7)
+  })
+})

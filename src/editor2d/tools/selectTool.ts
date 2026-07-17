@@ -18,7 +18,8 @@ import { beginTx, commitTx, abortTx, type TxToken } from '../../store/transactio
 import { useAppSettings } from '../../store/appSettings'
 import { formatLength } from '../../format/units'
 import { CATALOG } from '../../catalog'
-import { resizeHandlePositions, rotateHandlePos, HANDLE_RADIUS_PX, RESIZE_CORNERS, RESIZE_HANDLE_RADIUS_PX } from './handles'
+import { resizeHandlePositions, rotateHandlePos, roomPivot, roomRotateHandlePos, HANDLE_RADIUS_PX, RESIZE_CORNERS, RESIZE_HANDLE_RADIUS_PX } from './handles'
+import { MERGE_EPS } from '../../geometry/constants'
 import {
   furnitureDragPills,
   incidentWallIds,
@@ -145,6 +146,18 @@ type DragState =
       /** Frozen-offset snap candidates (constant for the whole gesture). */
       candidates: SnapCandidate[]
       lastSnap: SnapResult | null
+    }
+  | {
+      kind: 'room-rotate'
+      tx: TxToken
+      roomId: RoomId
+      rig: RoomRig
+      starts: RigStarts
+      /** roomPivot at arm — handle anchor AND rotation center. */
+      pivot: Vec2
+      startPointer: number
+      /** Last applied rotation delta — the commit re-runs exactly this. */
+      lastAngle: number
     }
 
 export function createSelectTool(): Tool {
@@ -283,6 +296,38 @@ export function createSelectTool(): Tool {
               anchorWorld: corners[(ci + 2) % 4]!,
             }
             ctx.interaction().set({ gestureActive: true })
+            return
+          }
+        }
+      }
+
+      // 1c. rotate handle of a sole-selected room (0.8.0) — mutually
+      // exclusive with the furniture handles above (selFurn is empty when
+      // a room is the sole selection)
+      const soleRoomId =
+        ui.selection.length === 1 && doc.rooms[ui.selection[0]! as RoomId]
+          ? (ui.selection[0]! as RoomId)
+          : null
+      if (soleRoomId) {
+        const dr = ctx.derived().rooms[soleRoomId]
+        if (dr && dist(e.world, roomRotateHandlePos(roomPivot(dr), px)) <= HANDLE_RADIUS_PX * px) {
+          const info = collectRoomRig(doc, soleRoomId)
+          if (info) {
+            const pivot = roomPivot(info)
+            const tx = beginTx()
+            const rig = ctx.actions().tearRoomRig(info.rig)
+            const starts = captureRigStarts(ctx.doc(), rig)
+            state = {
+              kind: 'room-rotate',
+              tx,
+              roomId: soleRoomId,
+              rig,
+              starts,
+              pivot,
+              startPointer: Math.atan2(e.world.y - pivot.y, e.world.x - pivot.x),
+              lastAngle: 0,
+            }
+            ctx.interaction().set({ gestureActive: true, cursorHint: 'grabbing' })
             return
           }
         }
@@ -695,6 +740,37 @@ export function createSelectTool(): Tool {
           ctx.interaction().set({ snap, gestureActive: true })
           return
         }
+
+        case 'room-rotate': {
+          const angle = Math.atan2(e.world.y - state.pivot.y, e.world.x - state.pivot.x)
+          let delta = angle - state.startPointer
+          if (!e.mods.ctrl) {
+            // two-tier detents on the DELTA: 90° multiples capture wide (6°)
+            // so orthogonality is easy; the 15° grid captures at 3°
+            const step15 = Math.PI / 12
+            const step90 = Math.PI / 2
+            const d90 = Math.round(delta / step90) * step90
+            const d15 = Math.round(delta / step15) * step15
+            if (Math.abs(d90 - delta) < (6 * Math.PI) / 180) delta = d90
+            else if (Math.abs(d15 - delta) < (3 * Math.PI) / 180) delta = d15
+          }
+          state.lastAngle = delta
+          ctx.actions().transformRoomRig(
+            state.rig,
+            state.starts,
+            { delta: { x: 0, y: 0 }, angleRad: delta, center: state.pivot },
+            { mode: 'live' },
+          )
+          // live degree readout at the handle's rotated position
+          const handle0 = roomRotateHandlePos(state.pivot, px)
+          const at = add(rotate(sub(handle0, state.pivot), delta), state.pivot)
+          const deg = Math.round(((((delta * 180) / Math.PI) % 360) + 360) % 360)
+          ctx.interaction().set({
+            gestureActive: true,
+            pills: [{ at, text: `${deg}°` }],
+          })
+          return
+        }
       }
     },
 
@@ -789,12 +865,36 @@ export function createSelectTool(): Tool {
           return
         }
         case 'room': {
-          // the commit re-run welds (rig ids demoted — stationary wins);
-          // sub-MERGE_EPS displacement commits as an exact no-op in the model
+          // a no-op drop aborts instead of committing — the abort rollback
+          // IS the tear cleanup, and no empty undo entry lands (the model's
+          // sub-MERGE_EPS guard would commit identical content under a new
+          // doc identity, which zundo records)
+          if (Math.hypot(state.lastDelta.x, state.lastDelta.y) < MERGE_EPS) {
+            abortTx(state.tx)
+            reset(ctx)
+            return
+          }
+          // the commit re-run welds (rig ids demoted — stationary wins)
           ctx.actions().transformRoomRig(
             state.rig,
             state.starts,
             { delta: state.lastDelta, angleRad: 0, center: state.grabWorld },
+            { mode: 'commit' },
+          )
+          commitTx(state.tx)
+          reset(ctx)
+          return
+        }
+        case 'room-rotate': {
+          if (state.lastAngle === 0) {
+            abortTx(state.tx) // handle click / detent back to 0 — no entry
+            reset(ctx)
+            return
+          }
+          ctx.actions().transformRoomRig(
+            state.rig,
+            state.starts,
+            { delta: { x: 0, y: 0 }, angleRad: state.lastAngle, center: state.pivot },
             { mode: 'commit' },
           )
           commitTx(state.tx)

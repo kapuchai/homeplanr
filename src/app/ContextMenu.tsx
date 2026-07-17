@@ -110,6 +110,16 @@ export function ContextMenu() {
     selection.length === 1 && doc.rooms[selection[0]! as RoomId] ? selection[0]! : null
   if (selRoom) {
     entries.push({
+      label: t('context.rotateRoom'),
+      shortcut: 'R',
+      onSelect: () => rotateSelection(ctx, 1),
+    })
+    entries.push({
+      label: t('context.rotateRoomCcw'),
+      shortcut: 'Shift+R',
+      onSelect: () => rotateSelection(ctx, -1),
+    })
+    entries.push({
       label: t('context.duplicateRoom'),
       onSelect: () => duplicateRoom(ctx, selRoom),
     })

@@ -16,7 +16,9 @@ import { polygonBounds } from '../geometry/polygon'
 import { useAppSettings } from '../store/appSettings'
 import { docContentBounds, selectionContentBounds } from './render/bounds'
 import { useViewportStore } from './viewport/viewportStore'
-import type { AnnotationId, FurnitureId, NodeId, OpeningId, WallId } from '../model/ids'
+import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../model/ids'
+import { captureRigStarts, collectRoomRig } from '../model/mutations/roomRig'
+import { roomPivot } from './tools/handles'
 
 /**
  * Selection commands — ONE implementation shared by the keymap and the
@@ -38,6 +40,11 @@ export function duplicateSelection(ctx: ToolContext): boolean {
 
 export function rotateSelection(ctx: ToolContext, dir: 1 | -1): boolean {
   if (isTxActive()) return false
+  // sole-selected room: rotate the whole rig ±90° about its pivot (0.8.0)
+  const sel = ctx.ui().selection
+  if (sel.length === 1 && ctx.doc().rooms[sel[0]! as RoomId]) {
+    return rotateRoom(ctx, sel[0]! as RoomId, dir)
+  }
   const ids = selectedFurniture(ctx)
   if (!ids.length) return false
   const tx = beginTx()
@@ -45,6 +52,30 @@ export function rotateSelection(ctx: ToolContext, dir: 1 | -1): boolean {
     const f = ctx.doc().furniture[id]!
     ctx.actions().transformFurniture(id, { rotation: f.rotation + (dir * Math.PI) / 2 })
   }
+  commitTx(tx)
+  return true
+}
+
+/**
+ * One-shot ±90° room rotation about roomPivot — the same tear + rig
+ * machinery as the drag, in one tx. Walls swept across neighbors resolve
+ * through the commit pipeline (X-splits/welds, rig demoted) —
+ * deterministic and a single undo entry.
+ */
+export function rotateRoom(ctx: ToolContext, roomId: RoomId, dir: 1 | -1): boolean {
+  if (isTxActive()) return false
+  const info = collectRoomRig(ctx.doc(), roomId)
+  if (!info) return false
+  const pivot = roomPivot(info)
+  const tx = beginTx()
+  const rig = ctx.actions().tearRoomRig(info.rig)
+  const starts = captureRigStarts(ctx.doc(), rig)
+  ctx.actions().transformRoomRig(
+    rig,
+    starts,
+    { delta: { x: 0, y: 0 }, angleRad: (dir * Math.PI) / 2, center: pivot },
+    { mode: 'commit' },
+  )
   commitTx(tx)
   return true
 }

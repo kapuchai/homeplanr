@@ -80,6 +80,8 @@ export const en = {
   'context.distributeVertically': 'Distribute vertically',
   'context.splitWall': 'Split wall here',
   'context.duplicateRoom': 'Duplicate room',
+  'context.rotateRoom': 'Rotate room 90°',
+  'context.rotateRoomCcw': 'Rotate room −90°',
   'context.copyRoom': 'Copy room',
   'context.pasteHere': 'Paste here',
   'context.zoomToSelection': 'Zoom to selection',
@@ -276,7 +278,7 @@ export const en = {
   'shortcuts.does.selectAll': 'Select all',
   'shortcuts.does.cycleOverlapping': 'Cycle overlapping items',
   'shortcuts.does.contextMenu': 'Context menu',
-  'shortcuts.does.rotate': 'Rotate furniture or ghost ±90°',
+  'shortcuts.does.rotate': 'Rotate furniture, ghost, or selected room ±90°',
   'shortcuts.does.flip': 'Flip (mirror) furniture or ghost',
   'shortcuts.does.nudge': 'Nudge 1 cm (Shift: 10 cm)',
   'shortcuts.does.duplicate': 'Duplicate furniture',
@@ -363,7 +365,7 @@ export const en = {
   'hint.singleSelect':
     'Drag to move · R rotates · Ctrl+D duplicates · Del deletes · Esc deselects (also inside rooms)',
   'hint.roomSelect':
-    'Drag moves the room with everything inside · drop next to a wall to merge · Esc deselects',
+    'Drag moves the room with everything inside · R or the handle rotates · drop next to a wall to merge',
   'hint.empty': 'Press W and click to draw your first wall',
   'hint.idle':
     'V select · W wall · D door · N window · M measure · T text · drag selects · right-drag pans · Shift+1 fit',
