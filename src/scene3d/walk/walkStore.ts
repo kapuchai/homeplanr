@@ -20,6 +20,10 @@ export interface WalkState {
   hint: string | null
   /** Bumped by exit() while walking — WalkControls glides out, then resets. */
   exitSeq: number
+  /** Pointer Lock currently engaged (0.11.0 FPS look). Set by WalkControls
+   * from pointerlockchange; read by the hint line and the teleport gate
+   * (no cursor under lock — floor clicks must not teleport). */
+  locked: boolean
   arm: () => void
   disarm: () => void
   /** arming → enter walk mode at p; walking → teleport to p. */
@@ -28,6 +32,7 @@ export interface WalkState {
   exit: () => void
   setHint: (hint: string | null) => void
   _setMode: (mode: WalkMode) => void
+  _setLocked: (locked: boolean) => void
   _consumeTarget: () => Vec2 | null
 }
 
@@ -37,6 +42,7 @@ export const useWalkStore = create<WalkState>()(
     pendingTarget: null,
     hint: null,
     exitSeq: 0,
+    locked: false,
     arm: () => set({ mode: 'arming', hint: null }),
     disarm: () => set({ mode: 'off', pendingTarget: null, hint: null }),
     requestWalkTo: (p) => {
@@ -52,6 +58,7 @@ export const useWalkStore = create<WalkState>()(
     },
     setHint: (hint) => set({ hint }),
     _setMode: (mode) => set({ mode }),
+    _setLocked: (locked) => set({ locked }),
     _consumeTarget: () => {
       const t = get().pendingTarget
       if (t) set({ pendingTarget: null })

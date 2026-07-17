@@ -7,6 +7,14 @@ import type { Vec2 } from '../../geometry/vec'
 import { useUiStore } from '../../store/uiStore'
 import { useConfirmStore } from '../../app/confirmStore'
 import { useWalkStore } from './walkStore'
+import {
+  LOCK_DEADMAN_MS,
+  attemptLock,
+  lockVerdict,
+  markLockDead,
+  noteLockedMove,
+  resetLockProbe,
+} from './pointerLock'
 import { EYE_HEIGHT, getCollisionSet, resolveMove } from './collision'
 import {
   clampPitch,
@@ -22,7 +30,18 @@ import {
  * exit are eased glides driven by useFrame; the frameloop is switched to
  * 'always' for the whole walking span and back to 'demand' on exit. Input
  * is buffered out during glides: mid-glide clicks are consumed and
- * dropped, keys and look-drags apply only while free-walking.
+ * dropped, keys and looks apply only while free-walking.
+ *
+ * Look (0.11.0): Pointer Lock FPS look when the platform proves it works,
+ * capture-drag otherwise — both feed the same yaw/pitch core. Lock is
+ * opportunistic (see pointerLock.ts): requested on walk enter and again
+ * on every canvas press, while drag capture stays armed regardless, so a
+ * request that never engages costs nothing. An unexpected unlock is
+ * disambiguated by focus: Esc under lock (consumed by the browser)
+ * leaves the document focused and exits walk; a focus loss (alt-tab,
+ * compositor grab) keeps walking with look degraded to drag until the
+ * next press re-locks. An UNPROVEN lock that stays silent for
+ * LOCK_DEADMAN_MS is declared dead and released (still walking).
  *
  * Exit paths (all restore the orbit pose, rotation order, frameloop, and
  * reset the walk store): Esc / the overlay Walk button glide back 0.5s;
@@ -91,6 +110,9 @@ export function WalkControls({
   const keys = useRef<MoveKeys>(freshKeys())
   const drag = useRef<{ pointerId: number; x: number; y: number } | null>(null)
   const exitRequested = useRef(false)
+  /** Set before OUR exitPointerLock calls — a self-inflicted unlock must
+   * not be mistaken for the user's native Esc (which exits walk). */
+  const expectedUnlock = useRef(false)
 
   const beginEnter = (target: Vec2) => {
     pose.current = {
@@ -292,41 +314,110 @@ export function WalkControls({
     }
   }, [active])
 
-  // look: capture-drag on the canvas while walking (no pointer-lock)
+  // look: Pointer Lock when it works, capture-drag otherwise (see the
+  // component docblock and pointerLock.ts for the probe contract)
   useEffect(() => {
     if (mode !== 'walking') return
     const el = gl.domElement
+    const dom = el.ownerDocument
+    const isLocked = () => dom.pointerLockElement === el
+    let deadmanId: number | null = null
+    const clearDeadman = () => {
+      if (deadmanId !== null) {
+        window.clearTimeout(deadmanId)
+        deadmanId = null
+      }
+    }
+    const applyLook = (dx: number, dy: number) => {
+      yaw.current -= dx * LOOK_SENSITIVITY
+      pitch.current = clampPitch(pitch.current - dy * LOOK_SENSITIVITY)
+      camera.rotation.set(pitch.current, yaw.current, 0)
+    }
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0 || glide.current) return
+      if (isLocked()) return // FPS look: no drag to arm, clicks stay inert
       drag.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY }
       el.setPointerCapture(e.pointerId)
+      attemptLock(el, 'auto') // the press is the user-activation carrier
     }
     const onPointerMove = (e: PointerEvent) => {
+      if (glide.current) return
+      if (isLocked()) {
+        clearDeadman() // an event arrived — the channel is alive
+        if (noteLockedMove(e.movementX, e.movementY) === 'broken') {
+          // lock engaged but deltas are dead — release WITHOUT exiting walk
+          expectedUnlock.current = true
+          dom.exitPointerLock()
+          return
+        }
+        applyLook(e.movementX, e.movementY)
+        return
+      }
       const d = drag.current
-      if (!d || d.pointerId !== e.pointerId || glide.current) return
+      if (!d || d.pointerId !== e.pointerId) return
       const dx = e.clientX - d.x
       const dy = e.clientY - d.y
       d.x = e.clientX
       d.y = e.clientY
-      yaw.current -= dx * LOOK_SENSITIVITY
-      pitch.current = clampPitch(pitch.current - dy * LOOK_SENSITIVITY)
-      camera.rotation.set(pitch.current, yaw.current, 0)
+      applyLook(dx, dy)
     }
     const endDrag = (e: PointerEvent) => {
       if (drag.current?.pointerId !== e.pointerId) return
       drag.current = null
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
     }
+    const onLockChange = () => {
+      resetLockProbe()
+      clearDeadman()
+      const locked = isLocked()
+      useWalkStore.getState()._setLocked(locked)
+      if (locked) {
+        // lock supersedes the drag armed by the same press
+        const d = drag.current
+        drag.current = null
+        if (d && el.hasPointerCapture(d.pointerId)) el.releasePointerCapture(d.pointerId)
+        // unproven platform: a lock that never emits a single move event
+        // is holding the pointer hostage — declare it dead and release
+        // (a proven-'ok' lock is exempt; an idle mouse emits nothing)
+        if (lockVerdict() !== 'ok') {
+          deadmanId = window.setTimeout(() => {
+            deadmanId = null
+            markLockDead()
+            expectedUnlock.current = true
+            dom.exitPointerLock()
+          }, LOCK_DEADMAN_MS)
+        }
+        return
+      }
+      if (expectedUnlock.current) {
+        expectedUnlock.current = false
+        return
+      }
+      // Unexpected unlock: Esc under lock (consumed by the browser — it
+      // never reaches our keydown handler) leaves the document focused
+      // and must exit walk; a focus loss (alt-tab, compositor grab)
+      // keeps walking — look degrades to drag until the next press.
+      if (dom.hasFocus() && useWalkStore.getState().mode === 'walking') {
+        useWalkStore.getState().exit()
+      }
+    }
     el.addEventListener('pointerdown', onPointerDown)
     el.addEventListener('pointermove', onPointerMove)
     el.addEventListener('pointerup', endDrag)
     el.addEventListener('pointercancel', endDrag)
+    dom.addEventListener('pointerlockchange', onLockChange)
+    attemptLock(el, 'auto') // walk enter — the arming click's activation usually carries
     return () => {
       el.removeEventListener('pointerdown', onPointerDown)
       el.removeEventListener('pointermove', onPointerMove)
       el.removeEventListener('pointerup', endDrag)
       el.removeEventListener('pointercancel', endDrag)
+      dom.removeEventListener('pointerlockchange', onLockChange)
+      clearDeadman()
       drag.current = null
+      expectedUnlock.current = false
+      if (isLocked()) dom.exitPointerLock()
+      useWalkStore.getState()._setLocked(false) // listener is gone — reset ourselves
     }
   }, [mode, gl, camera])
 

@@ -348,6 +348,7 @@ export const en = {
   'view3d.hintArming': 'Click a floor to start walking · Esc exits',
   'view3d.hintWalking':
     'WASD/arrows move · Shift sprints · drag looks · click floor teleports · Esc exits',
+  'view3d.hintWalkingLock': 'WASD/arrows move · Shift sprints · mouse looks · Esc exits',
   'view3d.hintOrbit': 'Drag orbits · wheel zooms',
   'view3d.glUnavailableTitle': '3D view unavailable',
   'view3d.glContextLost': 'The WebGL context was lost (GPU reset or driver issue).',

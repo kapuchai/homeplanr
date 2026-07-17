@@ -672,12 +672,14 @@ export function PlannerCanvas() {
   )
   const walkMode = useWalkStore((s) => s.mode)
   const walkHint = useWalkStore((s) => s.hint)
+  const walkLocked = useWalkStore((s) => s.locked)
   const captureApi = useRef<CaptureApi | null>(null)
 
   // shared by every floor AND the ground disc — walk-mode click-to-go
   const handleFloorClick = (e: ThreeEvent<MouseEvent>) => {
     const walk = useWalkStore.getState()
     if (walk.mode === 'off') return
+    if (walk.locked) return // no cursor under Pointer Lock — the frozen ray must not teleport
     e.stopPropagation() // the ray often hits floor + ground disc — act once
     if (e.delta > 4) return // r3f px-move metric: that was a drag, not a click
     const plan = worldToPlan([e.point.x, e.point.y, e.point.z])
@@ -696,7 +698,7 @@ export function PlannerCanvas() {
     (walkMode === 'arming'
       ? t('view3d.hintArming')
       : walkMode === 'walking'
-        ? t('view3d.hintWalking')
+        ? t(walkLocked ? 'view3d.hintWalkingLock' : 'view3d.hintWalking')
         : orbitHintSeen
           ? null
           : t('view3d.hintOrbit'))
