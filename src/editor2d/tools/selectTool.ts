@@ -24,7 +24,13 @@ import {
   wallLengthPills,
   type MeasureInput,
 } from '../measure/liveMeasurements'
-import type { AnnotationId, FurnitureId, NodeId, OpeningId, WallId } from '../../model/ids'
+import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../../model/ids'
+import {
+  captureRigStarts,
+  collectRoomRig,
+  type RigStarts,
+  type RoomRig,
+} from '../../model/mutations/roomRig'
 
 /**
  * Select/move tool — drag branches per hit kind (plan-pinned):
@@ -32,6 +38,9 @@ import type { AnnotationId, FurnitureId, NodeId, OpeningId, WallId } from '../..
  * Ctrl free), opening slide (clamped along its wall), wall perpendicular
  * translate, node drag with drop-on-node merge, empty-space drag = MARQUEE
  * select (0.3.0 — panning lives on Space/middle/right-drag in Editor2D).
+ * Room drag (0.8.0): ONLY when the room was already the sole selection at
+ * pointer-down (click #1 selects, drag #2 moves) — an unselected room
+ * floor stays the marquee; the rig tear runs inside the gesture tx.
  * Every entity drag is one transaction ⇒ one undo entry (marquee opens
  * none); Esc aborts (marquee Esc restores the prior selection).
  */
@@ -45,6 +54,13 @@ type DragState =
       screen: Vec2
       world: Vec2
       additive: boolean
+      /**
+       * The hit room was ALREADY the sole selection at pointer-down —
+       * captured BEFORE the down-time selection update (which would make
+       * every room look selected by drag time). Arms the room drag; an
+       * unselected room floor stays the marquee.
+       */
+      roomWasSole: boolean
     }
   | {
       kind: 'marquee'
@@ -113,6 +129,18 @@ type DragState =
       startWorld: Vec2
       startPoints: { x: number; y: number }[]
     }
+  | {
+      kind: 'room'
+      tx: TxToken
+      roomId: RoomId
+      /** Post-tear rig — walls/nodes/openings/furniture riding the drag. */
+      rig: RoomRig
+      /** Frozen start positions; every frame transforms FROM these. */
+      starts: RigStarts
+      grabWorld: Vec2
+      /** Last applied delta — the commit re-runs exactly this. */
+      lastDelta: Vec2
+    }
 
 export function createSelectTool(): Tool {
   let state: DragState = { kind: 'idle' }
@@ -138,6 +166,28 @@ export function createSelectTool(): Tool {
     dimensionLevel: useAppSettings.getState().dimensionLevel,
     uiScale: useAppSettings.getState().uiScale,
   })
+
+  /** Arm the room drag: tear inside the tx, freeze starts. False = rig
+   * collection failed (stale room / mid-edit transient) — caller falls
+   * back to the marquee. */
+  const beginRoomDrag = (ctx: ToolContext, roomId: RoomId, world: Vec2): boolean => {
+    const info = collectRoomRig(ctx.doc(), roomId)
+    if (!info) return false
+    const tx = beginTx()
+    const rig = ctx.actions().tearRoomRig(info.rig)
+    const starts = captureRigStarts(ctx.doc(), rig)
+    state = {
+      kind: 'room',
+      tx,
+      roomId,
+      rig,
+      starts,
+      grabWorld: world,
+      lastDelta: { x: 0, y: 0 },
+    }
+    ctx.interaction().set({ gestureActive: true, cursorHint: 'grabbing' })
+    return true
+  }
 
   const beginFurnitureDrag = (
     ctx: ToolContext,
@@ -256,12 +306,28 @@ export function createSelectTool(): Tool {
         cycle = { screen: e.screen, index }
       }
 
+      // room-drag arming reads the selection BEFORE the down-time update
+      // below rewrites it (afterwards every clicked room looks selected)
+      const roomWasSole =
+        !!hit &&
+        hit.kind === 'room' &&
+        !e.mods.shift &&
+        ui.selection.length === 1 &&
+        ui.selection[0] === hit.id
+
       // selection updates at pointerdown (standard: drag applies to selection)
       if (hit) {
         if (e.mods.shift) ui.toggleSelected(hit.id)
         else if (!ui.selection.includes(hit.id)) ui.setSelection([hit.id])
       }
-      state = { kind: 'pressed', hit, screen: e.screen, world: e.world, additive: e.mods.shift }
+      state = {
+        kind: 'pressed',
+        hit,
+        screen: e.screen,
+        world: e.world,
+        additive: e.mods.shift,
+        roomWasSole,
+      }
     },
 
     onPointerMove(e, ctx) {
@@ -372,10 +438,17 @@ export function createSelectTool(): Tool {
               }
             }
             ctx.interaction().set({ gestureActive: true })
+          } else if (hit.kind === 'room' && state.roomWasSole) {
+            // click-then-drag moves the room (0.8.0): the room must already
+            // be the sole selection at pointer-down — the first drag on an
+            // unselected room floor stays the marquee below
+            if (!beginRoomDrag(ctx, hit.id, state.world)) {
+              startMarquee(state.world, state.additive)
+            }
           } else {
-            // rooms don't drag — a drag STARTING on a room floor is the
-            // marquee (boxing furniture inside a room must work; a sub-slop
-            // click still selects the room via the pointer-up path)
+            // a drag STARTING on an unselected room floor is the marquee
+            // (boxing furniture inside a room must work; a sub-slop click
+            // still selects the room via the pointer-up path)
             startMarquee(state.world, state.additive)
           }
           return
@@ -594,6 +667,19 @@ export function createSelectTool(): Tool {
           })
           return
         }
+
+        case 'room': {
+          const delta = sub(e.world, state.grabWorld)
+          state.lastDelta = delta
+          ctx.actions().transformRoomRig(
+            state.rig,
+            state.starts,
+            { delta, angleRad: 0, center: state.grabWorld },
+            { mode: 'live' },
+          )
+          ctx.interaction().set({ gestureActive: true })
+          return
+        }
       }
     },
 
@@ -684,6 +770,19 @@ export function createSelectTool(): Tool {
         case 'annotation-dim':
         case 'annotation-area': {
           commitTx(state.tx) // annotations skip the pipeline — nothing to re-run
+          reset(ctx)
+          return
+        }
+        case 'room': {
+          // the commit re-run welds (rig ids demoted — stationary wins);
+          // sub-MERGE_EPS displacement commits as an exact no-op in the model
+          ctx.actions().transformRoomRig(
+            state.rig,
+            state.starts,
+            { delta: state.lastDelta, angleRad: 0, center: state.grabWorld },
+            { mode: 'commit' },
+          )
+          commitTx(state.tx)
           reset(ctx)
           return
         }

@@ -1577,3 +1577,120 @@ describe('M9 (0.3.0): furniture resize handles + duplicate room', () => {
     expect(Object.keys(d.nodes)).toHaveLength(8)
   })
 })
+
+describe('0.8.0 M2: room drag gesture', () => {
+  const store = () => useDocStore.getState()
+  const nodes = () => Object.values(store().doc.nodes)
+  const nodeAt = (p: Vec2) => nodes().find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 1e-6)
+  const square = (x0 = 0, y0 = 0, s = 4) =>
+    store().addWallChain([
+      vec(x0, y0),
+      vec(x0 + s, y0),
+      vec(x0 + s, y0 + s),
+      vec(x0, y0 + s),
+      vec(x0, y0),
+    ])
+  /** Two adjacent 4x4 rooms sharing the x=4 divider. */
+  const twoRooms = () => {
+    store().addWallChain([vec(0, 0), vec(4, 0), vec(8, 0), vec(8, 4), vec(4, 4), vec(0, 4), vec(0, 0)])
+    store().addWallSegment(vec(4, 0), vec(4, 4))
+  }
+
+  it('click-then-drag moves the room as one undo entry; selection survives', () => {
+    square()
+    click(vec(1, 1)) // click #1 selects the room
+    const roomId = useUiStore.getState().selection[0]!
+    expect(store().doc.rooms[roomId as never]).toBeDefined()
+    const base = past()
+    drag(vec(1, 1), vec(3, 1)) // drag #2 moves it by (2,0)
+    expect(past()).toBe(base + 1)
+    expect(nodeAt(vec(2, 0))).toBeDefined()
+    expect(nodeAt(vec(6, 4))).toBeDefined()
+    expect(nodeAt(vec(0, 0))).toBeUndefined()
+    expect(useUiStore.getState().selection).toEqual([roomId])
+    expect(useInteractionStore.getState().cursorHint).toBeNull() // reset after up
+    expect(isTxActive()).toBe(false)
+    safeUndo()
+    expect(nodeAt(vec(0, 0))).toBeDefined()
+  })
+
+  it('furniture inside the room rides the drag', () => {
+    square()
+    const sofa = addSofa(2, 2)
+    click(vec(1, 1))
+    drag(vec(1, 1), vec(1, 3)) // delta (0,2)
+    const f = store().doc.furniture[sofa]!
+    expect(f.x).toBeCloseTo(2, 9)
+    expect(f.y).toBeCloseTo(4, 9)
+  })
+
+  it('Shift on a selected room floor still marquees (additive), never drags', () => {
+    square()
+    click(vec(1, 1))
+    const roomId = useUiStore.getState().selection[0]!
+    const sofa = addSofa(2, 2)
+    tool().onPointerDown(pe(vec(1, 1), { shift: true }), ctx)
+    tool().onPointerMove(pe(vec(2.5, 2.5), { shift: true }), ctx)
+    expect(useInteractionStore.getState().preview?.kind).toBe('marquee')
+    expect(isTxActive()).toBe(false)
+    tool().onPointerUp(pe(vec(2.5, 2.5), { shift: true }), ctx)
+    expect(useUiStore.getState().selection).toContain(sofa)
+    expect(nodeAt(vec(0, 0))).toBeDefined() // room did not move
+    void roomId
+  })
+
+  it('Esc mid-drag rolls the tear back — doc and history untouched', () => {
+    twoRooms()
+    expect(walls()).toBe(7)
+    const base = past()
+    click(vec(6, 2)) // select the right room
+    tool().onPointerDown(pe(vec(6, 2)), ctx)
+    tool().onPointerMove(pe(vec(7.5, 2)), ctx) // past slop → tear + live move
+    expect(walls()).toBe(8) // torn duplicate exists mid-gesture
+    expect(isTxActive()).toBe(true)
+    expect(tool().onKeyDown?.('Escape', ctx)).toBe(true)
+    expect(walls()).toBe(7)
+    expect(nodeAt(vec(8, 0))).toBeDefined() // right room back in place
+    expect(past()).toBe(base)
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('dragging a room against another welds through the gesture; undo restores', () => {
+    square() // A: 0..4
+    square(6, 0) // B: 6..10
+    expect(walls()).toBe(8)
+    click(vec(7, 2)) // select B
+    drag(vec(7, 2), vec(5, 2)) // B moves by (-2,0): edge-to-edge with A
+    expect(walls()).toBe(7) // welded into one shared wall
+    expect(rooms()).toBe(2)
+    safeUndo()
+    expect(walls()).toBe(8)
+    expect(nodeAt(vec(6, 0))).toBeDefined()
+  })
+
+  it('dragging out and back to the start is a topological no-op', () => {
+    twoRooms()
+    click(vec(6, 2))
+    tool().onPointerDown(pe(vec(6, 2)), ctx)
+    tool().onPointerMove(pe(vec(6.1, 2.1)), ctx)
+    tool().onPointerMove(pe(vec(8, 2)), ctx) // out…
+    tool().onPointerMove(pe(vec(6, 2)), ctx) // …and exactly back
+    tool().onPointerUp(pe(vec(6, 2)), ctx)
+    expect(walls()).toBe(7) // tear deduped away
+    expect(rooms()).toBe(2)
+    expect(nodeAt(vec(8, 0))).toBeDefined()
+    expect(isTxActive()).toBe(false)
+  })
+
+  it('tool deactivation mid-room-drag aborts cleanly', () => {
+    square()
+    click(vec(1, 1))
+    tool().onPointerDown(pe(vec(1, 1)), ctx)
+    tool().onPointerMove(pe(vec(3, 3)), ctx)
+    expect(isTxActive()).toBe(true)
+    registry.switchTo(ctx, 'draw-wall')
+    expect(isTxActive()).toBe(false)
+    expect(nodeAt(vec(0, 0))).toBeDefined() // restored
+    registry.switchTo(ctx, 'select')
+  })
+})

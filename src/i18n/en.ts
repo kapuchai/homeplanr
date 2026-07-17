@@ -362,6 +362,8 @@ export const en = {
   'hint.multiSelect': '{count} selected · drag moves all · R rotates · Ctrl+D duplicates · Del deletes',
   'hint.singleSelect':
     'Drag to move · R rotates · Ctrl+D duplicates · Del deletes · Esc deselects (also inside rooms)',
+  'hint.roomSelect':
+    'Drag moves the room with everything inside · drop next to a wall to merge · Esc deselects',
   'hint.empty': 'Press W and click to draw your first wall',
   'hint.idle':
     'V select · W wall · D door · N window · M measure · T text · drag selects · right-drag pans · Shift+1 fit',

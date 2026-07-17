@@ -12,6 +12,7 @@ import * as rooms from '../model/mutations/rooms'
 import * as project from '../model/mutations/project'
 import * as annotations from '../model/mutations/annotations'
 import * as paste from '../model/mutations/paste'
+import * as roomRig from '../model/mutations/roomRig'
 import type { MutationMode } from '../model/mutations/pipeline'
 
 /**
@@ -54,6 +55,15 @@ export interface DocState {
   distributeFurniture: (ids: readonly FurnitureId[], axis: 'x' | 'y') => void
   // paste (M9): one mutation ⇒ one undo entry; the commit pipeline welds
   pasteSubgraph: (payload: paste.GraphPayload, target: Vec2) => WallId[]
+  // room rig (0.8.0): tear runs INSIDE the gesture tx (abort restores it);
+  // collect/captureStarts are pure reads — tools call them on ctx.doc()
+  tearRoomRig: (rig: roomRig.RoomRig) => roomRig.RoomRig
+  transformRoomRig: (
+    rig: roomRig.RoomRig,
+    starts: roomRig.RigStarts,
+    xform: roomRig.RigTransform,
+    opts?: { mode?: MutationMode },
+  ) => void
   // annotations
   addDimension: (a: Vec2, b: Vec2, offset?: number) => AnnotationId | null
   addLabel: (pos: Vec2, text: string) => AnnotationId | null
@@ -107,6 +117,9 @@ export const useDocStore = create<DocState>()(
           alignFurniture: (ids, edge) => mutate((d) => furniture.alignFurniture(d, ids, edge)),
           distributeFurniture: (ids, axis) => mutate((d) => furniture.distributeFurniture(d, ids, axis)),
           pasteSubgraph: (payload, target) => mutate((d) => paste.pasteSubgraph(d, payload, target)),
+          tearRoomRig: (rig) => mutate((d) => roomRig.tearRoomRig(d, rig)),
+          transformRoomRig: (rig, starts, xform, opts) =>
+            mutate((d) => roomRig.transformRigRigid(d, rig, starts, xform, opts)),
           addDimension: (a, b, offset) => mutate((d) => annotations.addDimension(d, a, b, offset)),
           addLabel: (pos, text) => mutate((d) => annotations.addLabel(d, pos, text)),
           addArea: (points) => mutate((d) => annotations.addArea(d, points)),

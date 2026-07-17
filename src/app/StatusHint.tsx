@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
+import type { RoomId } from '../model/ids'
 import { useAppSettings } from '../store/appSettings'
 import { usePersistStore } from '../store/persistence/controller'
 import { t } from '../i18n'
@@ -13,6 +14,9 @@ export function StatusHint() {
   const showAnnotations = useAppSettings((s) => s.showAnnotations)
   const empty = useDocStore(
     (s) => Object.keys(s.doc.walls).length === 0 && Object.keys(s.doc.furniture).length === 0,
+  )
+  const selRoom = useDocStore(
+    (s) => selection.length === 1 && !!s.doc.rooms[selection[0] as RoomId],
   )
   const lastSavedAt = usePersistStore((s) => s.lastSavedAt)
   const lastSaveWasAuto = usePersistStore((s) => s.lastSaveWasAuto)
@@ -62,7 +66,9 @@ export function StatusHint() {
   } else if (selection.length > 1) {
     text = t('hint.multiSelect', { count: selection.length })
   } else if (selection.length === 1) {
-    text = t('hint.singleSelect')
+    // rooms drag as a unit — the generic hint advertises R/Ctrl+D/Del,
+    // none of which apply to a room selection
+    text = selRoom ? t('hint.roomSelect') : t('hint.singleSelect')
   } else if (empty) {
     text = t('hint.empty')
   } else {
