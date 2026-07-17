@@ -587,6 +587,9 @@ function MultiPanel({ selection }: { selection: string[] }) {
 
   if (furnitureIds.length === selection.length && furnitureIds.length > 0) {
     const first = doc.furniture[furnitureIds[0]!]!
+    const emitterIds = furnitureIds.filter(
+      (id) => CATALOG[doc.furniture[id]!.catalogItemId]?.emitter,
+    )
     return (
       <aside className="props-panel" key={`items:${furnitureIds.join()}`}>
         <h3>{t('props.countItems', { count: furnitureIds.length })}</h3>
@@ -626,6 +629,33 @@ function MultiPanel({ selection }: { selection: string[] }) {
             </button>
           </div>
         </Row>
+        {emitterIds.length ? (
+          <Row>
+            <span>{t('props.lightOn')}</span>
+            <div className="segmented small">
+              <button
+                type="button"
+                onClick={() =>
+                  batch(() =>
+                    emitterIds.forEach((id) => a.setFurnitureLight(id, { lightOn: true })),
+                  )
+                }
+              >
+                {t('common.on')}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  batch(() =>
+                    emitterIds.forEach((id) => a.setFurnitureLight(id, { lightOn: false })),
+                  )
+                }
+              >
+                {t('common.off')}
+              </button>
+            </div>
+          </Row>
+        ) : null}
         <p className="hint">{t('props.hint.multiItems')}</p>
       </aside>
     )
@@ -976,6 +1006,42 @@ export function PropertiesPanel() {
           value={furniture.elevation}
           onCommit={(v) => a.transformFurniture(furniture.id, { elevation: v })}
         />
+        {item?.emitter ? (
+          <>
+            <Row>
+              <span>{t('props.lightOn')}</span>
+              <div className="segmented small">
+                <button
+                  type="button"
+                  aria-pressed={furniture.lightOn ?? true}
+                  className={(furniture.lightOn ?? true) ? 'active' : ''}
+                  onClick={() => a.setFurnitureLight(furniture.id, { lightOn: true })}
+                >
+                  {t('common.on')}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={furniture.lightOn === false}
+                  className={furniture.lightOn === false ? 'active' : ''}
+                  onClick={() => a.setFurnitureLight(furniture.id, { lightOn: false })}
+                >
+                  {t('common.off')}
+                </button>
+              </div>
+            </Row>
+            <NumField
+              label={t('props.brightness')}
+              value={furniture.lumen ?? item.emitter.defaultLumen}
+              unit="lm"
+              step={50}
+              onCommit={(v) =>
+                a.setFurnitureLight(furniture.id, {
+                  lumen: Math.min(3000, Math.max(100, v)),
+                })
+              }
+            />
+          </>
+        ) : null}
         {furniture.attachedOpeningId ? (
           <Row>
             <span>{t('props.attachedWindow')}</span>

@@ -246,6 +246,8 @@ export const en = {
   'props.imageFailed.body':
     'The file could not be read as an image, or it is too large even after downscaling.',
   'props.attachedWindow': 'On window',
+  'props.lightOn': 'Light',
+  'props.brightness': 'Brightness',
   'props.detach': 'Detach',
   'props.colors': 'Colors',
   'props.colorFor': 'Color for {slot}',
