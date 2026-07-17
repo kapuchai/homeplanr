@@ -5,7 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-07-18
+
+### Added
+
+- **Realistic lighting** — a new *Lighting (3D)* section in Options with a
+  single switch. Turn it on and the 3D view gets a real sun: it rises,
+  crosses the sky and sets exactly as it would at your location and season,
+  the sky and light change color from dawn gold through midday blue to
+  dusk and moonlit night, and long shadows stretch as evening comes. Off
+  (the default) keeps the familiar neutral look
+- **Time-of-day dial** — a new control at the top of the 3D view: the
+  curve is the sun's actual path over your day, and you drag the sun (or
+  the moon, at night) along it. Morning / noon / evening / night dots jump
+  there with a smooth light sweep across the room
+- **Your location drives the sun** — pick a preset city (Helsinki default)
+  or type exact coordinates, rotate the plan with *North offset*, and
+  choose the season: a Finnish midsummer evening and a midwinter noon
+  really do light differently. An *Exposure* slider fine-tunes overall
+  brightness
+- **Lamps that actually light** — new *Ceiling lamp*, *Wall sconce* and
+  *Table lamp* catalog items join the floor lamp, and all four now emit
+  real light with realistic lighting on: warm pools indoors, glowing
+  shades, light spilling out through windows at night. Each lamp has a
+  *Light on/off* switch and a *Brightness* value in lumens in the
+  properties panel (copies and duplicates keep both)
+- **Night mode for free** — drag the time dial past sunset: interiors go
+  dark except for your lamps, the outdoors turns moonlit. Walk mode at
+  night with a couple of lamps on is worth a look
+- **Ceilings block the sun** — with realistic lighting on, rooms are lit
+  through their windows instead of glowing from above
+
+### Fixed
+
+- Tall dialogs (Options grew this release) now scroll instead of clipping
+  top and bottom on short windows
+
 ## [0.11.0] - 2026-07-17
+
 
 ### Added
 

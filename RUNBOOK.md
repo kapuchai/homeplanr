@@ -4,7 +4,44 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.11.0, 2026-07-17)
+## State (as of v0.12.0, 2026-07-18)
+
+0.12.0 "Lighting" (NO schema bump — v6 already carried `lumen`/`lightOn`;
+`CatalogItem.emitter` is compile-time metadata): **realistic-lighting
+master toggle** (`appSettings.realisticLighting`, default OFF until 1.0.0;
+OFF renders the pre-0.12.0 scene bit-identically — classic visual
+baselines unchanged), **sun model** (`scene3d/sun.ts` pure solar position:
+season-preset declination [user chose seasons over dates] + hour angle off
+a longitude-derived integer-hour zone, `solarNoon()` exported;
+`theme/sunRamp.ts` = EVERY scene channel [sun/hemi/ambient/env/sky-fog]
+as one piecewise-linear function of altitude — below −3° the directional
+PLAYS THE MOON with a crossfade dip so the 180° bearing flip never pops;
+the high-sun stop reproduces classic 1.6/0.5/0.1/0.45 as the toggle-on
+parity anchor; SunSky also sets scene.background and WIDENS the shadow
+ortho ≤3× at low sun), **SunArc scrubber** (top-center 3D overlay; the
+curve IS the sun's altitude path over the day, glyph sun/moon; preset
+dots sweep timeOfDay via rAF lerp of the value itself riding --dur-2
+[reduced-motion → instant]; PanelHandle live-setState/persist-on-release
+drag; role=slider with arrows ±15min; hidden while walking),
+**location/season settings** (CITY_PRESETS Helsinki-first + lat/long +
+northOffset SliderRow + season segmented; ALL lighting state is
+device-local appSettings — deliberately not document data),
+**light-emitting furniture** (EmitterLight point/spot child of the
+instance group — `at` item-local so it scales, mirror negates at[0] in
+the RENDERER; lumens → candela [point lm/4π, spot lm/π];
+emissiveSlotMaterial keyed cache glows the shade slot;
+ShadowBudgetBridge: 2 nearest lit emitters cast @1024 per the M1
+WebKitGTK spike [spots ~free, points ×4@1024 → 35fps, ×2@2048 → 19.5fps];
+`setFurnitureLight` key-presence mutation, lightOn true DELETES [absent =
+ON]; clipboard whitelist +lumen/lightOn at all five sites), **lamps**
+(new ceiling-lamp [spot, defaultElevation 2.0 — Furniture3D has no
+per-room ceilingZ, documented], wall-sconce [passable — eye-band],
+table-lamp [0.75]; floor-lamp gained its emitter; emitter conformance
+rule), **panel light rows** (On/Off + Brightness lm, clamp 100–3000;
+MultiPanel batched), **night integration** (ceilings cast+receive under
+realistic ONLY — the reverse-side shadow pass makes the single-sided
+slab cast; ground disc neutral albedo in both UI themes under realistic;
+Modal gained max-height scroll — Options outgrew short windows).
 
 0.11.0 "3D Experience" (NO schema bump — additive `previewAssetId`/
 `previewCustom` on the v6 doc root): **one-click FPS walk** (the Walk
@@ -441,6 +478,34 @@ export + 3D screenshot, file association + single instance, Linux
   holds) with a session failure latch. The custom override
   (`setPreviewImage`) IS an undoable, dirtying mutation — the deliberate
   asymmetry vs the write-time auto embed.
+
+- **Realistic lighting is a RENDER-PATH SWITCH, never a retune (0.12.0)**:
+  toggle OFF must render the pre-0.12.0 scene bit-identically — the
+  classic SceneEnvironment branch stays untouched, exposure forced 1,
+  ceiling shadow flags off, theme ground tint restored, scene.background
+  null. The classic visual baselines pin it; touch the classic branch
+  only with a rebaseline in hand.
+- **Sun/ramp purity (0.12.0)**: solar position is a pure function of
+  (lat, lon, season, hours) and every lighting channel a pure function of
+  altitude (`sunRamp` stops) — no clocks, no state reads. Scrubbing
+  timeOfDay IS the animation system; anything time-driven must flow
+  through these two functions.
+- **Interior shadow budget (0.12.0, M1 spike-pinned)**: emitter lights
+  always render (shadowless is free on WebKitGTK); only the ≤2 nearest
+  lit emitters cast, at 1024² — interior maps NEVER 2048 and never more
+  than 2 casters (point-light cube maps are the cliff: ×4@1024 35fps,
+  ×2@2048 19.5fps). The sun keeps its separate 2048 directional map.
+- **Emitters are catalog metadata (0.12.0)**: `CatalogItem.emitter` never
+  persists; `at` is item-local and the RENDERER negates x when mirrored
+  (realizeItem mirrors geometry only). `lightOn` ABSENT means ON —
+  setFurnitureLight deletes `true` and stores only `false`; absent lumen
+  = the emitter's defaultLumen. The clipboard whitelist carries
+  lumen/lightOn (five sites — forgetting one silently strips on paste).
+- **IBL intensity ownership is SPLIT (0.12.0)**: the PMREM texture effect
+  never writes environmentIntensity; the classic 0.45 lives in its own
+  [realistic]-keyed effect and SunSky owns the value under realistic —
+  React runs child effects before parent effects, so an unconditional
+  parent-side write clobbers the ramp (the night-rendered-as-day bug).
 
 ## Schema change checklist (bumping schema N → N+1)
 
