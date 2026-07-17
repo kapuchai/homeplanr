@@ -45,13 +45,14 @@ function buildBasic(): ProjectDocument {
 }
 
 /**
- * The fixture apartment plus the v4 surface worth freezing: floor material,
- * per-side wall paint + the SINGLE both-faces `finish` (v4 shape — the
- * v4→v5 migration splits it per-side), a mirrored furniture item, the v3
- * annotations (offset dimension, rotated resized label) plus a v4 area
- * annotation, and the v4 batched fields: Room.roomType and
- * FurnitureInstance.price/notes/materialOverrides (schema-only in v4 — no
- * mutations existed, so they are frozen by direct assignment, mirroring
+ * The fixture apartment plus the v5 surface worth freezing: a v5 grouped-
+ * registry floor (parquetHerringbone), Room.roomType (UI shipped 0.8.0),
+ * per-side wall paint + per-side DIFFERENT finishes (the v5 split, using
+ * v5-added registry ids: wallpaperStripe front / plaster back), a mirrored
+ * furniture item, the v3 annotations (offset dimension, rotated resized
+ * label) plus a v4 area annotation, and the v4 batched fields:
+ * FurnitureInstance.price/notes/materialOverrides (still schema-only in v5
+ * — no mutations exist, so they are frozen by direct assignment, mirroring
  * the migrations-test roundtrip pattern).
  * (Each schema bump rewrites this builder to freeze the OUTGOING
  * version's real feature set — see RUNBOOK.)
@@ -59,7 +60,7 @@ function buildBasic(): ProjectDocument {
 /** The schema version these builders freeze. Bumping SCHEMA_VERSION without
  * rewriting the builders (RUNBOOK checklist step 1) must fail loudly here —
  * never mint goldens whose shape doesn't match their version. */
-const BUILDER_VERSION = 4
+const BUILDER_VERSION = 5
 
 function buildFull(): ProjectDocument {
   assert(
@@ -71,11 +72,16 @@ function buildFull(): ProjectDocument {
   renameProject(doc, 'Golden full')
   const living = Object.values(doc.rooms).find((r) => r.name === 'Living room')
   assert(living, 'full: fixture doc has no room named "Living room"')
-  setRoomFloorMaterial(doc, living.id, 'darkFloor')
+  setRoomFloorMaterial(doc, living.id, 'parquetHerringbone')
   living.roomType = 'living'
   const paintedWall = Object.values(doc.walls)[0]
   assert(paintedWall, 'full: fixture doc has no walls')
-  updateWall(doc, paintedWall.id, { paintFront: 'sage', paintBack: 'terracotta', finish: 'brick' })
+  updateWall(doc, paintedWall.id, {
+    paintFront: 'sage',
+    paintBack: 'terracotta',
+    finishFront: 'wallpaperStripe',
+    finishBack: 'plaster',
+  })
   const mirroredItem = Object.values(doc.furniture)[0]
   assert(mirroredItem, 'full: fixture doc has no furniture')
   transformFurniture(doc, mirroredItem.id, { mirrored: true })
@@ -98,10 +104,14 @@ function buildFull(): ProjectDocument {
     Object.values(doc.furniture).every((f) => f.catalogItemId),
     'full: catalog ids present',
   )
-  assert(living.floorMaterialId === 'darkFloor', 'full: floor material not set')
+  assert(living.floorMaterialId === 'parquetHerringbone', 'full: floor material not set')
   assert(living.roomType === 'living', 'full: roomType not set')
   assert(doc.walls[paintedWall.id]!.paintFront === 'sage', 'full: paintFront not set')
-  assert(doc.walls[paintedWall.id]!.finish === 'brick', 'full: single v4 finish not set')
+  assert(
+    doc.walls[paintedWall.id]!.finishFront === 'wallpaperStripe' &&
+      doc.walls[paintedWall.id]!.finishBack === 'plaster',
+    'full: per-side v5 finishes not set',
+  )
   assert(doc.furniture[mirroredItem.id]!.mirrored === true, 'full: mirrored not set')
   assert(doc.furniture[mirroredItem.id]!.price === 499, 'full: price not frozen')
   assert(doc.furniture[mirroredItem.id]!.notes === 'Golden notes', 'full: notes not frozen')

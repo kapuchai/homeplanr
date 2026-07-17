@@ -30,6 +30,8 @@ const v3Basic = golden('v3-basic.homeplanr')
 const v3Full = golden('v3-full.homeplanr')
 const v4Basic = golden('v4-basic.homeplanr')
 const v4Full = golden('v4-full.homeplanr')
+const v5Basic = golden('v5-basic.homeplanr')
+const v5Full = golden('v5-full.homeplanr')
 
 const deepFreeze = (o: unknown): void => {
   if (typeof o === 'object' && o !== null) {
@@ -40,7 +42,18 @@ const deepFreeze = (o: unknown): void => {
 
 describe('schema migrations (v1 goldens)', () => {
   it('EVERY historical golden opens silently: current version, healed=false, zero warnings', () => {
-    for (const g of [v1Basic, v1Full, v2Basic, v2Full, v3Basic, v3Full, v4Basic, v4Full]) {
+    for (const g of [
+      v1Basic,
+      v1Full,
+      v2Basic,
+      v2Full,
+      v3Basic,
+      v3Full,
+      v4Basic,
+      v4Full,
+      v5Basic,
+      v5Full,
+    ]) {
       const r = parseDocument(g)
       expect(r.doc.schemaVersion).toBe(SCHEMA_VERSION)
       expect(r.healed).toBe(false)
@@ -62,10 +75,10 @@ describe('schema migrations (v1 goldens)', () => {
     expect(Object.keys(doc.settings)).not.toContain('unitDisplay')
   })
 
-  it('migration steps are pure: frozen v1..v4 inputs are untouched, output is current', () => {
+  it('migration steps are pure: frozen v1..v5 inputs are untouched, output is current', () => {
     // v3Full and v4Full both carry finish:'brick' — the field-SPLITTING
     // v4→v5 migration must build new wall objects, never mutate frozen input
-    for (const g of [v1Full, v2Full, v3Full, v4Full]) {
+    for (const g of [v1Full, v2Full, v3Full, v4Full, v5Full]) {
       const raw = JSON.parse(g)
       const snapshot = JSON.stringify(raw)
       deepFreeze(raw)
@@ -437,6 +450,124 @@ describe('v5: per-side wall finish (finishFront/finishBack)', () => {
       docId: 'x',
       savedAt: 1,
       doc: JSON.parse(v4Basic),
+    })
+    const blob = decodeRecovery(json)
+    expect(blob).not.toBeNull()
+    expect(blob!.doc.schemaVersion).toBe(SCHEMA_VERSION)
+  })
+})
+
+describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
+  it('v5-full opens clean with every frozen v5 feature intact', () => {
+    const r = parseDocument(v5Full)
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    const living = Object.values(r.doc.rooms).find((room) => room.name === 'Living room')
+    expect(living?.roomType).toBe('living')
+    expect(living?.floorMaterialId).toBe('parquetHerringbone')
+    const sided = Object.values(r.doc.walls).find((w) => w.finishFront)!
+    expect(sided.finishFront).toBe('wallpaperStripe')
+    expect(sided.finishBack).toBe('plaster') // different sides stay different
+    const item = Object.values(r.doc.furniture).find((f) => f.price !== undefined)!
+    expect(item.price).toBe(499)
+    expect(item.materialOverrides).toEqual({ fabric: 'oak', legs: '#334455' })
+  })
+
+  it('a v5 doc (no assets key) migrates to an empty assets map', () => {
+    const { doc } = parseDocument(v5Basic)
+    expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(doc.assets).toEqual({})
+  })
+
+  it('assets + assetId roundtrip a save/open trip, clean and unhealed', () => {
+    const { doc } = parseDocument(v5Full)
+    doc.assets['i_art1' as never] = {
+      id: 'i_art1' as never,
+      mime: 'image/jpeg',
+      data: 'aGVsbG8=',
+      w: 640,
+      h: 480,
+    }
+    const item = Object.values(doc.furniture)[0]!
+    item.assetId = 'i_art1' as never
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.assets['i_art1' as never]).toEqual({
+      id: 'i_art1',
+      mime: 'image/jpeg',
+      data: 'aGVsbG8=',
+      w: 640,
+      h: 480,
+    })
+    expect(r.doc.furniture[item.id]!.assetId).toBe('i_art1')
+  })
+
+  it('junk asset ENTRIES drop silently (no warning, healed=false)', () => {
+    const base = JSON.parse(v5Basic)
+    base.schemaVersion = 6
+    base.assets = {
+      i_ok: { mime: 'image/webp', data: 'AA==', w: 10, h: 10 },
+      i_noMime: { mime: '', data: 'AA==', w: 10, h: 10 },
+      i_noData: { mime: 'image/png', data: '', w: 10, h: 10 },
+      i_badDims: { mime: 'image/png', data: 'AA==', w: 0, h: -3 },
+      i_junk: 'not an object',
+    }
+    const r = validateParsedObject(base)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.healed).toBe(false)
+    expect(Object.keys(r.doc.assets)).toEqual(['i_ok'])
+  })
+
+  it('dangling assetId / attachedOpeningId are KEPT (placeholder + detach paths own them)', () => {
+    const { doc } = parseDocument(v5Full)
+    const item = Object.values(doc.furniture)[0]!
+    item.assetId = 'i_gone' as never
+    item.attachedOpeningId = 'o_gone' as never
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.warnings).toHaveLength(0)
+    expect(r.healed).toBe(false)
+    expect(r.doc.furniture[item.id]!.assetId).toBe('i_gone')
+    expect(r.doc.furniture[item.id]!.attachedOpeningId).toBe('o_gone')
+  })
+
+  it('batched v6 fields roundtrip; junk values normalize silently', () => {
+    const { doc } = parseDocument(v5Full)
+    const opening = Object.values(doc.openings)[0]!
+    opening.style = 'sliding' // 0.10.0 vocabulary — open registry today
+    const item = Object.values(doc.furniture)[0]!
+    item.lumen = 800
+    item.lightOn = false // both boolean values must survive, not just true
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.openings[opening.id]!.style).toBe('sliding')
+    expect(r.doc.furniture[item.id]!.lumen).toBe(800)
+    expect(r.doc.furniture[item.id]!.lightOn).toBe(false)
+
+    const base = JSON.parse(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    const oKey = opening.id as string
+    const fKey = item.id as string
+    base.openings[oKey].style = ''
+    base.furniture[fKey].lumen = -5
+    base.furniture[fKey].lightOn = 'on'
+    base.furniture[fKey].assetId = 42
+    const v = validateParsedObject(base)
+    expect(v.warnings).toHaveLength(0)
+    expect('style' in v.doc.openings[opening.id]!).toBe(false)
+    const f = v.doc.furniture[item.id]!
+    expect(f.lumen).toBeUndefined()
+    expect(f.lightOn).toBeUndefined()
+    expect(f.assetId).toBeUndefined()
+  })
+
+  it('a v5 recovery blob decodes through the migration chokepoint', () => {
+    const json = JSON.stringify({
+      v: 1,
+      filePath: null,
+      docId: 'x',
+      savedAt: 1,
+      doc: JSON.parse(v5Basic),
     })
     const blob = decodeRecovery(json)
     expect(blob).not.toBeNull()

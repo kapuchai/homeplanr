@@ -1,4 +1,4 @@
-import type { AnnotationId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from './ids'
+import type { AnnotationId, AssetId, FurnitureId, NodeId, OpeningId, RoomId, WallId } from './ids'
 
 /**
  * The document model — the single source of truth both renderers derive from.
@@ -50,6 +50,9 @@ export interface OpeningBase {
   width: number
   /** m */
   height: number
+  /** Opening style, open registry (v6, UI lands in 0.10.0) — any non-empty
+   * string; renderers fall back to the standard style for unknown ids. */
+  style?: string
 }
 
 export interface Door extends OpeningBase {
@@ -105,6 +108,34 @@ export interface FurnitureInstance {
   /** Material-slot recolors, slot → material id or hex (v4, open registry —
    * render-side fallback handles unknown values; UI lands in 0.9.0). */
   materialOverrides?: Record<string, string>
+  /** Embedded image shown by image-capable items (wall art) — a doc.assets
+   * key (v6). Dangling refs render as the item's placeholder, never crash. */
+  assetId?: AssetId
+  /** Window this item derives its placement from (v6, curtains) — while the
+   * opening exists the derived layer positions the item; on opening removal
+   * the commit pipeline detaches, leaving the stored transform. */
+  attachedOpeningId?: OpeningId
+  /** Luminous flux for light-emitting items, lm (v6, UI lands in 0.12.0). */
+  lumen?: number
+  /** Whether an emitter is switched on (v6, UI lands in 0.12.0). */
+  lightOn?: boolean
+}
+
+/**
+ * Embedded image asset (v6): ingest-time downscaled + re-encoded, stored as
+ * base64 so the document stays a single portable JSON file. A new top-level
+ * map (not per-instance data) so undo snapshots share it structurally.
+ * Unreferenced assets are garbage-collected on explicit save.
+ */
+export interface ImageAsset {
+  id: AssetId
+  /** e.g. 'image/jpeg' — open set; decoders that can't handle it fall back. */
+  mime: string
+  /** Base64 payload (no data-URL prefix). */
+  data: string
+  /** Pixel dimensions after ingest downscaling. */
+  w: number
+  h: number
 }
 
 /**
@@ -157,7 +188,7 @@ export interface ProjectSettings {
 }
 
 export interface ProjectDocument {
-  schemaVersion: 5
+  schemaVersion: 6
   id: string
   name: string
   /** ISO strings. Mutations never touch updatedAt — serialize() stamps it. */
@@ -170,9 +201,12 @@ export interface ProjectDocument {
   rooms: Record<RoomId, Room>
   furniture: Record<FurnitureId, FurnitureInstance>
   annotations: Record<AnnotationId, Annotation>
+  /** Embedded image assets (v6) — inert leaf data, excluded from graph
+   * self-heal; referenced by FurnitureInstance.assetId. */
+  assets: Record<AssetId, ImageAsset>
 }
 
-export const SCHEMA_VERSION = 5 as const
+export const SCHEMA_VERSION = 6 as const
 
 /** Pinned defaults (plan: "DEFAULTS"). All meters. */
 export const DEFAULTS = {
@@ -217,5 +251,6 @@ export function emptyDocument(id: string, name: string, nowIso: string): Project
     rooms: {},
     furniture: {},
     annotations: {},
+    assets: {},
   }
 }

@@ -7,6 +7,7 @@ import {
 } from '../../model/types'
 import {
   asAnnotationId,
+  asAssetId,
   asFurnitureId,
   asNodeId,
   asOpeningId,
@@ -108,6 +109,12 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
     }
     return { ...raw, walls, schemaVersion: 5 }
   },
+  // v5 → v6: purely additive (the top-level assets map + optional
+  // assetId / attachedOpeningId / lumen / lightOn on furniture and
+  // Opening.style, all handled by the validator) — identity bump, no data
+  // moves. The batched style/lumen/lightOn fields ship ahead of their UIs
+  // (0.10.0 / 0.12.0) like the v4 batch did.
+  5: (raw) => ({ ...raw, schemaVersion: 6 }),
 }
 
 export function parseDocument(json: string): ParseResult {
@@ -153,6 +160,7 @@ export function validateParsedObject(raw: unknown): ParseResult {
     rooms: {},
     furniture: {},
     annotations: {},
+    assets: {},
   }
 
   // settings: merge known keys with bounds
@@ -246,6 +254,9 @@ export function validateParsedObject(raw: unknown): ParseResult {
         t: v.t as number,
         width: v.width as number,
         height: v.height as number,
+        // v6, open registry: any non-empty string (renderers fall back to
+        // the standard style for unknown ids)
+        ...(isStr(v.style) && v.style ? { style: v.style } : {}),
       }
       if (v.kind === 'door') {
         doc.openings[id] = {
@@ -346,6 +357,15 @@ export function validateParsedObject(raw: unknown): ParseResult {
           ) as [string, string][]
           return entries.length ? { materialOverrides: Object.fromEntries(entries) } : {}
         })(),
+        // v6 additions — same field-level rule. Dangling asset/opening refs
+        // are deliberately KEPT (render placeholder / commit-time detach):
+        // a stripped-recovery or forward-compatible file must not lose them.
+        ...(isStr(v.assetId) && v.assetId ? { assetId: asAssetId(v.assetId) } : {}),
+        ...(isStr(v.attachedOpeningId) && v.attachedOpeningId
+          ? { attachedOpeningId: asOpeningId(v.attachedOpeningId) }
+          : {}),
+        ...(isFiniteNum(v.lumen) && v.lumen > 0 ? { lumen: v.lumen } : {}),
+        ...(typeof v.lightOn === 'boolean' ? { lightOn: v.lightOn } : {}),
       }
     }
   }
@@ -419,7 +439,32 @@ export function validateParsedObject(raw: unknown): ParseResult {
     }
   }
 
+  // assets (v6) — inert leaf data like furniture/annotations, but junk
+  // entries drop SILENTLY (field-level rule, no warning): they only arrive
+  // from hand-edited files, and a warning would flip `healed` on open.
+  // Payload size is unbounded here by design — caps are ingest-time.
+  if (isObj(obj.assets)) {
+    for (const [key, v] of Object.entries(obj.assets)) {
+      if (
+        isObj(v) &&
+        isStr(v.mime) &&
+        v.mime &&
+        isStr(v.data) &&
+        v.data &&
+        isFiniteNum(v.w) &&
+        v.w > 0 &&
+        isFiniteNum(v.h) &&
+        v.h > 0
+      ) {
+        const id = asAssetId(key)
+        doc.assets[id] = { id, mime: v.mime, data: v.data, w: v.w, h: v.h }
+      }
+    }
+  }
+
   // --- self-heal: normalize + clamp + reconcile, then detect drift ---
+  // (assets stay OUT of the hash, like furniture/annotations — their
+  // presence must never read as graph drift)
   const before = JSON.stringify([doc.nodes, doc.walls, doc.openings, doc.rooms])
   normalizeGraph(doc)
   revalidateOpenings(doc)
