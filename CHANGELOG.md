@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-17
+
+### Added
+
+- **Move rooms as a whole** — select a room (click its floor), then drag:
+  the room moves with its walls, doors, windows, and all furniture
+  standing inside (island rooms ride along too). A wall shared with a
+  neighbor stays with the neighbor — together with any door in it — and
+  the moved room gets its own copy. Dropping a room edge-to-edge against
+  another merges the touching walls into one shared wall; one undo step
+  reverses the whole move
+- **Room snapping** — while dragging, room corners snap onto nearby wall
+  corners (the ring shows where the weld will land) and parallel walls
+  snap collinear so partial-overlap docking produces a clean shared
+  segment; hold Ctrl to drop freely
+- **Rotate rooms** — a rotate handle appears on the selected room
+  (15° detents with a stronger snap at right angles; Ctrl rotates
+  freely), and `R` / `Shift+R` or the context menu rotate ±90°.
+  Furniture inside orbits and turns with the room
+- **Per-side wall finishes** — the single both-faces finish became
+  *Finish front* / *Finish back* (like paint has always been): brick
+  outside, wallpaper inside. Existing plans upgrade automatically
+- **New wall finishes** — wallpaper (stripes and damask), wood panel,
+  and plaster join brick, concrete, and tile
+- **New floor materials** — herringbone parquet, oak and walnut
+  laminate, beige and gray linoleum, and plaster (17 materials total),
+  in a grouped floor picker (Wood / Tile / Stone / Smooth & soft)
+- **Room types** — assign a type (Living room, Bedroom, Kitchen,
+  Bathroom, Balcony, … 12 total) from the room panel. The type appears
+  under the room label (and in exports), and picking a type suggests a
+  matching floor material when none was chosen yet
+- **Plan statistics** — with nothing selected, the properties panel now
+  shows the room count, total area, and per-type area breakdown
+
+### Changed
+
+- Bundled templates now carry room types and show off per-side finishes
+  (the studio gained an interior brick feature wall and a tiled
+  bathroom partition)
+- File format schema v5 (from v4): the both-faces wall `finish` field
+  split into `finishFront`/`finishBack`. Older files open silently and
+  upgrade on the next save, as always
+
 ## [0.7.0] - 2026-07-17
 
 ### Added

@@ -4,9 +4,33 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.7.0, 2026-07-17)
+## State (as of v0.8.0, 2026-07-17)
 
-0.7.0 "2D Editor Quality" (schema v3 → **v4**): **per-part symbol
+0.8.0 "Rooms & Surfaces" (schema v4 → **v5**): **room rig** (rooms move/
+rotate as rigid units — `roomRig.ts` collect/tear/transform; click-then-
+drag gesture armed only when the room was ALREADY the sole selection;
+tear = raw doc edits inside the gesture tx, neighbor keeps a shared wall
+AND its openings [user-confirmed], stored-fingerprint swap keeps identity
++ live rendering; commit demotes rig ids so stationary geometry wins all
+welds), **room snapping** (frozen-offset corner-onto-node candidates are
+THE weld mechanism + centerline guideX/Y for collinear docking; node
+SnapCandidate grew `display`), **room rotation** (roomPivot = centroid
+with labelAnchor fallback shared by handle AND math; 15° delta detents
+with 6° capture on 90° multiples, Ctrl free — Ctrl NOT Shift, flagged
+override of the release file; rotateRoom command behind R/menu),
+**per-side finishes** (`finishFront/finishBack` open-registry strings,
+MIGRATIONS[4] splits the old both-faces field — first field-splitting
+migration; v4 goldens minted pre-bump; makeGoldens gained a
+BUILDER_VERSION guard), **WALL_FINISHES registry** (+wallpaperStripe/
+wallpaperDamask/panel/plaster; finishSpec(id)→spec|null is the ONLY path
+to pattern/roughness — unknown ids render as plain paint, never crash),
+**floor registry 17 materials** (+herringbone/plaster PatternKinds,
+FloorSpec.group + grouped details/summary picker), **room types UI**
+(ROOM_TYPES registry with suggestedFloorId — seeded ONLY when
+floorMaterialId absent; type badge via planGeometry.roomLabelLines shared
+by BOTH label twins; plan statistics in the empty-selection panel).
+
+0.7.0 recap (schema v3 → v4): **per-part symbol
 footprints** (the bbox body mask is gone — silhouette+body prim pairs per
 unique part footprint, flattened-opacity group, two styling twins:
 SymbolRenderer + exportPlanSvg primEl), **dimension ladder**
@@ -70,7 +94,7 @@ export + 3D screenshot, file association + single instance, Linux
 |---|---|
 | Dev (native window, HMR) | `npm run tauri dev` |
 | Dev (browser only) | `npm run dev` |
-| Unit tests (677) | `npm test` |
+| Unit tests (724) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Visual baselines (local rig) | `npx playwright test --project=chromium e2e/visual.spec.ts` — add `--update-snapshots` to rebaseline, then EYEBALL the new PNGs |
 | Native smoke (Tier 1) | `npm run smoke:native` — needs a FRESH release binary (`npm run tauri build -- --no-bundle`), `~/.cargo/bin/tauri-driver`, and no running homeplanr instance |
@@ -182,6 +206,40 @@ export + 3D screenshot, file association + single instance, Linux
   World-sized text (label annotations, meters) and EXPORT paper metrics
   never scale — the default-1 params are load-bearing. Never couple
   --ui-scale to the viewport zoom k or native webview zoom.
+- **Room rig (0.8.0)**: `tearRoomRig` is RAW doc edits with NO pipeline
+  call (a normalize at zero delta would weld the coincident duplicates
+  straight back) and runs INSIDE the gesture tx (abort restores it,
+  including the stored-fingerprint swap). Tear predicate = mutual OUTER
+  boundary only (a wall in the dragged room's wallCycle AND another
+  non-nested room's wallCycle); container/island relations NEVER tear —
+  islands ride with walls, furniture, and identities. The torn original
+  keeps its openings (the neighbor keeps the door — user-confirmed);
+  rig furniture = center inside the OUTER polygon, holes NOT excluded.
+  `transformRigRigid` transforms from FROZEN starts (never incremental),
+  commit demotes every rig id (paste semantics — stationary wins), and
+  the sub-MERGE_EPS guard commits a whole-room micro-drag as an exact
+  no-op (else shared corners weld back and the room lands SHEARED). The
+  gesture aborts (never commits) a zero-delta drop — no empty undo entry.
+  Room drag arms ONLY when the room was already the sole selection at
+  pointer-down, captured BEFORE the down-time selection update — the
+  marquee-from-room-floor gesture is load-bearing and test-pinned.
+- **Room rotation pivot** = `roomPivot` (centroid; labelAnchor when the
+  centroid is outside — L-shapes), shared by the handle AND the rotation
+  math — anchoring them differently makes the handle orbit the pivot.
+  Corner-node coincidence is THE weld mechanism for room snapping
+  (normalizeGraph has no collinear-overlap merge); guides only make
+  collinear docking exact (T-split + demoted dedupe = shared segment).
+- **Finish/floor/roomType lookups go through their spec fallbacks**
+  (`finishSpec`/`floorSpec`/`roomTypeSpec`) — open registries mean
+  unknown ids ARRIVE from forward-compatible files; indexing a pattern
+  or name table directly with an unknown id crashed the 3D scene once.
+  'paint' is the reserved absent-default finish id — never register it.
+- **Room label twins**: `planGeometry.roomLabelLines` is the ONE source
+  for title + type line in WorldLayers AND exportPlanSvg (name, else
+  known type name, else 'Room'; the type line never duplicates the name).
+- **setRoomType floor suggestion** seeds ONLY when floorMaterialId is
+  absent — a user's floor choice is never overwritten; clearing the type
+  never touches the floor.
 - **File writes serialize** through `serializedWrite` (controller.ts) —
   explicit saves AND autosaves; every input is (re)read INSIDE the lock.
   Doc-replacing ops serialize through `serialized()` and cancel pending
