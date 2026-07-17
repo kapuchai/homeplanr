@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BufferGeometry } from 'three'
 import { CATALOG } from './index'
-import { realizeItem } from './realize'
+import { SEAM_EPS, realizeItem } from './realize'
 import { collectParts } from './builder'
 
 /**
@@ -110,8 +110,9 @@ describe('realizeItem mirrored', () => {
   it('mirrored desk tabletop still winds upward (+z normal from winding)', () => {
     const desk = CATALOG['desk']!
     const top = realizeItem(desk, { mirrored: true }).groups.find((g) => g.mat === 'top')!
-    // the tabletop's top face lies in the plane z = h exactly
-    const zTop = desk.dims.h
+    // the tabletop's top face sits one seam inset below the authored
+    // plane z = h (0.11.0 z-fight fix; centers never drift)
+    const zTop = desk.dims.h - SEAM_EPS
     let found = 0
     const n = triangleCount(top.geometry)
     for (let t = 0; t < n; t++) {

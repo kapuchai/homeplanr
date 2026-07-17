@@ -22,6 +22,14 @@ import type { CatalogItem } from './types'
  * item-local x = 0 (FurnitureInstance.mirrored) by re-emitting each part
  * through mirrorPart — the same part-level transform builder.mirrorX
  * uses, never a negative-scale matrix, so winding stays valid.
+ *
+ * Seam inset (0.11.0): parts are authored ABUTTING exactly, so parts in
+ * different slots share coplanar faces and z-fight. Every part is built
+ * SEAM_EPS smaller per side around its authored center (translate math
+ * keeps the ORIGINAL size so centers never drift); dims too thin to
+ * survive the shrink keep their exact size. Render-only: symbols,
+ * footprints, and collision all derive from the item defs, never from
+ * these geometries.
  */
 export interface RealizedItem {
   groups: { mat: string; geometry: BufferGeometry }[]
@@ -29,22 +37,36 @@ export interface RealizedItem {
 
 const cache = new Map<string, RealizedItem>()
 
+/** Per-side seam shrink (m) — 0.5 mm, invisible at any viewing distance. */
+export const SEAM_EPS = 0.0005
+/** Dims at or below this (5 mm) keep their exact size — thin panels and
+ * hairline reveals must never invert or visibly slim down. */
+const MIN_SHRINKABLE = SEAM_EPS * 10
+
+const inset = (v: number): number => (v > MIN_SHRINKABLE ? v - 2 * SEAM_EPS : v)
+
 function partGeometry(p: Part): BufferGeometry {
   let geo: BufferGeometry
   if (p.kind === 'box') {
+    const sx = inset(p.size[0])
+    const sy = inset(p.size[1])
+    const sz = inset(p.size[2])
     geo =
       p.round && p.round > 0
-        ? new RoundedBoxGeometry(p.size[0], p.size[1], p.size[2], 2, Math.min(p.round, Math.min(...p.size) / 2))
-        : new BoxGeometry(p.size[0], p.size[1], p.size[2])
+        ? new RoundedBoxGeometry(sx, sy, sz, 2, Math.min(p.round, Math.min(sx, sy, sz) / 2))
+        : new BoxGeometry(sx, sy, sz)
     if (p.rot) geo.applyMatrix4(new Matrix4().makeRotationFromEuler(new Euler(...p.rot)))
+    // ORIGINAL half-height — the inset box stays centered in its authored slot
     geo.translate(p.at[0], p.at[1], p.at[2] + p.size[2] / 2)
   } else {
-    geo = new CylinderGeometry(p.r, p.r, p.h, 24)
+    const r = p.r > MIN_SHRINKABLE ? p.r - SEAM_EPS : p.r
+    geo = new CylinderGeometry(r, r, inset(p.h), 24)
     // CylinderGeometry's height runs along +Y; reorient per axis
     const axis = p.axis ?? 'z'
     if (axis === 'z') geo.rotateX(Math.PI / 2)
     else if (axis === 'x') geo.rotateZ(Math.PI / 2)
     if (p.scale) geo.scale(p.scale[0], p.scale[1], p.scale[2])
+    // ORIGINAL height keeps the authored center (see the box branch)
     const h = axis === 'z' ? p.h * (p.scale?.[2] ?? 1) : 0
     geo.translate(p.at[0], p.at[1], p.at[2] + h / 2)
   }

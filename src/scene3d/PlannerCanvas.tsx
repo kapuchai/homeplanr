@@ -222,7 +222,13 @@ function WindowFixture({ op, wall, style }: { op: RealizedOpening; wall: Wall; s
     return s
   }, [arched, w, rise, ry])
   const mullions = style === 'panorama' ? Math.max(1, Math.ceil(w / MULLION_PITCH) - 1) : 0
-  const sideH = arched ? springH : h
+  // Miters (0.11.0): side strips BUTT against the horizontals instead of
+  // overlapping them — they start above the bottom rail and stop under
+  // the top rail (or under the arch torus tube at the spring line), so
+  // no two frame boxes ever share a volume or a coplanar face.
+  const sideLo = FRAME
+  const sideHi = arched ? Math.max(sideLo + 0.01, springH - FRAME / 2) : h - FRAME
+  const sideH = sideHi - sideLo
   return (
     <>
       {/* glass */}
@@ -234,14 +240,14 @@ function WindowFixture({ op, wall, style }: { op: RealizedOpening; wall: Wall; s
         <boxGeometry args={[w, FRAME, FRAME]} />
       </mesh>
       <mesh
-        position={[-(w / 2 - FRAME / 2), 0, sideH / 2]}
+        position={[-(w / 2 - FRAME / 2), 0, (sideLo + sideHi) / 2]}
         castShadow
         material={itemMaterial('whiteLacquer')}
       >
         <boxGeometry args={[FRAME, FRAME, sideH]} />
       </mesh>
       <mesh
-        position={[w / 2 - FRAME / 2, 0, sideH / 2]}
+        position={[w / 2 - FRAME / 2, 0, (sideLo + sideHi) / 2]}
         castShadow
         material={itemMaterial('whiteLacquer')}
       >
@@ -278,7 +284,8 @@ function WindowFixture({ op, wall, style }: { op: RealizedOpening; wall: Wall; s
           <boxGeometry args={[w, FRAME, FRAME]} />
         </mesh>
       )}
-      {/* panorama: interior mullions at an even pitch */}
+      {/* panorama: interior mullions at an even pitch, butted between
+          the rails like the side strips (0.11.0 miter rule) */}
       {Array.from({ length: mullions }, (_, i) => (
         <mesh
           key={i}
@@ -286,7 +293,7 @@ function WindowFixture({ op, wall, style }: { op: RealizedOpening; wall: Wall; s
           castShadow
           material={itemMaterial('whiteLacquer')}
         >
-          <boxGeometry args={[FRAME, FRAME, h - 0.06]} />
+          <boxGeometry args={[FRAME, FRAME, h - 2 * FRAME]} />
         </mesh>
       ))}
     </>
@@ -412,18 +419,28 @@ function DoorFixture({
     <group position={[hingeU, faceY, 0]} rotation={[0, 0, dirSign * swingSign * AJAR]}>
       {glazed ? (
         <>
-          {/* glazed balcony leaf: frame strips + glass */}
+          {/* glazed balcony leaf: rails full width, stiles BUTTED between
+              them (0.11.0 miter rule — rails span z [0,0.08] and
+              [h−0.09,h−0.01], stiles fill the gap exactly) */}
           <mesh position={[leafCx, 0, 0.04]} castShadow material={itemMaterial('whiteLacquer')}>
             <boxGeometry args={[leafW, LEAF_T, 0.08]} />
           </mesh>
           <mesh position={[leafCx, 0, h - 0.05]} castShadow material={itemMaterial('whiteLacquer')}>
             <boxGeometry args={[leafW, LEAF_T, 0.08]} />
           </mesh>
-          <mesh position={[dirSign * 0.04, 0, h / 2]} castShadow material={itemMaterial('whiteLacquer')}>
-            <boxGeometry args={[0.08, LEAF_T, h - 0.02]} />
+          <mesh
+            position={[dirSign * 0.04, 0, (0.08 + (h - 0.09)) / 2]}
+            castShadow
+            material={itemMaterial('whiteLacquer')}
+          >
+            <boxGeometry args={[0.08, LEAF_T, h - 0.17]} />
           </mesh>
-          <mesh position={[dirSign * (leafW - 0.04), 0, h / 2]} castShadow material={itemMaterial('whiteLacquer')}>
-            <boxGeometry args={[0.08, LEAF_T, h - 0.02]} />
+          <mesh
+            position={[dirSign * (leafW - 0.04), 0, (0.08 + (h - 0.09)) / 2]}
+            castShadow
+            material={itemMaterial('whiteLacquer')}
+          >
+            <boxGeometry args={[0.08, LEAF_T, h - 0.17]} />
           </mesh>
           <mesh position={[leafCx, 0, h / 2]} material={itemMaterial('glass')}>
             <boxGeometry args={[leafW - 0.1, 0.02, h - 0.15]} />
