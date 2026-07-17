@@ -58,6 +58,7 @@ export interface DocState {
   // window attachment (v6 curtains)
   attachFurniture: (id: FurnitureId, openingId: OpeningId, ref?: Vec2) => void
   detachFurniture: (id: FurnitureId) => void
+  setMaterialOverride: (id: FurnitureId, slot: string, value: string | undefined) => void
   duplicateFurniture: (ids: readonly FurnitureId[]) => FurnitureId[]
   alignFurniture: (ids: readonly FurnitureId[], edge: furniture.AlignEdge) => void
   distributeFurniture: (ids: readonly FurnitureId[], axis: 'x' | 'y') => void
@@ -129,6 +130,8 @@ export const useDocStore = create<DocState>()(
           attachFurniture: (id, openingId, ref) =>
             mutate((d) => attachment.attachFurnitureToOpening(d, id, openingId, ref)),
           detachFurniture: (id) => mutate((d) => attachment.detachFurniture(d, id)),
+          setMaterialOverride: (id, slot, value) =>
+            mutate((d) => furniture.setMaterialOverride(d, id, slot, value)),
           duplicateFurniture: (ids) => mutate((d) => furniture.duplicateFurniture(d, ids)),
           alignFurniture: (ids, edge) => mutate((d) => furniture.alignFurniture(d, ids, edge)),
           distributeFurniture: (ids, axis) => mutate((d) => furniture.distributeFurniture(d, ids, axis)),

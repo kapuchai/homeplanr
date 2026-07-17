@@ -6,7 +6,8 @@ import { formatArea, formatLength, fromDisplayLength, lengthUnitLabel, toDisplay
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { area } from '../geometry/polygon'
-import { FLOOR_GROUPS, FLOOR_MATERIALS, WALL_FINISHES, WALL_PAINTS } from '../catalog/palette'
+import { FLOOR_GROUPS, FLOOR_MATERIALS, PALETTE, WALL_FINISHES, WALL_PAINTS } from '../catalog/palette'
+import type { MaterialId } from '../catalog/types'
 import { ROOM_TYPES, roomTypeSpec } from '../catalog/roomTypes'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
@@ -49,6 +50,22 @@ async function uploadFurnitureImage(id: FurnitureId): Promise<void> {
     return
   }
   useDocStore.getState().setFurnitureImage(id, content)
+}
+
+/** Effective slot color for the picker input: hex override wins, then a
+ * PALETTE-id override's color, then the slot default. Always a 6-digit hex
+ * (input[type=color] rejects anything else); 3-digit overrides expand. */
+function effectiveSlotColor(defaultId: MaterialId, override: string | undefined): string {
+  const expand = (h: string) =>
+    h.length === 4 ? `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}` : h
+  if (override) {
+    if (/^#[0-9a-fA-F]{3}$/.test(override) || /^#[0-9a-fA-F]{6}$/.test(override)) {
+      return expand(override).toLowerCase()
+    }
+    const spec = PALETTE[override as MaterialId]
+    if (spec) return spec.color
+  }
+  return PALETTE[defaultId].color
 }
 
 function useFocusCommit(draft: string) {
@@ -770,6 +787,38 @@ export function PropertiesPanel() {
               ) : null}
             </div>
           </Row>
+        ) : null}
+        {item ? (
+          <>
+            <h4>{t('props.colors')}</h4>
+            {Object.entries(item.materials).map(([slot, defId]) => {
+              const override = furniture.materialOverrides?.[slot]
+              return (
+                <Row key={slot}>
+                  <span>{slot.charAt(0).toUpperCase() + slot.slice(1)}</span>
+                  <div className="color-slot">
+                    <input
+                      type="color"
+                      value={effectiveSlotColor(defId, override)}
+                      aria-label={t('props.colorFor', { slot })}
+                      onChange={(e) =>
+                        a.setMaterialOverride(furniture.id, slot, e.target.value)
+                      }
+                    />
+                    {override ? (
+                      <button
+                        type="button"
+                        className="swatch swatch-none"
+                        title={t('props.colorReset')}
+                        aria-label={t('props.colorReset')}
+                        onClick={() => a.setMaterialOverride(furniture.id, slot, undefined)}
+                      />
+                    ) : null}
+                  </div>
+                </Row>
+              )
+            })}
+          </>
         ) : null}
       </aside>
     )

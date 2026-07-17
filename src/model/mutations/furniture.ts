@@ -124,6 +124,26 @@ export function renameFurniture(doc: ProjectDocument, id: FurnitureId, name: str
   else delete f.name
 }
 
+/** Per-slot recolor (v6 coloring UI): value = PALETTE id or hex; undefined
+ * clears the slot; an emptied record leaves the document (files stay
+ * clean). Values are NOT validated here — the render side falls back on
+ * unknowns (open-registry rule). */
+export function setMaterialOverride(
+  doc: ProjectDocument,
+  id: FurnitureId,
+  slot: string,
+  value: string | undefined,
+): void {
+  const f = doc.furniture[id]
+  if (!f || !slot) return
+  if (value) {
+    f.materialOverrides = { ...(f.materialOverrides ?? {}), [slot]: value }
+  } else if (f.materialOverrides) {
+    delete f.materialOverrides[slot]
+    if (!Object.keys(f.materialOverrides).length) delete f.materialOverrides
+  }
+}
+
 /** Point an instance at an embedded asset (set-or-clear; absent = the
  * item's placeholder art). The asset itself is added via addAsset — orphans
  * left behind by a swap/clear are shed by gcAssets at file-write time. */

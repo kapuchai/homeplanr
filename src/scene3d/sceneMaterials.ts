@@ -22,6 +22,42 @@ export function itemMaterial(id: MaterialId): MeshStandardMaterial {
   return m
 }
 
+/**
+ * Per-slot furniture material with an optional instance override (v6
+ * coloring UI): a PALETTE id swaps the whole material; a hex recolors the
+ * slot's DEFAULT material (its roughness/metalness survive, so a recolored
+ * sofa still reads as fabric). Unknown values fall back to the default —
+ * open-registry rule, junk arrives from forward-compatible files. Color
+ * variants share the base shader program (color is a uniform), so the
+ * palette's few-programs invariant holds; the cache follows the
+ * wallFaceMaterial precedent (keyed, kept for the app lifetime).
+ */
+const overrideCache = new Map<string, MeshStandardMaterial>()
+const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
+export function furnitureSlotMaterial(
+  defaultId: MaterialId,
+  override: string | undefined,
+): MeshStandardMaterial {
+  if (!override || override === defaultId) return itemMaterial(defaultId)
+  if (override in PALETTE) return itemMaterial(override as MaterialId)
+  if (!HEX_RE.test(override)) return itemMaterial(defaultId)
+  const key = `${defaultId}|${override.toLowerCase()}`
+  let m = overrideCache.get(key)
+  if (!m) {
+    const spec = PALETTE[defaultId]
+    m = new MeshStandardMaterial({
+      color: override,
+      roughness: spec.roughness,
+      metalness: spec.metalness,
+      ...(spec.opacity !== undefined
+        ? { transparent: true, opacity: spec.opacity, depthWrite: false }
+        : {}),
+    })
+    overrideCache.set(key, m)
+  }
+  return m
+}
+
 const sceneCache = new Map<string, MeshStandardMaterial>()
 export function sceneMaterial(id: keyof typeof SCENE_MATERIALS): MeshStandardMaterial {
   let m = sceneCache.get(id)

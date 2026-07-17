@@ -31,7 +31,13 @@ import {
   type SceneBBox,
 } from './mesh/fitCamera'
 import { useAppSettings } from '../store/appSettings'
-import { floorMaterial, itemMaterial, sceneMaterial, wallFaceMaterial } from './sceneMaterials'
+import {
+  floorMaterial,
+  furnitureSlotMaterial,
+  itemMaterial,
+  sceneMaterial,
+  wallFaceMaterial,
+} from './sceneMaterials'
 import { useArtMaterial } from './artTexture'
 import { WalkControls } from './walk/WalkControls'
 import { useWalkStore } from './walk/walkStore'
@@ -223,7 +229,10 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
           material={
             g.mat === item.imageSlot && artMaterial
               ? artMaterial
-              : itemMaterial(item.materials[g.mat] as MaterialId)
+              : furnitureSlotMaterial(
+                  item.materials[g.mat] as MaterialId,
+                  f.materialOverrides?.[g.mat],
+                )
           }
           castShadow
         />

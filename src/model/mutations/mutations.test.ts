@@ -23,6 +23,7 @@ import {
   addFurnitureBatch,
   duplicateFurniture,
   resizeFurniture,
+  setMaterialOverride,
   transformFurniture,
 } from './furniture'
 import { vec, type Vec2 } from '../../geometry/vec'
@@ -465,6 +466,27 @@ describe('furniture', () => {
     expect(c.price).toBe(499)
     expect(c.materialOverrides).toEqual({ fabric: '#aabbcc' })
     expect(c.materialOverrides).not.toBe(f.materialOverrides) // no aliasing
+  })
+
+  it('setMaterialOverride sets, replaces, clears per slot; empty record leaves the doc', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'sofa-3',
+      x: 1,
+      y: 2,
+      size: { w: 2.2, d: 0.95, h: 0.85 },
+    })
+    setMaterialOverride(d, id, 'fabric', '#ff0000')
+    expect(d.furniture[id]!.materialOverrides).toEqual({ fabric: '#ff0000' })
+    setMaterialOverride(d, id, 'legs', 'woodDark')
+    setMaterialOverride(d, id, 'fabric', '#00ff00') // replace in place
+    expect(d.furniture[id]!.materialOverrides).toEqual({ fabric: '#00ff00', legs: 'woodDark' })
+    setMaterialOverride(d, id, 'fabric', undefined)
+    expect(d.furniture[id]!.materialOverrides).toEqual({ legs: 'woodDark' })
+    setMaterialOverride(d, id, 'legs', undefined)
+    expect('materialOverrides' in d.furniture[id]!).toBe(false) // files stay clean
+    setMaterialOverride(d, id, '', '#123456') // junk slot: no-op
+    expect('materialOverrides' in d.furniture[id]!).toBe(false)
   })
 
   it('transformFurniture mirrored: true writes the flag, false deletes it', () => {
