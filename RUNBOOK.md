@@ -4,7 +4,42 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.10.0, 2026-07-17)
+## State (as of v0.11.0, 2026-07-17)
+
+0.11.0 "3D Experience" (NO schema bump — additive `previewAssetId`/
+`previewCustom` on the v6 doc root): **FPS mouse-look** (`pointerLock.ts`
+opportunistic lock with a session verdict; WebKitGTK grants it ONLY when
+`requestPointerLock` is called INSIDE the gesture handler — the entering
+floor click requests it in `handleFloorClick`, the walking effect's
+deferred attempt is the lenient-engine fallback; capture-drag stays armed
+so a refused request costs nothing; two dead-lock guards — a zero-delta
+streak AND a `LOCK_DEADMAN_MS` timer for locks that emit no events —
+release + mark the verdict broken; unexpected unlocks disambiguated by
+`document.hasFocus()`: Esc-under-lock exits walk, alt-tab keeps walking on
+drag), **3D-view settings** (`appSettings`: lookMode auto/lock/drag,
+lookSensitivity presets, collisionEnabled, wallHideMode off/hide,
+ceilingsEnabled; OptionsDialog "3D view" `<section>` with the extracted
+`OnOffRow`; collision OFF bypasses BOTH `resolveMove` [WalkControls] and
+`validateTeleport` [PlannerCanvas]), **dollhouse wall hiding**
+(`wallOcclusion.ts` `hiddenWallIds` side-test vs the sceneBBox anchor with
+dead-zones; `OccluderBridge` recomputes on throttled OrbitControls change +
+`invalidate()`; `visible=false` on per-wall group + its OpeningFixtures +
+junction patch [patch hides only when EVERY incident wall hides]; default
+ON, off while walking), **per-room ceilings** (`buildCeilingMeshData` =
+floor triangulation lifted to the room's LOWEST wall height, SINGLE-SIDED
+down-facing so backface culling clears top/high-orbit views with no
+occluder logic; `castShadow=false` keeps interiors as bright as today —
+hemi/ambient/IBL are unshadowed, only the directional sun would darken;
+default ON), **z-fighting fixes** (`realize.ts` `SEAM_EPS` 0.5 mm/side part
+inset keeping authored center, dims ≤5 mm exempt; WindowFixture + balcony
+DoorFixture frame strips BUTT instead of overlap), **save-preview image**
+(`scenePreview.ts` offscreen top-down 512² JPEG from the live builders
+minus ceilings/fixtures, transient renderer + failure latch;
+`buildFileJson` embeds into a write-time CLONE at all three write sites
+unless `previewCustom`; `referencedAssetIds` counts `previewAssetId` so GC
+keeps it; recents `thumb` ~128² JPEG in the File menu; custom override =
+`setPreviewImage` undoable mutation in the empty-selection PropertiesPanel).
+ExportDialog preview deliberately dropped (2D-export dialog).
 
 0.10.0 "Openings" (NO schema bump — rides v6's `Opening.style`):
 **opening style registry** (`catalog/openingStyles.ts` — 6 door + 4
@@ -340,6 +375,67 @@ export + 3D screenshot, file association + single instance, Linux
 - **Confirm prompts QUEUE (FIFO)** and each declares a non-destructive
   `escValue` (the recovery prompt's Esc means dismiss-keep-blob, never
   Discard). The shared `Modal` owns Esc/focus-trap/restore.
+- **Pointer Lock is requested INSIDE the gesture (0.11.0)**: WebKitGTK
+  grants `requestPointerLock` only from a user-activation handler — the
+  entering floor click calls it in `handleFloorClick`; WalkControls'
+  walking-effect attempt is the lenient-engine fallback, NOT the primary
+  path. Capture-drag stays armed regardless so a refused/absent lock
+  costs nothing (drag is the e2e-testable path — Playwright can't drive
+  lock). A lock that ENGAGES with dead plumbing is caught two ways —
+  a zero-delta streak AND a deadman timer (no events at all) — both
+  release + latch the session verdict `broken`. Unexpected unlocks
+  disambiguate on `document.hasFocus()`: focused ⇒ Esc ⇒ exit walk;
+  unfocused ⇒ alt-tab ⇒ keep walking on drag. `walkStore.locked` gates
+  floor-click teleports (no cursor under lock).
+- **Collision toggle bypasses BOTH oracles (0.11.0)**: `collisionEnabled`
+  off short-circuits free-walk `resolveMove` (WalkControls, `plan += d`)
+  AND floor-click `validateTeleport` (PlannerCanvas, raw plan to
+  `requestWalkTo`). Patching only one still blocks the other. Constants
+  (PLAYER_RADIUS, MAX_SUBSTEP anti-tunnel) untouched — the toggle is a
+  short-circuit, never a retune.
+- **Wall occlusion is a pure side-test (0.11.0)** (`wallOcclusion.ts`):
+  a wall hides iff camera and the sceneBBox anchor are on clearly
+  opposite sides of its infinite line (dead-zones keep the top view and
+  partitions-through-the-anchor visible). `visible=false` (never a
+  material clone — hide mode needs none) on the per-wall group, its
+  OpeningFixtures, AND the junction patch (a pillar hides ONLY when every
+  incident wall hides, else a visible wall loses its end cap). Recompute
+  is throttled on OrbitControls `change` + `invalidate()` (demand
+  frameloop). OFF while walking. patchHidden reads `doc.walls` incidence
+  but the hidden set is `wallSolids`-domain — safe because normalizeGraph
+  welds away any wall too short to reach a `wallSolids` entry.
+- **Ceilings are single-sided, down-facing, non-casting (0.11.0)**
+  (`buildCeilingMeshData`, `CeilingMesh`): the room's floor triangulation
+  (holes applied) lifted to the room's LOWEST wall height, winding
+  reversed so the −z normal is the visible face — backface culling clears
+  top/high-orbit views with NO occluder pass. `castShadow=false` is
+  load-bearing: hemi/ambient/IBL are unshadowed in three.js, so only the
+  directional sun could darken a covered room; an uncasting ceiling keeps
+  interiors exactly as bright as pre-0.11.0 (revisit when 0.12.0 adds
+  interior lights). Gated on `ceilingsEnabled`.
+- **Furniture seam inset is render-only (0.11.0)** (`realize.ts`
+  `SEAM_EPS` 0.5 mm/side): every part is built smaller around its
+  AUTHORED center (translate math uses the original size so centers never
+  drift), dims ≤ `MIN_SHRINKABLE` (5 mm) exempt so thin panels can't
+  invert. Symbols, footprints, and collision derive from item DEFS, never
+  realized geometry — the inset never reaches them. Window/door frame
+  strips BUTT (start above the bottom rail, stop under the top rail / arch
+  spring) instead of overlapping — no two frame boxes share a coplanar
+  face.
+- **Save preview rides the assets map, never blocks a save (0.11.0)**:
+  doc-level `previewAssetId`/`previewCustom` are ADDITIVE on v6 (no bump);
+  `referencedAssetIds` counts `previewAssetId` (THE GC oracle — else
+  gcAssets eats it), the validator keeps dangling ids like furniture art,
+  both stay OUT of the self-heal hash. `buildFileJson` (all three write
+  sites — save/save-as/autosave write identical bytes) renders a fresh
+  top-down JPEG into a write-time CLONE unless `previewCustom` — the store
+  doc is NEVER mutated (no dirty state, no undo entry; content-dedup keeps
+  ids stable), and ANY failure (latched GL, empty scene, encoder) falls
+  through to plain bytes. `scenePreview.ts` uses a TRANSIENT renderer
+  (create→render→dispose per call — the one-persistent-context invariant
+  holds) with a session failure latch. The custom override
+  (`setPreviewImage`) IS an undoable, dirtying mutation — the deliberate
+  asymmetry vs the write-time auto embed.
 
 ## Schema change checklist (bumping schema N → N+1)
 
@@ -375,8 +471,12 @@ export + 3D screenshot, file association + single instance, Linux
    localStorage — recovery/recents don't carry over).
 5. CI green before considering a push done (`gh run watch`).
 6. Dark-mode visual pass — 2D and 3D — after any theme-touching change.
-7. Walk-mode look: pointer-capture drag on WebKitGTK in `npm run tauri dev`
-   (no text selection, no dropped drags).
+7. Walk-mode look on WebKitGTK in `npm run tauri dev` (0.11.0): with
+   *Walk look = Auto/Mouse*, entering walk hides the cursor and the mouse
+   turns the head directly (Pointer Lock — verified working when
+   requested inside the entering click); Esc exits; alt-tab keeps you
+   walking. With *Walk look = Drag* (the fallback), pointer-capture drag
+   still works — no text selection, no dropped drags.
 8. Packaged file-association double-click: cold start AND second-instance
    relay into the already-running window.
 9. Catalog thumbnails render; then force a context loss (devtools

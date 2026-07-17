@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-07-17
+
+### Added
+
+- **First-person mouse-look in walk mode** — walk mode now grabs the
+  mouse for true FPS look where the platform supports it: the cursor
+  vanishes and the mouse turns your head directly, no dragging. Where
+  pointer capture isn't available it falls back to the familiar
+  drag-to-look, automatically. Press Esc to leave. A *Walk look* setting
+  (Auto / Mouse / Drag) and a *Look sensitivity* control live in the new
+  3D-view options
+- **3D view settings** — a new *3D view* section in Options: walk-look
+  mode and sensitivity, a *Walk collision* switch (turn it off to walk
+  through walls), *Hide facing walls*, and *Ceilings*
+- **See into rooms from outside** — in the orbit view, walls between you
+  and the room's interior fade away as you rotate, so you look straight
+  into the floor plan like a dollhouse. Toggleable; always off while
+  walking (you're inside)
+- **Ceilings** — rooms now have a ceiling overhead in walk mode and from
+  low angles. Looking down from the top or a high orbit, ceilings step
+  out of the way so you still see the plan. Toggleable
+- **A picture of every plan** — saving a `.homeplanr` file now tucks a
+  small top-down 3D snapshot inside it, shown as a thumbnail next to the
+  file in *File → recent*. Prefer your own image? Set a custom preview
+  from the empty-selection properties panel (*Preview image → Upload*),
+  or switch back to *Auto* any time
+
+### Changed
+
+- 3D furniture no longer shimmers along the seams where parts meet
+  (a sub-millimetre inset), and window and door frames no longer flicker
+  at their corners (mitred frame joints)
+
 ## [0.10.0] - 2026-07-17
 
 ### Added
