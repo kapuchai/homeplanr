@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 6,
+  "id": "p_golden_full",
+  "name": "Golden full",
+  "createdAt": "2026-07-11T00:00:00.000Z",
+  "updatedAt": "2026-07-12T00:00:00.000Z",
+  "settings": {
+    "gridSize": 0.1,
+    "defaultWallThickness": 0.15,
+    "defaultWallHeight": 2.5
+  },
+  "nodes": {
+    "n_2mTt20Q8b8": {
+      "id": "n_2mTt20Q8b8",
+      "x": 0,
+      "y": 0
+    },
+    "n_wPBXSY3Zei": {
+      "id": "n_wPBXSY3Zei",
+      "x": 8,
+      "y": 0
+    },
+    "n_k_-cgNFF-R": {
+      "id": "n_k_-cgNFF-R",
+      "x": 8,
+      "y": 5
+    },
+    "n_px7DDq7DA9": {
+      "id": "n_px7DDq7DA9",
+      "x": 0,
+      "y": 5
+    },
+    "n_n4hDCmwP-s": {
+      "id": "n_n4hDCmwP-s",
+      "x": 5,
+      "y": 0
+    },
+    "n_qFajI1-FR-": {
+      "id": "n_qFajI1-FR-",
+      "x": 5,
+      "y": 5
+    },
+    "n_tbxw0LwfzB": {
+      "id": "n_tbxw0LwfzB",
+      "x": 9.6,
+      "y": -0.35
+    }
+  },
+  "walls": {
+    "w_LEYa5p3d-3": {
+      "id": "w_LEYa5p3d-3",
+      "a": "n_2mTt20Q8b8",
+      "b": "n_n4hDCmwP-s",
+      "thickness": 0.15,
+      "height": 2.5,
+      "paintFront": "sage",
+      "paintBack": "terracotta",
+      "finishFront": "wallpaperStripe",
+      "finishBack": "plaster"
+    },
+    "w_e-RTfpQPXu": {
+      "id": "w_e-RTfpQPXu",
+      "a": "n_wPBXSY3Zei",
+      "b": "n_k_-cgNFF-R",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_iLDxBggTLF": {
+      "id": "w_iLDxBggTLF",
+      "a": "n_k_-cgNFF-R",
+      "b": "n_qFajI1-FR-",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_3GWAkjdnIq": {
+      "id": "w_3GWAkjdnIq",
+      "a": "n_px7DDq7DA9",
+      "b": "n_2mTt20Q8b8",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_JmfsExVq1-": {
+      "id": "w_JmfsExVq1-",
+      "a": "n_n4hDCmwP-s",
+      "b": "n_qFajI1-FR-",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_GGn6SCpSy6": {
+      "id": "w_GGn6SCpSy6",
+      "a": "n_n4hDCmwP-s",
+      "b": "n_wPBXSY3Zei",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_XLOIz8q7DT": {
+      "id": "w_XLOIz8q7DT",
+      "a": "n_qFajI1-FR-",
+      "b": "n_px7DDq7DA9",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_uCnz8TFoqx": {
+      "id": "w_uCnz8TFoqx",
+      "a": "n_wPBXSY3Zei",
+      "b": "n_tbxw0LwfzB",
+      "thickness": 0.15,
+      "height": 2.5
+    }
+  },
+  "openings": {
+    "o_ha5mQmzE99": {
+      "id": "o_ha5mQmzE99",
+      "wallId": "w_JmfsExVq1-",
+      "t": 0.45,
+      "kind": "door",
+      "width": 0.9,
+      "height": 2,
+      "hinge": "a",
+      "swing": "front",
+      "style": "double"
+    },
+    "o_YFT9rqd6fb": {
+      "id": "o_YFT9rqd6fb",
+      "wallId": "w_LEYa5p3d-3",
+      "t": 0.4,
+      "kind": "window",
+      "width": 1.2,
+      "height": 1.2,
+      "sillHeight": 0.9,
+      "style": "arched"
+    }
+  },
+  "rooms": {
+    "r_qVnWhyjthM": {
+      "id": "r_qVnWhyjthM",
+      "wallCycle": [
+        "w_LEYa5p3d-3",
+        "w_JmfsExVq1-",
+        "w_XLOIz8q7DT",
+        "w_3GWAkjdnIq"
+      ],
+      "holeCycles": [],
+      "name": "Living room",
+      "floorMaterialId": "parquetHerringbone",
+      "roomType": "living"
+    },
+    "r_yPTrAO7Uqc": {
+      "id": "r_yPTrAO7Uqc",
+      "wallCycle": [
+        "w_e-RTfpQPXu",
+        "w_iLDxBggTLF",
+        "w_JmfsExVq1-",
+        "w_GGn6SCpSy6"
+      ],
+      "holeCycles": [],
+      "name": "Bedroom"
+    }
+  },
+  "furniture": {
+    "f_iUvBPnkVFG": {
+      "id": "f_iUvBPnkVFG",
+      "catalogItemId": "sofa-3",
+      "x": 2.2,
+      "y": 0.75,
+      "rotation": 0,
+      "size": {
+        "w": 2.2,
+        "d": 0.95,
+        "h": 0.85
+      },
+      "elevation": 0,
+      "mirrored": true,
+      "price": 499,
+      "notes": "Golden notes",
+      "materialOverrides": {
+        "fabric": "oak",
+        "legs": "#334455"
+      }
+    },
+    "f_08SJ06ZXvF": {
+      "id": "f_08SJ06ZXvF",
+      "catalogItemId": "dining-table",
+      "x": 3.2,
+      "y": 3.2,
+      "rotation": 0,
+      "size": {
+        "w": 1.6,
+        "d": 0.9,
+        "h": 0.74
+      },
+      "elevation": 0
+    },
+    "f_wSACrQjasi": {
+      "id": "f_wSACrQjasi",
+      "catalogItemId": "dining-chair",
+      "x": 3.2,
+      "y": 2.4,
+      "rotation": 0,
+      "size": {
+        "w": 0.45,
+        "d": 0.52,
+        "h": 0.88
+      },
+      "elevation": 0
+    },
+    "f_SDjHgG8IH8": {
+      "id": "f_SDjHgG8IH8",
+      "catalogItemId": "bed-double",
+      "x": 6.5,
+      "y": 2.2,
+      "rotation": 1.5707963267948966,
+      "size": {
+        "w": 1.67,
+        "d": 2.12,
+        "h": 1
+      },
+      "elevation": 0
+    },
+    "f_hUbN4N1i8N": {
+      "id": "f_hUbN4N1i8N",
+      "catalogItemId": "wardrobe",
+      "x": 6.4,
+      "y": 4.6,
+      "rotation": 3.141592653589793,
+      "size": {
+        "w": 1.5,
+        "d": 0.6,
+        "h": 2.2
+      },
+      "elevation": 0
+    },
+    "f_m3qCNrb-d5": {
+      "id": "f_m3qCNrb-d5",
+      "catalogItemId": "toilet",
+      "x": 7.7,
+      "y": 0.5,
+      "rotation": -1.5707963267948966,
+      "size": {
+        "w": 0.38,
+        "d": 0.65,
+        "h": 0.78
+      },
+      "elevation": 0
+    },
+    "f_2Gcz3fc2Qt": {
+      "id": "f_2Gcz3fc2Qt",
+      "catalogItemId": "art-portrait",
+      "x": 0.7,
+      "y": 4.85,
+      "rotation": 3.141592653589793,
+      "size": {
+        "w": 0.5,
+        "d": 0.2,
+        "h": 0.7
+      },
+      "elevation": 1.15,
+      "assetId": "i_UR1QHB1cOE"
+    },
+    "f_Gk_eKJOZ-7": {
+      "id": "f_Gk_eKJOZ-7",
+      "catalogItemId": "curtain",
+      "x": 2,
+      "y": 0.175,
+      "rotation": -3.141592653589793,
+      "size": {
+        "w": 1.5,
+        "d": 0.2,
+        "h": 2.4
+      },
+      "elevation": 0,
+      "attachedOpeningId": "o_YFT9rqd6fb"
+    },
+    "f___2KnvY47j": {
+      "id": "f___2KnvY47j",
+      "catalogItemId": "floor-lamp",
+      "x": 0.6,
+      "y": 4.2,
+      "rotation": 0,
+      "size": {
+        "w": 0.35,
+        "d": 0.35,
+        "h": 1.6
+      },
+      "elevation": 0,
+      "lumen": 1400,
+      "lightOn": false
+    }
+  },
+  "annotations": {
+    "a_phI1iWxxgc": {
+      "id": "a_phI1iWxxgc",
+      "kind": "dimension",
+      "a": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "b": {
+        "x": 3.5,
+        "y": 0.5
+      },
+      "offset": 0.35
+    },
+    "a_XxeOK-gfpH": {
+      "id": "a_XxeOK-gfpH",
+      "kind": "label",
+      "x": 2,
+      "y": 2.5,
+      "text": "Golden label",
+      "rotation": 0.5235987755982988,
+      "fontSize": 0.2
+    },
+    "a_V_4XTvUBiJ": {
+      "id": "a_V_4XTvUBiJ",
+      "kind": "area",
+      "points": [
+        {
+          "x": 0.6,
+          "y": 0.6
+        },
+        {
+          "x": 2.4,
+          "y": 0.6
+        },
+        {
+          "x": 2.4,
+          "y": 1.8
+        },
+        {
+          "x": 0.6,
+          "y": 1.8
+        }
+      ]
+    }
+  },
+  "assets": {
+    "i_UR1QHB1cOE": {
+      "id": "i_UR1QHB1cOE",
+      "mime": "image/jpeg",
+      "data": "Z29sZGVuLWFydA==",
+      "w": 24,
+      "h": 32
+    },
+    "i_BTw8jtTEQR": {
+      "id": "i_BTw8jtTEQR",
+      "mime": "image/jpeg",
+      "data": "Z29sZGVuLXByZXZpZXc=",
+      "w": 16,
+      "h": 16
+    }
+  },
+  "previewAssetId": "i_BTw8jtTEQR",
+  "previewCustom": true
+}

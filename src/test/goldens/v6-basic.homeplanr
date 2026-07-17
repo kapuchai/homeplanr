@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 6,
+  "id": "p_golden_basic",
+  "name": "Golden basic",
+  "createdAt": "2026-07-12T00:00:00.000Z",
+  "updatedAt": "2026-07-12T00:00:00.000Z",
+  "settings": {
+    "gridSize": 0.1,
+    "defaultWallThickness": 0.15,
+    "defaultWallHeight": 2.5
+  },
+  "nodes": {
+    "n_h03eWIRCnT": {
+      "id": "n_h03eWIRCnT",
+      "x": 0,
+      "y": 0
+    },
+    "n_r0XXgXDvEh": {
+      "id": "n_r0XXgXDvEh",
+      "x": 4,
+      "y": 0
+    },
+    "n_LAikcs5LjN": {
+      "id": "n_LAikcs5LjN",
+      "x": 4,
+      "y": 3
+    },
+    "n_JRTzl1XioX": {
+      "id": "n_JRTzl1XioX",
+      "x": 0,
+      "y": 3
+    }
+  },
+  "walls": {
+    "w_IzRpnKQWQb": {
+      "id": "w_IzRpnKQWQb",
+      "a": "n_h03eWIRCnT",
+      "b": "n_r0XXgXDvEh",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_x1Yk92l3qJ": {
+      "id": "w_x1Yk92l3qJ",
+      "a": "n_r0XXgXDvEh",
+      "b": "n_LAikcs5LjN",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w__-x57VpyKt": {
+      "id": "w__-x57VpyKt",
+      "a": "n_LAikcs5LjN",
+      "b": "n_JRTzl1XioX",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_D2-D1QtX4y": {
+      "id": "w_D2-D1QtX4y",
+      "a": "n_JRTzl1XioX",
+      "b": "n_h03eWIRCnT",
+      "thickness": 0.15,
+      "height": 2.5
+    }
+  },
+  "openings": {},
+  "rooms": {
+    "r_SFVzBDt0Hq": {
+      "id": "r_SFVzBDt0Hq",
+      "wallCycle": [
+        "w_IzRpnKQWQb",
+        "w_x1Yk92l3qJ",
+        "w__-x57VpyKt",
+        "w_D2-D1QtX4y"
+      ],
+      "holeCycles": []
+    }
+  },
+  "furniture": {},
+  "annotations": {},
+  "assets": {}
+}

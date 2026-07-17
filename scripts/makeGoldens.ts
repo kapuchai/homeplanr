@@ -15,10 +15,19 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SCHEMA_VERSION, emptyDocument, type ProjectDocument } from '../src/model/types'
 import { addWallChain, updateWall } from '../src/model/mutations/walls'
+import { updateOpening } from '../src/model/mutations/openings'
 import { setRoomFloorMaterial } from '../src/model/mutations/rooms'
-import { transformFurniture } from '../src/model/mutations/furniture'
+import {
+  addFurniture,
+  setFurnitureAsset,
+  setFurnitureLight,
+  transformFurniture,
+} from '../src/model/mutations/furniture'
+import { addAsset, setPreviewImage } from '../src/model/mutations/assets'
+import { attachFurnitureToOpening } from '../src/model/mutations/attachment'
 import { addArea, addDimension, addLabel, updateAnnotation } from '../src/model/mutations/annotations'
 import { renameProject } from '../src/model/mutations/project'
+import { CATALOG } from '../src/catalog'
 import { serializeDocument } from '../src/store/persistence/serialize'
 import { buildFixtureDoc } from '../src/test/fixtureDoc'
 import { vec } from '../src/geometry/vec'
@@ -45,22 +54,23 @@ function buildBasic(): ProjectDocument {
 }
 
 /**
- * The fixture apartment plus the v5 surface worth freezing: a v5 grouped-
- * registry floor (parquetHerringbone), Room.roomType (UI shipped 0.8.0),
- * per-side wall paint + per-side DIFFERENT finishes (the v5 split, using
- * v5-added registry ids: wallpaperStripe front / plaster back), a mirrored
- * furniture item, the v3 annotations (offset dimension, rotated resized
- * label) plus a v4 area annotation, and the v4 batched fields:
- * FurnitureInstance.price/notes/materialOverrides (still schema-only in v5
- * — no mutations exist, so they are frozen by direct assignment, mirroring
- * the migrations-test roundtrip pattern).
+ * The fixture apartment plus the full v6 surface worth freezing: everything
+ * the v5 golden froze (grouped-registry floor, roomType, per-side paint +
+ * per-side DIFFERENT finishes, mirrored furniture, v3/v4 annotations,
+ * price/notes/materialOverrides) PLUS the v6 features: an embedded image
+ * asset + wall art referencing it (doc.assets / FurnitureInstance.assetId),
+ * a curtain attached to a window (attachedOpeningId write-through), opening
+ * styles on both kinds (Opening.style — 0.10.0 rode the v6 field), lamp
+ * light state (lumen + stored lightOn:false — 0.12.0 rode the v6 fields),
+ * and the 0.11.0 custom save preview (previewAssetId + previewCustom,
+ * additive on v6).
  * (Each schema bump rewrites this builder to freeze the OUTGOING
  * version's real feature set — see RUNBOOK.)
  */
 /** The schema version these builders freeze. Bumping SCHEMA_VERSION without
  * rewriting the builders (RUNBOOK checklist step 1) must fail loudly here —
  * never mint goldens whose shape doesn't match their version. */
-const BUILDER_VERSION = 5
+const BUILDER_VERSION = 6
 
 function buildFull(): ProjectDocument {
   assert(
@@ -96,9 +106,53 @@ function buildFull(): ProjectDocument {
   const areaId = addArea(doc, [vec(0.6, 0.6), vec(2.4, 0.6), vec(2.4, 1.8), vec(0.6, 1.8)])
   assert(areaId, 'full: area annotation rejected')
 
+  // --- v6 surface ---
   const openings = Object.values(doc.openings)
+  const door = openings.find((o) => o.kind === 'door')
+  const window = openings.find((o) => o.kind === 'window')
+  assert(door && window, 'full: fixture doc lacks a door/window')
+  updateOpening(doc, door.id, { style: 'double' })
+  updateOpening(doc, window.id, { style: 'arched' })
+
+  const placeExtra = (catalogItemId: string, x: number, y: number, rotation = 0) => {
+    const item = CATALOG[catalogItemId]
+    assert(item, `full: unknown catalog id ${catalogItemId}`)
+    return addFurniture(doc, {
+      catalogItemId,
+      x,
+      y,
+      rotation,
+      size: { ...item.dims },
+      elevation: item.defaultElevation ?? 0,
+    })
+  }
+  const artId = placeExtra('art-portrait', 0.7, 4.85, Math.PI)
+  const artAssetId = addAsset(doc, { mime: 'image/jpeg', data: 'Z29sZGVuLWFydA==', w: 24, h: 32 })
+  setFurnitureAsset(doc, artId, artAssetId)
+  const curtainId = placeExtra('curtain', 2, 0.2)
+  attachFurnitureToOpening(doc, curtainId, window.id)
+  const lampId = placeExtra('floor-lamp', 0.6, 4.2)
+  setFurnitureLight(doc, lampId, { lumen: 1400, lightOn: false })
+  setPreviewImage(doc, { mime: 'image/jpeg', data: 'Z29sZGVuLXByZXZpZXc=', w: 16, h: 16 })
+
   assert(openings.some((o) => o.kind === 'door'), 'full: expected a door')
   assert(openings.some((o) => o.kind === 'window'), 'full: expected a window')
+  assert(doc.openings[door.id]!.style === 'double', 'full: door style not frozen')
+  assert(doc.openings[window.id]!.style === 'arched', 'full: window style not frozen')
+  assert(doc.furniture[artId]!.assetId === artAssetId, 'full: wall-art assetId not frozen')
+  assert(doc.assets[artAssetId], 'full: art asset missing from doc.assets')
+  assert(
+    doc.furniture[curtainId]!.attachedOpeningId === window.id,
+    'full: curtain attachment not frozen',
+  )
+  assert(
+    doc.furniture[lampId]!.lumen === 1400 && doc.furniture[lampId]!.lightOn === false,
+    'full: lamp lumen/lightOn not frozen',
+  )
+  assert(
+    doc.previewAssetId && doc.previewCustom === true && doc.assets[doc.previewAssetId],
+    'full: custom preview not frozen',
+  )
   assert(count(doc.furniture) >= 2, 'full: expected 2+ furniture items')
   assert(
     Object.values(doc.furniture).every((f) => f.catalogItemId),
