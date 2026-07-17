@@ -5,6 +5,46 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-07-17
+
+### Added
+
+- **Door styles** — doors are no longer one-of-each. Pick a style before
+  placing: *Standard*, *Sliding* (barn-style panel gliding along the
+  wall), *Double* (two mirrored leaves), *Balcony* (glazed leaf),
+  *Passage* (an open doorway with no leaf at all), or *Garage* (a wide
+  segmented gate). Each has its own plan symbol and 3D look
+- **Window styles** — *Standard*, *Full-height* (glass from the floor),
+  *Panorama* (extra-wide with mullions), and *Arched* (a rounded arch in
+  3D). Styles pre-fill sensible sizes; every dimension stays editable
+- **Doors stand ajar in 3D** — the flat closed slab is gone. Hinged
+  doors stand three-quarters open on their actual hinge side and swing
+  direction, matching the plan's swing arc exactly; sliding doors stand
+  partially slid under their track; garage doors sit closed. Walk mode
+  still passes through doorways freely — an open leaf never blocks you
+- **Style cards in the side panel** — activating the Door or Window tool
+  swaps the furniture catalog for style cards with drawn previews; the
+  chosen style stays armed per tool. Restyle an existing opening any
+  time from its properties panel — dimensions you set are kept
+- **Flush placement** — dragging or placing an opening near a neighbor
+  snaps it flush against it, leaving no sliver of wall between; Ctrl
+  drops it freely, like every other snap
+- **Drag openings between walls** — dragging a door or window near
+  another wall moves it there (with its size, hinge, swing, and style;
+  attached curtains follow their window). If it doesn't fit, it stays
+  put
+
+### Changed
+
+- The pre-click door/window ghost now previews the full styled symbol
+  (windows show their glazing lines too)
+
+### Fixed
+
+- A raw color literal introduced in 0.9.0's review fixes slipped past
+  the color lint into the 3D art-texture path; main-branch CI has been
+  red on it since — now sourced from the palette (no visual change)
+
 ## [0.9.0] - 2026-07-17
 
 ### Added

@@ -4,9 +4,35 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.9.0, 2026-07-17)
+## State (as of v0.10.0, 2026-07-17)
 
-0.9.0 "Furniture & Catalog" (schema v5 → **v6**): **embedded image
+0.10.0 "Openings" (NO schema bump — rides v6's `Opening.style`):
+**opening style registry** (`catalog/openingStyles.ts` — 6 door + 4
+window styles, `openingStyleSpec(kind, id)` non-null fallback to standard
+is the ONLY lookup path; absent style IS standard, restyle-to-standard
+DELETES the field; `defaults` seed dims at placement only, `restyleSill`
+the one restyle-forced field), **2D ink prims** (`OpeningSymbol.ink` =
+role-tagged lines/arcs from `openingInk`; TWO styling twins:
+`OpeningInkGlyph` [editor/ghost/style cards] + exportPlanSvg's emitter;
+doorGlyph stays the only arc source — double doors COMPOSE two
+half-width calls, sweeps never re-derived), **mode-aware catalog panel**
+(place-opening tool swaps the furniture grid for style cards drawn
+through the REAL glyph pipeline; per-kind armed memory in
+toolParams.doorStyle/windowStyle), **3D per-style fixtures**
+(WindowFixture/DoorFixture in PlannerCanvas; ajar leaf φ =
+dirSign·swingSign·AJAR mirrors the pinned doorGlyph — verified vs 2D
+arcs; arched = elliptical torus + wall-toned spandrel INSIDE the
+rectangular carve; leaves are VISUAL ONLY, collision never sees fixture
+meshes), **flush-snap** (`fitIntoGaps` snapRadius onto gap edges at the
+legal 1cm margin; `findOpeningSlot` gained {exclude, snapRadius}; drag +
+ghost snap, Ctrl suspends; demoted pass never snaps), **wall-to-wall
+drag** (`rehomeOpening` + selectTool nearest-other-wall capture with 2px
+hysteresis, slot-gated; curtains follow via write-through), **clipboard
+carries op.style** (payload whitelist extended). Also fixed: 0.9.0's
+lint:colors CI regression (raw hex in artTexture → palette
+TEXTURE_BASE_WHITE).
+
+0.9.0 recap (schema v5 → **v6**): **embedded image
 assets** (`doc.assets` top-level map so undo shares it structurally;
 ingest = the ONLY pixel entry — downscale ≤1024, JPEG/WebP-checked/PNG,
 ≤400KB ladder in `imageIngest.ts`; gcAssets prunes orphans from FILE
@@ -122,7 +148,7 @@ export + 3D screenshot, file association + single instance, Linux
 |---|---|
 | Dev (native window, HMR) | `npm run tauri dev` |
 | Dev (browser only) | `npm run dev` |
-| Unit tests (853) | `npm test` |
+| Unit tests (879) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Visual baselines (local rig) | `npx playwright test --project=chromium e2e/visual.spec.ts` — add `--update-snapshots` to rebaseline, then EYEBALL the new PNGs |
 | Native smoke (Tier 1) | `npm run smoke:native` — needs a FRESH release binary (`npm run tauri build -- --no-bundle`), `~/.cargo/bin/tauri-driver`, and no running homeplanr instance |
@@ -285,6 +311,28 @@ export + 3D screenshot, file association + single instance, Linux
 - **Every catalog item has a KEYWORDS entry** (`catalog/search.ts`) —
   the completeness test fails the build for a missing or stale id, and
   the hygiene test rejects name-redundant keywords.
+- **Opening styles (0.10.0) resolve ONLY through `openingStyleSpec`**
+  (open registry; unknown/absent → the kind's standard spec, never null).
+  Absent style IS standard: mutations never persist 'standard' and
+  restyling back to it deletes the field. `op.width` means REVEAL WIDTH
+  for every style — attachment, hit test, dimensions, and collision all
+  depend on it; a style must never reinterpret it.
+- **Opening ink twins (0.10.0)**: `openingInk` builds role-tagged prims
+  (jamb/leaf/glazing/track/passage + swing arcs); `OpeningInkGlyph`
+  (editor layer, ghost, style cards) and exportPlanSvg's ink emitter are
+  the TWO styling twins that must stay in agreement. doorGlyph remains
+  the only swing-arc source — double doors compose two half-width calls;
+  never re-derive sweeps per style.
+- **3D door leaves are VISUAL ONLY** (`DoorFixture`): the ajar rotation
+  φ = dirSign·swingSign·AJAR mirrors doorGlyph's pinned semantics (at
+  90° it reduces to leafEnd algebraically). Collision reads realized
+  intervals and never sees fixture meshes — an ajar leaf must never
+  enter the collision set.
+- **Flush-snap margin stays law** (`fitIntoGaps` snapRadius): snapping
+  lands at gap edges = neighbor + openingCoreMargin (1 cm), never
+  closer; zero radius is bit-identical to pre-0.10.0 and the demoted
+  paste pass never snaps. `findOpeningSlot`'s `exclude` exists so a
+  dragged opening ignores itself — never pass it on placement paths.
 - **File writes serialize** through `serializedWrite` (controller.ts) —
   explicit saves AND autosaves; every input is (re)read INSIDE the lock.
   Doc-replacing ops serialize through `serialized()` and cancel pending
@@ -446,6 +494,10 @@ the release gates, right after the local bundle build.
 - **Door-arc sweep flags are empirically pinned** (two user checks, y-down
   and y-up). Verify visually after any viewport-transform change; don't
   re-derive from theory.
+- **The 3D Top camera preset renders the plan rolled 180°** vs the 2D
+  view (chirality-preserving — a camera-up convention, not a mirror bug;
+  established pre-0.10.0). Account for it when comparing top-view
+  screenshots against the 2D plan.
 - **single-instance MUST stay the FIRST Rust plugin** registered in lib.rs —
   it decides whether the process runs at all; a second launch relays its
   argv/cwd into the callback and exits before any other plugin or window
