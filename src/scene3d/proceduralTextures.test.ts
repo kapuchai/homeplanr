@@ -15,6 +15,11 @@ const KIND_MAP = {
   stone: true,
   brick: true,
   concrete: true,
+  wallpaperStripe: true,
+  wallpaperDamask: true,
+  panel: true,
+  plaster: true,
+  herringbone: true,
 } as const satisfies Record<PatternKind, true>
 const KINDS = Object.keys(KIND_MAP) as PatternKind[]
 

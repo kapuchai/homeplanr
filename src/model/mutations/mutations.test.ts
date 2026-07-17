@@ -347,6 +347,8 @@ describe('wall paint + finish (updateWall)', () => {
     expect(w().finishBack).toBe('tile') // per-side: the other side stays
     updateWall(d, r.wallId!, { finishBack: 'paint' }) // 'paint' = default → delete
     expect('finishBack' in w()).toBe(false)
+    updateWall(d, r.wallId!, { finishFront: 'wallpaperStripe' }) // 0.8.0 registry id
+    expect(w().finishFront).toBe('wallpaperStripe')
   })
 
   it('a no-op paint/finish patch keeps document identity under immer', () => {

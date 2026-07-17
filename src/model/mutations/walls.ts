@@ -1,6 +1,6 @@
 import type { ProjectDocument, Wall, WallNode } from '../types'
 import { DEFAULTS } from '../types'
-import { WALL_PAINT_IDS } from '../../catalog/palette'
+import { WALL_FINISH_IDS, WALL_PAINT_IDS } from '../../catalog/palette'
 import { newNodeId, newWallId, type AnnotationId, type FurnitureId, type NodeId, type OpeningId, type WallId } from '../ids'
 import type { Vec2 } from '../../geometry/vec'
 import { dist } from '../../geometry/vec'
@@ -175,20 +175,17 @@ export function applyWallPaint(
   }
 }
 
-/** Known non-default finish ids (mutation-level gate, paint parity: the
- * UI writes only known ids; unknown ids arrive via files and are
- * preserved by the open-registry validator, never by mutations). */
-const KNOWN_FINISH_IDS = new Set<string>(['brick', 'concrete', 'tile'])
-
-/** Per-side finish rules (v5): known non-'paint' ids assign; anything else
- * deletes. Writes only on actual change (derived-reference stability). */
+/** Per-side finish rules (v5): known WALL_FINISHES ids assign; anything
+ * else deletes (mutation-level gate, paint parity — unknown ids arrive
+ * only via files and are preserved by the open-registry validator).
+ * Writes only on actual change (derived-reference stability). */
 export function applyWallFinish(
   w: Wall,
   key: 'finishFront' | 'finishBack',
   finishId: string | undefined,
 ): void {
   const next =
-    finishId !== undefined && KNOWN_FINISH_IDS.has(finishId) ? finishId : undefined
+    finishId !== undefined && WALL_FINISH_IDS.has(finishId) ? finishId : undefined
   if (next === undefined) {
     if (w[key] !== undefined) delete w[key]
   } else if (w[key] !== next) {

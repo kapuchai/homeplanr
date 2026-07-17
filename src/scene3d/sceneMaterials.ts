@@ -1,7 +1,6 @@
 import { MeshStandardMaterial } from 'three'
-import { PALETTE, SCENE_MATERIALS, WALL_PAINTS, floorSpec } from '../catalog/palette'
+import { PALETTE, SCENE_MATERIALS, WALL_PAINTS, finishSpec, floorSpec } from '../catalog/palette'
 import type { MaterialId } from '../catalog/types'
-import type { WallFinishId } from '../model/types'
 import { patternTexture } from './proceduralTextures'
 
 /** Singleton three materials — created once, shared by every mesh. */
@@ -56,41 +55,31 @@ export function floorMaterial(id: string | undefined): MeshStandardMaterial {
   return m
 }
 
-/** Face roughness per wall finish ('paint' is the absent-finish default). */
-const FINISH_ROUGHNESS: Record<WallFinishId, number> = {
-  paint: 0.9,
-  brick: 0.95,
-  concrete: 0.95,
-  tile: 0.3,
-}
-
 const wallFaceCache = new Map<string, MeshStandardMaterial>()
 
 /**
  * Wall FACE material (front/back buckets of buildWallFaceMeshData). Unknown
- * or absent paint ids fall back to the default wallPaint color; brick /
- * concrete / tile finishes overlay the matching grayscale pattern so the
- * paint tint shows through (pattern may be null where canvas is missing).
+ * or absent paint ids fall back to the default wallPaint color; a known
+ * finish overlays its grayscale pattern so the paint tint shows through
+ * (pattern may be null where canvas is missing). Finish ids are an OPEN
+ * registry (v5): finishSpec returns null for unknown ids, which render as
+ * plain paint — never index pattern tables with an unknown key.
  */
 export function wallFaceMaterial(
   paintId: string | undefined,
   finishId: string | undefined,
 ): MeshStandardMaterial {
-  // finish ids are an OPEN registry (v5): unknown ids render as plain
-  // paint — never index the pattern/roughness tables with an unknown key
-  // (that would crash the scene on a forward-compatible file)
-  const f: WallFinishId =
-    finishId === 'brick' || finishId === 'concrete' || finishId === 'tile' ? finishId : 'paint'
-  const key = `${f}|${paintId ?? 'default'}`
+  const spec = finishSpec(finishId)
+  const key = `${spec?.id ?? 'paint'}|${paintId ?? 'default'}`
   let m = wallFaceCache.get(key)
   if (!m) {
     const color =
       (paintId !== undefined && WALL_PAINTS.find((p) => p.id === paintId)?.color) ||
       SCENE_MATERIALS.wallPaint.color
-    const map = f === 'paint' ? null : patternTexture(f)
+    const map = spec ? patternTexture(spec.pattern) : null
     m = new MeshStandardMaterial({
       color,
-      roughness: FINISH_ROUGHNESS[f],
+      roughness: spec?.roughness ?? SCENE_MATERIALS.wallPaint.roughness,
       metalness: 0,
       ...(map ? { map } : {}),
     })

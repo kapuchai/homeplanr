@@ -12,7 +12,17 @@ import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from 'three'
  * surface. Node tests have no DOM: patternTexture returns (and caches)
  * null there — every consumer treats the map as optional.
  */
-export type PatternKind = 'plank' | 'tile' | 'stone' | 'brick' | 'concrete'
+export type PatternKind =
+  | 'plank'
+  | 'tile'
+  | 'stone'
+  | 'brick'
+  | 'concrete'
+  | 'wallpaperStripe'
+  | 'wallpaperDamask'
+  | 'panel'
+  | 'plaster'
+  | 'herringbone'
 
 const SIZE = 256
 
@@ -23,6 +33,11 @@ const TILE_METERS: Record<PatternKind, number> = {
   stone: 1.2,
   brick: 0.6,
   concrete: 1.0,
+  wallpaperStripe: 0.6,
+  wallpaperDamask: 0.6,
+  panel: 0.5,
+  plaster: 1.0,
+  herringbone: 0.9,
 }
 
 /** Small integer hash → [0, 1) — the deterministic stand-in for Math.random. */
@@ -167,12 +182,118 @@ function drawConcrete(ctx: CanvasRenderingContext2D): void {
   softBlotches(ctx, 900, 8, 120, 16, 0.05, 0.07, 40, 60)
 }
 
+/** Subtle vertical stripes: 8 bands per 0.6 m + a fine pinstripe. The
+ * pattern is y-invariant, so it is vertically seamless by construction. */
+function drawWallpaperStripe(ctx: CanvasRenderingContext2D): void {
+  const band = SIZE / 8
+  for (let b = 0; b < 8; b++) {
+    ctx.fillStyle = gray(b % 2 === 0 ? 130 : 123)
+    ctx.fillRect(b * band, 0, band, SIZE)
+    ctx.fillStyle = gray(114)
+    ctx.fillRect(b * band, 0, 1.5, SIZE)
+  }
+}
+
+/** Low-contrast damask read: diamond motifs on a diagonal checker (period
+ * 2 cells in both axes — wraps by construction). */
+function drawWallpaperDamask(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = gray(129)
+  ctx.fillRect(0, 0, SIZE, SIZE)
+  const cell = SIZE / 4
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      if ((i + j) % 2 !== 0) continue
+      const cx = i * cell + cell / 2
+      const cy = j * cell + cell / 2
+      const r = cell * 0.32
+      ctx.strokeStyle = grayA(116, 0.8)
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(cx, cy - r)
+      ctx.lineTo(cx + r, cy)
+      ctx.lineTo(cx, cy + r)
+      ctx.lineTo(cx - r, cy)
+      ctx.closePath()
+      ctx.stroke()
+      ctx.fillStyle = grayA(118, 0.85)
+      ctx.beginPath()
+      ctx.arc(cx, cy, 2.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+}
+
+/** Vertical boards (0.125 m per board at 0.5 m tile): full-height panels
+ * with a seam and a bevel highlight; y-invariant → vertically seamless. */
+function drawPanel(ctx: CanvasRenderingContext2D): void {
+  const board = SIZE / 4
+  for (let b = 0; b < 4; b++) {
+    ctx.fillStyle = gray(122 + hash2(b, 7) * 16)
+    ctx.fillRect(b * board, 0, board, SIZE)
+    ctx.fillStyle = gray(100) // seam
+    ctx.fillRect(b * board, 0, 2, SIZE)
+    ctx.fillStyle = grayA(142, 0.5) // bevel highlight beside the seam
+    ctx.fillRect(b * board + 2, 0, 2, SIZE)
+  }
+}
+
+/** Smooth plaster: fine low-contrast grain + very faint broad mottling. */
+function drawPlaster(ctx: CanvasRenderingContext2D): void {
+  const cell = 4
+  const n = SIZE / cell
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      ctx.fillStyle = gray(125 + hash2(i + 300, j) * 7)
+      ctx.fillRect(i * cell, j * cell, cell, cell)
+    }
+  }
+  softBlotches(ctx, 1300, 5, 123, 10, 0.04, 0.05, 50, 70)
+}
+
+/** Chevron-herringbone parquet: 4 zigzag columns of 45° planks. Column
+ * width 64 px, seam spacing 32 px; the per-column diagonal displacement is
+ * a multiple of the spacing, so the pattern wraps on both axes. */
+function drawHerringbone(ctx: CanvasRenderingContext2D): void {
+  const col = SIZE / 4
+  const seam = col / 2
+  for (let c = 0; c < 4; c++) {
+    const dir = c % 2 === 0 ? 1 : -1
+    const x0 = c * col
+    const x1 = x0 + col
+    for (let s = -3; s < SIZE / seam + 3; s++) {
+      const y0 = s * seam
+      ctx.fillStyle = gray(118 + hash2(c, ((s % 8) + 8) % 8) * 22)
+      ctx.beginPath()
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y0 + dir * col)
+      ctx.lineTo(x1, y0 + seam + dir * col)
+      ctx.lineTo(x0, y0 + seam)
+      ctx.closePath()
+      ctx.fill()
+      ctx.strokeStyle = gray(98)
+      ctx.lineWidth = 1.2
+      ctx.beginPath()
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y0 + dir * col)
+      ctx.stroke()
+    }
+    // column seam
+    ctx.fillStyle = gray(98)
+    ctx.fillRect(x0, 0, 1.2, SIZE)
+  }
+}
+
 const DRAW: Record<PatternKind, (ctx: CanvasRenderingContext2D) => void> = {
   plank: drawPlank,
   tile: drawTile,
   stone: drawStone,
   brick: drawBrick,
   concrete: drawConcrete,
+  wallpaperStripe: drawWallpaperStripe,
+  wallpaperDamask: drawWallpaperDamask,
+  panel: drawPanel,
+  plaster: drawPlaster,
+  herringbone: drawHerringbone,
 }
 
 const cache = new Map<PatternKind, CanvasTexture | null>()

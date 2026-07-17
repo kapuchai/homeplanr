@@ -1,4 +1,5 @@
 import type { MaterialId } from './types'
+import type { PatternKind } from '../scene3d/proceduralTextures'
 
 /**
  * Shared material palette — few, coherent materials (≤2 shader programs:
@@ -64,6 +65,39 @@ export const FLOOR_IDS: ReadonlySet<string> = new Set(FLOOR_MATERIALS.map((f) =>
 /** Unknown/absent ids fall back to the default wood floor (render-side leniency). */
 export function floorSpec(id: string | undefined): FloorSpec {
   return (id !== undefined && FLOOR_MATERIALS.find((f) => f.id === id)) || FLOOR_MATERIALS[0]!
+}
+
+/**
+ * Wall finish registry (0.8.0) — Wall.finishFront/finishBack reference
+ * these ids. OPEN registry: unknown ids in documents are preserved by the
+ * validator and render as plain paint. In 3D a finish overlays its
+ * grayscale pattern (tinted by the wall paint); `swatch` is the UI
+ * preview color only. First three ids predate v5 — never rename.
+ */
+export interface FinishSpec {
+  id: string
+  name: string
+  pattern: PatternKind
+  roughness: number
+  swatch: string
+}
+
+export const WALL_FINISHES: readonly FinishSpec[] = [
+  { id: 'brick', name: 'Brick', pattern: 'brick', roughness: 0.95, swatch: '#b56a4f' },
+  { id: 'concrete', name: 'Concrete', pattern: 'concrete', roughness: 0.95, swatch: '#b5b3ae' },
+  { id: 'tile', name: 'Tile', pattern: 'tile', roughness: 0.3, swatch: '#dfe3e2' },
+  { id: 'wallpaperStripe', name: 'Wallpaper, stripes', pattern: 'wallpaperStripe', roughness: 0.85, swatch: '#d9d2c6' },
+  { id: 'wallpaperDamask', name: 'Wallpaper, damask', pattern: 'wallpaperDamask', roughness: 0.85, swatch: '#cfc6d4' },
+  { id: 'panel', name: 'Wood panel', pattern: 'panel', roughness: 0.7, swatch: '#c8a878' },
+  { id: 'plaster', name: 'Plaster', pattern: 'plaster', roughness: 0.9, swatch: '#e3ded4' },
+]
+
+export const WALL_FINISH_IDS: ReadonlySet<string> = new Set(WALL_FINISHES.map((f) => f.id))
+
+/** Known finish → its spec; unknown/absent → null = plain paint (the
+ * render-side fallback the open registry relies on). */
+export function finishSpec(id: string | undefined): FinishSpec | null {
+  return (id !== undefined && WALL_FINISHES.find((f) => f.id === id)) || null
 }
 
 /** Per-side wall paint presets (Wall.paintFront/paintBack reference these ids). */

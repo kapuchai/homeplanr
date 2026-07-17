@@ -747,10 +747,6 @@ textarea,
   border: 1px dashed var(--muted);
 }
 
-.finish-seg button {
-  padding: calc(var(--ui-scale) * 4px) calc(var(--ui-scale) * 7px);
-  font-size: calc(var(--ui-scale) * 11px);
-}
 
 /* ---- M5-R catalog card thumbnails: 64px isometric renders ---- */
 .catalog-card {

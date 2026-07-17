@@ -6,14 +6,13 @@ import { formatArea, formatLength, fromDisplayLength, lengthUnitLabel, toDisplay
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { area } from '../geometry/polygon'
-import { FLOOR_MATERIALS, WALL_PAINTS } from '../catalog/palette'
+import { FLOOR_MATERIALS, WALL_FINISHES, WALL_PAINTS } from '../catalog/palette'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
 import { LABEL_PLACEHOLDER } from '../editor2d/tools/annotateTextTool'
 import { DEFAULTS } from '../model/types'
-import type { WallFinishId } from '../model/types'
 import type { AnnotationId, FurnitureId, OpeningId, RoomId, WallId } from '../model/ids'
-import { t, type MessageKey } from '../i18n'
+import { t } from '../i18n'
 
 /**
  * Right properties panel. Inputs are DRAFT-BUFFERED (plan-pinned): typing
@@ -186,12 +185,6 @@ function Row({ children }: { children: React.ReactNode }) {
   return <div className="prop-row">{children}</div>
 }
 
-const WALL_FINISHES: readonly [WallFinishId, MessageKey][] = [
-  ['paint', 'props.finishPaint'],
-  ['brick', 'props.finishBrick'],
-  ['concrete', 'props.finishConcrete'],
-  ['tile', 'props.finishTile'],
-]
 
 /**
  * One ∅-default swatch + the 14 WALL_PAINTS presets.
@@ -249,11 +242,12 @@ function PaintSwatchRow({
 }
 
 /**
- * Per-side finish row (v5): segmented control over the known finishes;
- * 'paint' = field absent. `current` null = mixed (multi rows). Row hover
- * previews the side on the 2D badge, like the paint rows.
+ * Per-side finish row (v5, registry-driven since 0.8.0 M6): one ∅ swatch
+ * (plain paint = field absent) + a WALL_FINISHES swatch per spec.
+ * `current` null = mixed (multi rows), unknown ids show no active swatch.
+ * Row hover previews the side on the 2D badge, like the paint rows.
  */
-function FinishSegRow({
+function FinishSwatchRow({
   label,
   current,
   onPick,
@@ -261,30 +255,38 @@ function FinishSegRow({
 }: {
   label: string
   current: string | null | undefined
-  onPick: (id: WallFinishId) => void
+  onPick: (id: string | undefined) => void
   hoverSide: 'front' | 'back'
 }) {
   const setHighlight = useUiStore((s) => s.setHighlightWallSide)
   useEffect(() => () => setHighlight(null), [setHighlight])
   return (
     <div
-      className="prop-row"
+      className="prop-row paint-row"
       onMouseEnter={() => setHighlight(hoverSide)}
       onMouseLeave={() => setHighlight(null)}
     >
       <span>{label}</span>
-      <div className="segmented small finish-seg">
-        {WALL_FINISHES.map(([f, name]) => (
+      <div className="swatches">
+        <button
+          type="button"
+          title={t('props.finishDefault')}
+          aria-label={t('props.finishDefault')}
+          aria-pressed={current === undefined}
+          className={`swatch swatch-none${current === undefined ? ' active' : ''}`}
+          onClick={() => onPick(undefined)}
+        />
+        {WALL_FINISHES.map((f) => (
           <button
-            key={f}
+            key={f.id}
             type="button"
-            className={
-              current === f || (current === undefined && f === 'paint') ? 'active' : ''
-            }
-            onClick={() => onPick(f)}
-          >
-            {t(name)}
-          </button>
+            title={f.name}
+            aria-label={f.name}
+            aria-pressed={current === f.id}
+            className={`swatch${current === f.id ? ' active' : ''}`}
+            style={{ background: f.swatch }}
+            onClick={() => onPick(f.id)}
+          />
         ))}
       </div>
     </div>
@@ -336,7 +338,7 @@ function MultiPanel({ selection }: { selection: string[] }) {
           value={first.height}
           onCommit={(v) => batch(() => wallIds.forEach((id) => a.updateWall(id, { height: v })))}
         />
-        <FinishSegRow
+        <FinishSwatchRow
           label={t('props.finishFront')}
           current={shared('finishFront')}
           hoverSide="front"
@@ -344,7 +346,7 @@ function MultiPanel({ selection }: { selection: string[] }) {
             batch(() => wallIds.forEach((id) => a.updateWall(id, { finishFront: f })))
           }
         />
-        <FinishSegRow
+        <FinishSwatchRow
           label={t('props.finishBack')}
           current={shared('finishBack')}
           hoverSide="back"
@@ -565,13 +567,13 @@ export function PropertiesPanel() {
           value={wall.height}
           onCommit={(v) => a.updateWall(wall.id, { height: v })}
         />
-        <FinishSegRow
+        <FinishSwatchRow
           label={t('props.finishFront')}
           current={wall.finishFront}
           hoverSide="front"
           onPick={(f) => a.updateWall(wall.id, { finishFront: f })}
         />
-        <FinishSegRow
+        <FinishSwatchRow
           label={t('props.finishBack')}
           current={wall.finishBack}
           hoverSide="back"
