@@ -50,6 +50,7 @@ export interface GraphPayload {
     sillHeight?: number
     hinge?: 'a' | 'b'
     swing?: 'front' | 'back'
+    style?: string
   }[]
   roomMeta: { wallKeys: string[]; name?: string; floorMaterialId?: string; roomType?: string }[]
 }
@@ -104,6 +105,7 @@ export function pasteSubgraph(
         height: op.height,
         hinge: op.hinge ?? DEFAULTS.door.hinge,
         swing: op.swing ?? 'front',
+        ...(op.style ? { style: op.style } : {}),
       }
     } else {
       doc.openings[id] = {
@@ -114,6 +116,7 @@ export function pasteSubgraph(
         width: op.width,
         height: op.height,
         sillHeight: op.sillHeight ?? DEFAULTS.window.sillHeight,
+        ...(op.style ? { style: op.style } : {}),
       }
     }
   }

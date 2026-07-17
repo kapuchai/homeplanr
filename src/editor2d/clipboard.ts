@@ -113,6 +113,7 @@ export function buildPayload(
             height: op.height,
             ...(op.kind === 'window' ? { sillHeight: op.sillHeight } : {}),
             ...(op.kind === 'door' ? { hinge: op.hinge, swing: op.swing } : {}),
+            ...(op.style ? { style: op.style } : {}),
           })),
         roomMeta: rooms
           .filter((r) => r.name || r.floorMaterialId || r.roomType)

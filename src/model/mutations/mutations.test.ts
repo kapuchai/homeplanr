@@ -255,6 +255,79 @@ describe('opening cascades on wall edits', () => {
   })
 })
 
+describe('0.10.0 M1: opening style plumbing', () => {
+  it('addOpening stamps a non-standard style; standard/absent never persist', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(12, 0))
+    const sliding = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.2, style: 'sliding' })!
+    const plain = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.5 })!
+    const standard = addOpening(d, {
+      kind: 'door',
+      wallId: r.wallId!,
+      t: 0.8,
+      style: 'standard',
+    })!
+    expect(d.openings[sliding]!.style).toBe('sliding')
+    expect('style' in d.openings[plain]!).toBe(false)
+    expect('style' in d.openings[standard]!).toBe(false)
+  })
+
+  it('updateOpening sets, replaces, and clears style (null/""/standard all clear)', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(6, 0))
+    const id = addOpening(d, { kind: 'window', wallId: r.wallId!, t: 0.5 })!
+    updateOpening(d, id, { style: 'panorama' })
+    expect(d.openings[id]!.style).toBe('panorama')
+    updateOpening(d, id, { style: 'arched' })
+    expect(d.openings[id]!.style).toBe('arched')
+    updateOpening(d, id, { style: null })
+    expect('style' in d.openings[id]!).toBe(false)
+    updateOpening(d, id, { style: 'fullheight' })
+    updateOpening(d, id, { style: 'standard' })
+    expect('style' in d.openings[id]!).toBe(false)
+    updateOpening(d, id, { style: 'fullheight' })
+    updateOpening(d, id, { style: '' })
+    expect('style' in d.openings[id]!).toBe(false)
+  })
+
+  it('style survives the pipeline (revalidation keeps geometry-inert fields)', () => {
+    const d = doc()
+    const r = addWallSegment(d, vec(0, 0), vec(6, 0))
+    const id = addOpening(d, { kind: 'door', wallId: r.wallId!, t: 0.8, style: 'double' })!
+    // shrink the wall so revalidation clamps t — style must ride along
+    moveNode(d, d.walls[r.wallId!]!.b, vec(2, 0))
+    expect(d.openings[id]).toBeDefined()
+    expect(d.openings[id]!.style).toBe('double')
+  })
+
+  it('pasteSubgraph carries opening style', () => {
+    const payload = {
+      nodes: [
+        { key: 'a', dx: -3, dy: 0 },
+        { key: 'b', dx: 3, dy: 0 },
+      ],
+      walls: [{ key: 'w', aKey: 'a', bKey: 'b', thickness: 0.15, height: 2.5 }],
+      openings: [
+        {
+          wallKey: 'w',
+          kind: 'window' as const,
+          t: 0.5,
+          width: 2.4,
+          height: 1.4,
+          sillHeight: 0.5,
+          style: 'panorama',
+        },
+      ],
+      roomMeta: [],
+    }
+    const d = doc()
+    pasteSubgraph(d, payload, vec(3, 5))
+    const ops = Object.values(d.openings)
+    expect(ops).toHaveLength(1)
+    expect(ops[0]!.style).toBe('panorama')
+  })
+})
+
 describe('room identity (Jaccard reconcile)', () => {
   it('name survives adding a door and moving a node', () => {
     const d = doc()

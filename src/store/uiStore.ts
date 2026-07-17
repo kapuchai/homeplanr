@@ -20,6 +20,11 @@ export type ViewMode = '2d' | '3d'
 
 export interface ToolParams {
   openingKind: 'door' | 'window'
+  /** Armed opening style per kind (0.10.0) — remembered independently so
+   * the door and window tools each keep their last choice. Absent =
+   * standard. */
+  doorStyle?: string
+  windowStyle?: string
   /** Armed catalog item for click-to-place. */
   catalogItemId: string | null
   wallThickness?: number

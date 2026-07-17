@@ -1,5 +1,6 @@
 import type { Opening, ProjectDocument } from '../types'
 import { DEFAULTS } from '../types'
+import { STANDARD_STYLE_ID } from '../../catalog/openingStyles'
 import { newOpeningId, type OpeningId, type WallId } from '../ids'
 import { dist } from '../../geometry/vec'
 import { computeWallOutlines } from '../../geometry/wallOutline'
@@ -20,6 +21,7 @@ export type AddOpeningParams =
       height?: number
       hinge?: 'a' | 'b'
       swing?: 'front' | 'back'
+      style?: string
     }
   | {
       kind: 'window'
@@ -28,6 +30,7 @@ export type AddOpeningParams =
       width?: number
       height?: number
       sillHeight?: number
+      style?: string
     }
 
 /**
@@ -125,7 +128,10 @@ export function addOpening(
   if (slot === null) return null
 
   const id = newOpeningId()
-  const base = { id, wallId: params.wallId, t: slot / L }
+  // Absent style IS the standard style — never persist it explicitly.
+  const style =
+    params.style && params.style !== STANDARD_STYLE_ID ? { style: params.style } : {}
+  const base = { id, wallId: params.wallId, t: slot / L, ...style }
   if (params.kind === 'door') {
     doc.openings[id] = {
       ...base,
@@ -158,12 +164,21 @@ export function updateOpening(
     sillHeight: number
     hinge: 'a' | 'b'
     swing: 'front' | 'back'
+    /** null (or 'standard') clears the field — absent IS standard. */
+    style: string | null
   }>,
   opts: { mode?: MutationMode } = {},
 ): void {
   const op = doc.openings[id]
   if (!op) return
   if (patch.t !== undefined) op.t = patch.t
+  if (patch.style !== undefined) {
+    if (patch.style === null || patch.style === '' || patch.style === STANDARD_STYLE_ID) {
+      delete op.style
+    } else {
+      op.style = patch.style
+    }
+  }
   if (patch.width !== undefined) op.width = Math.max(0.3, patch.width)
   if (patch.height !== undefined) op.height = Math.max(0.3, patch.height)
   if (op.kind === 'window' && patch.sillHeight !== undefined) {
