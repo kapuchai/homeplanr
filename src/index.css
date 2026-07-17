@@ -338,6 +338,14 @@ textarea,
   margin-left: auto;
 }
 
+/* Walk-mode Pointer Lock (0.11.0): WebKitGTK keeps drawing the frozen
+   cursor over non-canvas chrome while the lock is held — hide it
+   everywhere (!important outbids per-control cursor rules). */
+body.pointer-locked,
+body.pointer-locked * {
+  cursor: none !important;
+}
+
 /* recent-file preview thumb (0.11.0) — fixed box, cover-cropped */
 .menu-thumb {
   width: calc(var(--ui-scale) * 44px);

@@ -1,22 +1,19 @@
 /**
- * Pointer Lock capability probe + session verdict (0.11.0 M1).
+ * Pointer Lock capability probe + session verdict (0.11.0).
  *
- * WebKitGTK support is historically shaky, so lock is opportunistic: an
- * attempt is one cheap API call made while capture-drag is ALREADY armed,
- * and every failure path lands back on drag with no UX cliff. Requests
- * that never resolve or fire pointerlockerror simply leave drag in
- * charge — the one failure that must be remembered is a lock that
- * ENGAGES with dead movement plumbing (the pointer would be held
- * hostage with no way to look). That comes in two shapes: move events
- * that flow with zero deltas (the zero-delta streak below), and no move
- * events at all (WalkControls' deadman timer — an unproven lock that
- * stays silent for LOCK_DEADMAN_MS is released via markLockDead). The
- * verdict is module-scoped for the session and never persisted: a
- * driver or compositor change across launches may fix it.
+ * Walk mode looks with Pointer Lock: entering walk requests the lock from
+ * the Walk-button gesture so the cursor vanishes at once (WebKitGTK grants
+ * it only from inside a user-activation handler — see PlannerCanvas). The
+ * ONE failure that must be remembered is a lock that ENGAGES with dead
+ * movement plumbing (the pointer held hostage with no way to look): two
+ * shapes — move events that flow with zero deltas (the zero-delta streak
+ * below) and no move events at all (WalkControls' deadman timer releases
+ * an unproven lock silent for LOCK_DEADMAN_MS via markLockDead). A broken
+ * verdict falls back to the invisible capture-drag path so look never
+ * dies entirely. The verdict is module-scoped for the session and never
+ * persisted: a driver or compositor change across launches may fix it.
  */
 export type LockVerdict = 'unknown' | 'ok' | 'broken'
-
-export type LookMode = 'auto' | 'lock' | 'drag'
 
 /** Consecutive locked pointermoves with zero deltas before declaring the
  * movement plumbing broken. A stationary mouse emits no move events at
@@ -68,14 +65,13 @@ export function markLockDead(): void {
 }
 
 /**
- * Fire a lock request if the mode and verdict allow one. Rejections and
- * silent no-ops are swallowed — capture-drag is already running, and
- * pointerlockchange is the only success signal anyone listens to.
- * 'lock' retries even a broken verdict (explicit user override).
+ * Fire a lock request unless the session already proved lock broken.
+ * Rejections and silent no-ops are swallowed — the capture-drag fallback
+ * is always armed, and pointerlockchange is the only success signal
+ * anyone listens to.
  */
-export function attemptLock(el: Element, mode: LookMode): void {
-  if (mode === 'drag') return
-  if (mode === 'auto' && verdict === 'broken') return
+export function attemptLock(el: Element): void {
+  if (verdict === 'broken') return
   if (typeof el.requestPointerLock !== 'function') return
   try {
     // older implementations return void, newer a Promise — absorb both

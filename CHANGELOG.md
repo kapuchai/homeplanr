@@ -9,16 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **First-person mouse-look in walk mode** — walk mode now grabs the
-  mouse for true FPS look where the platform supports it: the cursor
-  vanishes and the mouse turns your head directly, no dragging. Where
-  pointer capture isn't available it falls back to the familiar
-  drag-to-look, automatically. Press Esc to leave. A *Walk look* setting
-  (Auto / Mouse / Drag) and a *Look sensitivity* control live in the new
-  3D-view options
-- **3D view settings** — a new *3D view* section in Options: walk-look
-  mode and sensitivity, a *Walk collision* switch (turn it off to walk
-  through walls), *Hide facing walls*, and *Ceilings*
+- **First-person walk with mouse-look** — one click on *Walk* drops you
+  into the room: the cursor vanishes and the mouse turns your head
+  directly, WASD walks, Esc leaves and brings the cursor back. No floor
+  pick, no extra settings. Where the platform can't grab the mouse it
+  falls back to drag-to-look automatically
+- **3D view settings** — a new *3D view* section in Options: a *Walk
+  collision* switch (turn it off to walk through walls), *Hide facing
+  walls*, and *Ceilings*
 - **See into rooms from outside** — in the orbit view, walls between you
   and the room's interior fade away as you rotate, so you look straight
   into the floor plan like a dollhouse. Toggleable; always off while

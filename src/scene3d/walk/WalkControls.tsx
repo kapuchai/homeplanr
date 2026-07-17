@@ -49,7 +49,7 @@ import {
  * a viewMode switch to 2D and unmount (context-loss epoch remount)
  * restore instantly.
  */
-/** Base look sensitivity — multiplied by the lookSensitivity device pref. */
+/** Look sensitivity (rad per pixel of pointer movement). */
 const LOOK_SENSITIVITY = 0.0032
 const ENTER_GLIDE_S = 0.65
 const GLIDE_S = 0.5
@@ -331,19 +331,17 @@ export function WalkControls({
       }
     }
     const applyLook = (dx: number, dy: number) => {
-      // live getState read — a mid-walk Options change applies instantly
-      const sens = LOOK_SENSITIVITY * useAppSettings.getState().lookSensitivity
-      yaw.current -= dx * sens
-      pitch.current = clampPitch(pitch.current - dy * sens)
+      yaw.current -= dx * LOOK_SENSITIVITY
+      pitch.current = clampPitch(pitch.current - dy * LOOK_SENSITIVITY)
       camera.rotation.set(pitch.current, yaw.current, 0)
     }
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0 || glide.current) return
       if (isLocked()) return // FPS look: no drag to arm, clicks stay inert
+      // drag fallback (lock unavailable/refused): arm it AND retry the lock
       drag.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY }
       el.setPointerCapture(e.pointerId)
-      // the press is the user-activation carrier
-      attemptLock(el, useAppSettings.getState().lookMode)
+      attemptLock(el)
     }
     const onPointerMove = (e: PointerEvent) => {
       if (glide.current) return
@@ -415,10 +413,10 @@ export function WalkControls({
     el.addEventListener('pointerup', endDrag)
     el.addEventListener('pointercancel', endDrag)
     dom.addEventListener('pointerlockchange', onLockChange)
-    // The entering floor click requests the lock INSIDE its own handler
-    // (WebKitGTK refuses deferred requests — see handleFloorClick); this
+    // The Walk button's click requests the lock INSIDE its own handler
+    // (WebKitGTK refuses deferred requests — see PlannerCanvas); this
     // deferred attempt is the harmless second chance for lenient engines.
-    attemptLock(el, useAppSettings.getState().lookMode)
+    attemptLock(el)
     // The click's lock can engage BEFORE this effect attached the
     // listener — sync the flag instead of trusting the missed event.
     syncLockedState()

@@ -3,15 +3,12 @@ import { Modal } from './Modal'
 import {
   ACCENT_IDS,
   DIMENSION_LEVELS,
-  LOOK_MODES,
-  LOOK_SENSITIVITIES,
   THEME_PREFERENCES,
   UI_SCALES,
   useAppSettings,
   type DimensionLevel,
   type ThemePreference,
 } from '../store/appSettings'
-import type { LookMode } from '../scene3d/walk/pointerLock'
 import { ACCENTS } from '../theme/accents'
 import { useThemeStore } from '../theme/themeStore'
 import { t } from '../i18n'
@@ -40,12 +37,6 @@ const DIMENSION_LABELS: Record<DimensionLevel, string> = {
   walls: t('options.dimsWalls'),
   openings: t('options.dimsOpenings'),
   all: t('options.dimsAll'),
-}
-
-const LOOK_MODE_LABELS: Record<LookMode, string> = {
-  auto: t('options.lookAuto'),
-  lock: t('options.lookLock'),
-  drag: t('options.lookDrag'),
 }
 
 /** Shared on/off segmented pair — the Autosave pattern, extracted now
@@ -239,38 +230,6 @@ export function OptionsDialog() {
         </section>
         <section className="options-section">
           <h4>{t('options.section.view3d')}</h4>
-          <div className="options-row">
-            <span>{t('options.lookMode')}</span>
-            <div className="segmented small">
-              {LOOK_MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={settings.lookMode === m}
-                  className={settings.lookMode === m ? 'active' : ''}
-                  onClick={() => settings.setLookMode(m)}
-                >
-                  {LOOK_MODE_LABELS[m]}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="options-row">
-            <span>{t('options.lookSensitivity')}</span>
-            <div className="segmented small">
-              {LOOK_SENSITIVITIES.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  aria-pressed={settings.lookSensitivity === v}
-                  className={settings.lookSensitivity === v ? 'active' : ''}
-                  onClick={() => settings.setLookSensitivity(v)}
-                >
-                  {Math.round(v * 100)}%
-                </button>
-              ))}
-            </div>
-          </div>
           <OnOffRow
             label={t('options.walkCollision')}
             value={settings.collisionEnabled}

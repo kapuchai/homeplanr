@@ -2,12 +2,14 @@ import { expect, test } from '@playwright/test'
 import { drawRoom, show3d } from './helpers'
 
 /**
- * Walk-mode smoke (M6): draw a room → 3D → arm Walk → click the floor →
- * the walk camera renders a non-blank frame → Esc glides back out and the
- * Walk button disarms. Mirrors smoke.spec's setup conventions.
+ * Walk-mode smoke (0.11.0): draw a room → 3D → click Walk → the walk
+ * camera drops straight in at a default spot (no floor pick) and renders a
+ * non-blank frame → Esc glides back out and the Walk button disarms.
+ * (Pointer Lock can't be driven under Playwright, so this exercises entry
+ * + render + exit, not the mouse-look itself.)
  */
 
-test('walk mode: arm → click floor → walking renders → Esc exits', async ({ page }) => {
+test('walk mode: click Walk → enters + renders → Esc exits', async ({ page }) => {
   await page.goto('/')
   await drawRoom(page)
   await expect(page.locator('svg.editor-canvas text').filter({ hasText: 'm²' })).toBeVisible()
@@ -15,12 +17,10 @@ test('walk mode: arm → click floor → walking renders → Esc exits', async (
   // --- 3D view up and rendering ---
   const gl = await show3d(page)
 
-  // --- arm walk mode and step onto the floor ---
+  // --- one click on Walk enters walk mode directly (no floor pick) ---
   const walkBtn = page.getByRole('button', { name: 'Walk' })
   await walkBtn.click()
   await expect(walkBtn).toHaveClass(/active/)
-  const box = (await gl.boundingBox())!
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
   await page.waitForTimeout(1000) // enter glide (0.65s) + settled frames
 
   // eye-level frame is non-blank (blank canvases compress tiny)

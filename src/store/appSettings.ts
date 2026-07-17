@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import type { UnitSystem } from '../format/units'
 import { CURRENCIES } from '../format/units'
-import type { LookMode } from '../scene3d/walk/pointerLock'
 
 /**
  * App-level preferences — device-local, never part of the document and never
@@ -24,9 +23,6 @@ export type WheelMode = 'zoom' | 'pan'
 export type DimensionLevel = 'off' | 'walls' | 'openings' | 'all'
 /** Interface-scale presets (Options → Appearance). */
 export type UiScale = 0.9 | 1 | 1.1 | 1.25 | 1.5
-/** Walk-look speed multiplier presets (0.11.0) on WalkControls' base
- * sensitivity — segmented like UiScale, no slider primitive exists. */
-export type LookSensitivity = 0.5 | 0.75 | 1 | 1.5 | 2
 /** Orbit-mode wall hiding (0.11.0): 'hide' drops walls facing the camera
  * so rooms read from outside (the dollhouse view); 'off' keeps them all.
  * Never active while walking. */
@@ -62,10 +58,6 @@ export interface AppSettings {
   /** Walk-mode collision (0.11.0) — off bypasses BOTH movement resolve
    * and teleport validation (walking through walls is the point). */
   collisionEnabled: boolean
-  /** Walk look input: 'auto' probes Pointer Lock with capture-drag
-   * fallback (pointerLock.ts), the explicit modes pin one path. */
-  lookMode: LookMode
-  lookSensitivity: LookSensitivity
   wallHideMode: WallHideMode
   /** Per-room ceiling slabs in the 3D view (0.11.0). */
   ceilingsEnabled: boolean
@@ -102,8 +94,6 @@ export const WHEEL_MODES: readonly WheelMode[] = ['zoom', 'pan']
 /** Ladder order — Shift+D cycles through this array. */
 export const DIMENSION_LEVELS: readonly DimensionLevel[] = ['off', 'walls', 'openings', 'all']
 export const UI_SCALES: readonly UiScale[] = [0.9, 1, 1.1, 1.25, 1.5]
-export const LOOK_MODES: readonly LookMode[] = ['auto', 'lock', 'drag']
-export const LOOK_SENSITIVITIES: readonly LookSensitivity[] = [0.5, 0.75, 1, 1.5, 2]
 export const WALL_HIDE_MODES: readonly WallHideMode[] = ['off', 'hide']
 
 const DEFAULTS: AppSettings = {
@@ -120,8 +110,6 @@ const DEFAULTS: AppSettings = {
   autosaveEnabled: false,
   orbitHintSeen: false,
   collisionEnabled: true,
-  lookMode: 'auto',
-  lookSensitivity: 1,
   wallHideMode: 'hide',
   ceilingsEnabled: true,
   catalogPanelWidth: PANEL_LIMITS.catalog.def,
@@ -182,8 +170,6 @@ export function parseAppSettings(json: string | null): AppSettings {
         typeof r.orbitHintSeen === 'boolean' ? r.orbitHintSeen : DEFAULTS.orbitHintSeen,
       collisionEnabled:
         typeof r.collisionEnabled === 'boolean' ? r.collisionEnabled : DEFAULTS.collisionEnabled,
-      lookMode: pick(r.lookMode, LOOK_MODES, DEFAULTS.lookMode),
-      lookSensitivity: pick(r.lookSensitivity, LOOK_SENSITIVITIES, DEFAULTS.lookSensitivity),
       wallHideMode: pick(r.wallHideMode, WALL_HIDE_MODES, DEFAULTS.wallHideMode),
       ceilingsEnabled:
         typeof r.ceilingsEnabled === 'boolean' ? r.ceilingsEnabled : DEFAULTS.ceilingsEnabled,
@@ -235,8 +221,6 @@ const persist = (s: AppSettings): void => {
         autosaveEnabled: s.autosaveEnabled,
         orbitHintSeen: s.orbitHintSeen,
         collisionEnabled: s.collisionEnabled,
-        lookMode: s.lookMode,
-        lookSensitivity: s.lookSensitivity,
         wallHideMode: s.wallHideMode,
         ceilingsEnabled: s.ceilingsEnabled,
         catalogPanelWidth: s.catalogPanelWidth,
@@ -268,8 +252,6 @@ interface AppSettingsState extends AppSettings {
   setAutosaveEnabled: (enabled: boolean) => void
   setOrbitHintSeen: (seen: boolean) => void
   setCollisionEnabled: (enabled: boolean) => void
-  setLookMode: (mode: LookMode) => void
-  setLookSensitivity: (value: LookSensitivity) => void
   setWallHideMode: (mode: WallHideMode) => void
   setCeilingsEnabled: (enabled: boolean) => void
   /** Clamped + persisted. During a drag, write via useAppSettings.setState
@@ -300,8 +282,6 @@ export const useAppSettings = create<AppSettingsState>()(
       setAutosaveEnabled: (autosaveEnabled) => apply({ autosaveEnabled }),
       setOrbitHintSeen: (orbitHintSeen) => apply({ orbitHintSeen }),
       setCollisionEnabled: (collisionEnabled) => apply({ collisionEnabled }),
-      setLookMode: (lookMode) => apply({ lookMode }),
-      setLookSensitivity: (lookSensitivity) => apply({ lookSensitivity }),
       setWallHideMode: (wallHideMode) => apply({ wallHideMode }),
       setCeilingsEnabled: (ceilingsEnabled) => apply({ ceilingsEnabled }),
       setPanelWidth: (panel, width) =>

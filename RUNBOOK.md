@@ -7,20 +7,24 @@ lives in the original plan; day-to-day, this file + `src/model/README.md`
 ## State (as of v0.11.0, 2026-07-17)
 
 0.11.0 "3D Experience" (NO schema bump — additive `previewAssetId`/
-`previewCustom` on the v6 doc root): **FPS mouse-look** (`pointerLock.ts`
-opportunistic lock with a session verdict; WebKitGTK grants it ONLY when
-`requestPointerLock` is called INSIDE the gesture handler — the entering
-floor click requests it in `handleFloorClick`, the walking effect's
-deferred attempt is the lenient-engine fallback; capture-drag stays armed
-so a refused request costs nothing; two dead-lock guards — a zero-delta
-streak AND a `LOCK_DEADMAN_MS` timer for locks that emit no events —
-release + mark the verdict broken; unexpected unlocks disambiguated by
-`document.hasFocus()`: Esc-under-lock exits walk, alt-tab keeps walking on
-drag), **3D-view settings** (`appSettings`: lookMode auto/lock/drag,
-lookSensitivity presets, collisionEnabled, wallHideMode off/hide,
-ceilingsEnabled; OptionsDialog "3D view" `<section>` with the extracted
-`OnOffRow`; collision OFF bypasses BOTH `resolveMove` [WalkControls] and
-`validateTeleport` [PlannerCanvas]), **dollhouse wall hiding**
+`previewCustom` on the v6 doc root): **one-click FPS walk** (the Walk
+button enters DIRECTLY — no floor pick, no `arming` state: entry spot =
+largest room's centroid [else scene centre] nudged clear via
+validateTeleport, and the button's own click gesture calls
+`attemptLock` so the cursor vanishes at once — WebKitGTK grants
+Pointer Lock ONLY inside a user-activation handler [user-verified];
+`pointerLock.ts` keeps a session verdict; capture-drag is the silent
+fallback when lock is refused/broken, and floor clicks teleport only in
+that fallback; two dead-lock guards — a zero-delta streak AND a
+`LOCK_DEADMAN_MS` timer for locks that emit no events — release + mark
+the verdict broken; unexpected unlocks disambiguated by
+`document.hasFocus()`: Esc-under-lock exits walk, alt-tab keeps walking
+on drag), **3D-view settings** (`appSettings`: collisionEnabled,
+wallHideMode off/hide, ceilingsEnabled — look mode/sensitivity settings
+were CUT on user feedback, lock is the one look path; OptionsDialog
+"3D view" `<section>` with the extracted `OnOffRow`; collision OFF
+bypasses BOTH `resolveMove` [WalkControls] and `validateTeleport`
+[PlannerCanvas]), **dollhouse wall hiding**
 (`wallOcclusion.ts` `hiddenWallIds` side-test vs the sceneBBox anchor with
 dead-zones; `OccluderBridge` recomputes on throttled OrbitControls change +
 `invalidate()`; `visible=false` on per-wall group + its OpeningFixtures +
@@ -377,13 +381,14 @@ export + 3D screenshot, file association + single instance, Linux
   Discard). The shared `Modal` owns Esc/focus-trap/restore.
 - **Pointer Lock is requested INSIDE the gesture (0.11.0)**: WebKitGTK
   grants `requestPointerLock` only from a user-activation handler — the
-  entering floor click calls it in `handleFloorClick`; WalkControls'
-  walking-effect attempt is the lenient-engine fallback, NOT the primary
-  path. Capture-drag stays armed regardless so a refused/absent lock
-  costs nothing (drag is the e2e-testable path — Playwright can't drive
-  lock). A lock that ENGAGES with dead plumbing is caught two ways —
-  a zero-delta streak AND a deadman timer (no events at all) — both
-  release + latch the session verdict `broken`. Unexpected unlocks
+  WALK BUTTON's click calls it (walk enters directly, no floor pick;
+  the old `arming` state is gone); WalkControls' walking-effect attempt
+  and the fallback-teleport click are lenient-engine retries, NOT the
+  primary path. Capture-drag stays armed regardless so a refused/absent
+  lock costs nothing (drag is the e2e-testable path — Playwright can't
+  drive lock). A lock that ENGAGES with dead plumbing is caught two
+  ways — a zero-delta streak AND a deadman timer (no events at all) —
+  both release + latch the session verdict `broken`. Unexpected unlocks
   disambiguate on `document.hasFocus()`: focused ⇒ Esc ⇒ exit walk;
   unfocused ⇒ alt-tab ⇒ keep walking on drag. `walkStore.locked` gates
   floor-click teleports (no cursor under lock).
@@ -471,12 +476,12 @@ export + 3D screenshot, file association + single instance, Linux
    localStorage — recovery/recents don't carry over).
 5. CI green before considering a push done (`gh run watch`).
 6. Dark-mode visual pass — 2D and 3D — after any theme-touching change.
-7. Walk-mode look on WebKitGTK in `npm run tauri dev` (0.11.0): with
-   *Walk look = Auto/Mouse*, entering walk hides the cursor and the mouse
-   turns the head directly (Pointer Lock — verified working when
-   requested inside the entering click); Esc exits; alt-tab keeps you
-   walking. With *Walk look = Drag* (the fallback), pointer-capture drag
-   still works — no text selection, no dropped drags.
+7. Walk-mode look on WebKitGTK in `npm run tauri dev` (0.11.0): ONE
+   click on Walk hides the cursor and enters first-person — the mouse
+   turns the head directly (Pointer Lock, requested inside the button's
+   own click); Esc exits and restores the cursor; alt-tab keeps you
+   walking. The invisible fallback (lock refused/broken): drag-to-look
+   with a visible cursor — no text selection, no dropped drags.
 8. Packaged file-association double-click: cold start AND second-instance
    relay into the already-running window.
 9. Catalog thumbnails render; then force a context loss (devtools

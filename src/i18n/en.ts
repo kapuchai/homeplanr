@@ -118,11 +118,6 @@ export const en = {
   'options.showAnnotations': 'Measurements & labels',
   'options.uiScale': 'Interface scale',
   'options.section.view3d': '3D view',
-  'options.lookMode': 'Walk look',
-  'options.lookAuto': 'Auto',
-  'options.lookLock': 'Mouse (FPS)',
-  'options.lookDrag': 'Drag',
-  'options.lookSensitivity': 'Look sensitivity',
   'options.walkCollision': 'Walk collision',
   'options.wallHiding': 'Hide facing walls',
   'options.ceilings': 'Ceilings',
@@ -356,7 +351,6 @@ export const en = {
 
   // ---- 3D view ----
   'view3d.blocked': 'That spot is blocked',
-  'view3d.hintArming': 'Click a floor to start walking · Esc exits',
   'view3d.hintWalking':
     'WASD/arrows move · Shift sprints · drag looks · click floor teleports · Esc exits',
   'view3d.hintWalkingLock': 'WASD/arrows move · Shift sprints · mouse looks · Esc exits',
@@ -376,7 +370,7 @@ export const en = {
   'view3d.presetReset': 'Reset',
   'view3d.presetResetTitle': 'Refit the whole scene',
   'view3d.walk': 'Walk',
-  'view3d.walkTitle': 'Walk around (click a floor to start)',
+  'view3d.walkTitle': 'Walk around (Esc exits)',
   'view3d.saveImage': 'Save image',
   'view3d.saveImageTitle': 'Save the current 3D view as a PNG',
 

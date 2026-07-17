@@ -815,6 +815,13 @@ export function PlannerCanvas() {
   const walkHint = useWalkStore((s) => s.hint)
   const walkLocked = useWalkStore((s) => s.locked)
   const captureApi = useRef<CaptureApi | null>(null)
+  // WebKitGTK hides the locked cursor only over the lock TARGET (the
+  // canvas) — the cursor image stays frozen over whatever chrome it was
+  // on when lock engaged (the Walk button). Hide it app-wide instead.
+  useEffect(() => {
+    document.body.classList.toggle('pointer-locked', walkLocked)
+    return () => document.body.classList.remove('pointer-locked')
+  }, [walkLocked])
   const wallHideMode = useAppSettings((s) => s.wallHideMode)
   const [hiddenWalls, setHiddenWalls] = useState<Set<WallId>>(() => new Set())
   const occluderAnchor = useMemo(() => ({ x: box.cx, y: box.cy }), [box])
@@ -864,13 +871,10 @@ export function PlannerCanvas() {
       return
     }
     walk.requestWalkTo(target)
-    // WebKitGTK grants Pointer Lock only from INSIDE the gesture handler
-    // (user check, 0.11.0): the deferred attempt in WalkControls' effect
-    // is refused there, so the entering click requests the lock itself.
+    // fallback teleport (lock unavailable — cursor still visible): retry
+    // the lock from this gesture in case the platform now grants it
     const canvas = e.nativeEvent.target
-    if (canvas instanceof HTMLCanvasElement) {
-      attemptLock(canvas, useAppSettings.getState().lookMode)
-    }
+    if (canvas instanceof HTMLCanvasElement) attemptLock(canvas)
   }
 
   const applyPreset = (kind: CameraPresetKind) => {
@@ -880,13 +884,11 @@ export function PlannerCanvas() {
 
   const hint =
     walkHint ??
-    (walkMode === 'arming'
-      ? t('view3d.hintArming')
-      : walkMode === 'walking'
-        ? t(walkLocked ? 'view3d.hintWalkingLock' : 'view3d.hintWalking')
-        : orbitHintSeen
-          ? null
-          : t('view3d.hintOrbit'))
+    (walkMode === 'walking'
+      ? t(walkLocked ? 'view3d.hintWalkingLock' : 'view3d.hintWalking')
+      : orbitHintSeen
+        ? null
+        : t('view3d.hintOrbit'))
 
   if (glError) {
     return (
@@ -913,10 +915,7 @@ export function PlannerCanvas() {
   }
 
   return (
-    <div
-      className="view3d-wrapper"
-      style={walkMode === 'arming' ? { cursor: 'crosshair' } : undefined}
-    >
+    <div className="view3d-wrapper">
       <GlErrorBoundary key={epoch} onError={setGlError}>
         <Canvas
         // r3f v9 re-applies this prop on EVERY Canvas render (root.configure),
@@ -1024,8 +1023,25 @@ export function PlannerCanvas() {
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             const walk = useWalkStore.getState()
-            if (walk.mode === 'off') walk.arm()
-            else walk.exit()
+            if (walk.mode !== 'off') {
+              walk.exit()
+              return
+            }
+            // 0.11.0: no floor pick — drop in at the largest room's centre
+            // (else the scene centre), nudged clear when collision is on
+            const rooms = Object.values(derived.rooms)
+            const spot = rooms.length
+              ? rooms.reduce((a, b) => (b.areaM2 > a.areaM2 ? b : a)).centroid
+              : { x: box.cx, y: box.cy }
+            const entry = useAppSettings.getState().collisionEnabled
+              ? (validateTeleport(getCollisionSet(doc, derived), spot, undefined, 1) ?? spot)
+              : spot
+            // request Pointer Lock NOW, inside the click gesture, so the
+            // cursor vanishes as walk begins (WebKitGTK needs the user
+            // activation — a deferred request from an effect is refused)
+            const canvas = captureApi.current?.gl.domElement
+            if (canvas) attemptLock(canvas)
+            walk.enterWalk(entry)
           }}
         >
           {t('view3d.walk')}

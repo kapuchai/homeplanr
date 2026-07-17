@@ -54,52 +54,39 @@ describe('lock verdict probe', () => {
     markLockDead()
     expect(lockVerdict()).toBe('broken')
     const { el, spy } = fakeEl()
-    attemptLock(el, 'auto')
+    attemptLock(el)
     expect(spy).not.toHaveBeenCalled()
   })
 })
 
 describe('attemptLock', () => {
-  it('drag mode never requests', () => {
+  it('requests while the verdict is not broken', () => {
     const { el, spy } = fakeEl()
-    attemptLock(el, 'drag')
-    expect(spy).not.toHaveBeenCalled()
-  })
-
-  it('auto mode requests while the verdict is not broken', () => {
-    const { el, spy } = fakeEl()
-    attemptLock(el, 'auto')
+    attemptLock(el)
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
-  it('auto mode stops requesting after a broken verdict', () => {
+  it('stops requesting after a broken verdict (drag fallback takes over)', () => {
     for (let i = 0; i < ZERO_DELTA_LIMIT; i++) noteLockedMove(0, 0)
     const { el, spy } = fakeEl()
-    attemptLock(el, 'auto')
+    attemptLock(el)
     expect(spy).not.toHaveBeenCalled()
-  })
-
-  it('lock mode overrides a broken verdict', () => {
-    for (let i = 0; i < ZERO_DELTA_LIMIT; i++) noteLockedMove(0, 0)
-    const { el, spy } = fakeEl()
-    attemptLock(el, 'lock')
-    expect(spy).toHaveBeenCalledTimes(1)
   })
 
   it('swallows a throwing implementation', () => {
     const { el } = fakeEl(() => {
       throw new Error('NotSupportedError')
     })
-    expect(() => attemptLock(el, 'auto')).not.toThrow()
+    expect(() => attemptLock(el)).not.toThrow()
   })
 
   it('swallows a rejecting promise implementation', async () => {
     const { el } = fakeEl(() => Promise.reject(new Error('NotAllowedError')))
-    attemptLock(el, 'auto')
+    attemptLock(el)
     await new Promise((r) => setTimeout(r, 0)) // an unhandled rejection would fail the run
   })
 
   it('ignores elements without the API', () => {
-    expect(() => attemptLock({} as Element, 'auto')).not.toThrow()
+    expect(() => attemptLock({} as Element)).not.toThrow()
   })
 })

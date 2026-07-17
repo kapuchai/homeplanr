@@ -20,8 +20,6 @@ const DEFAULTS: AppSettings = {
   autosaveEnabled: false,
   orbitHintSeen: false,
   collisionEnabled: true,
-  lookMode: 'auto',
-  lookSensitivity: 1,
   wallHideMode: 'hide',
   ceilingsEnabled: true,
   catalogPanelWidth: 232,
@@ -59,8 +57,6 @@ describe('parseAppSettings', () => {
       autosaveEnabled: true,
       orbitHintSeen: true,
       collisionEnabled: false,
-      lookMode: 'lock',
-      lookSensitivity: 1.5,
       wallHideMode: 'off',
       ceilingsEnabled: false,
       catalogPanelWidth: 300,
@@ -88,8 +84,6 @@ describe('parseAppSettings', () => {
           dimensionLevel: 'everything',
           snapEnabled: 'off',
           collisionEnabled: 'no',
-          lookMode: 'gamepad',
-          lookSensitivity: 3,
           wallHideMode: 'fade',
           ceilingsEnabled: 1,
           lastDirSave: '',
@@ -110,8 +104,6 @@ describe('parseAppSettings', () => {
       autosaveEnabled: false,
       orbitHintSeen: false,
       collisionEnabled: true, // 'no' → default
-      lookMode: 'auto', // 'gamepad' → default
-      lookSensitivity: 1, // off-preset number → default
       wallHideMode: 'hide', // 'fade' does not exist (yet) → default
       ceilingsEnabled: true, // 1 → default
       catalogPanelWidth: 232,
@@ -192,8 +184,6 @@ describe('useAppSettings persistence', () => {
       autosaveEnabled: s.autosaveEnabled,
       orbitHintSeen: s.orbitHintSeen,
       collisionEnabled: s.collisionEnabled,
-      lookMode: s.lookMode,
-      lookSensitivity: s.lookSensitivity,
       wallHideMode: s.wallHideMode,
       ceilingsEnabled: s.ceilingsEnabled,
       catalogPanelWidth: s.catalogPanelWidth,
@@ -221,8 +211,6 @@ describe('useAppSettings persistence', () => {
     s.setAutosaveEnabled(true)
     s.setOrbitHintSeen(true)
     s.setCollisionEnabled(false)
-    s.setLookMode('drag')
-    s.setLookSensitivity(0.75)
     s.setWallHideMode('off')
     s.setCeilingsEnabled(false)
     s.setPanelWidth('catalog', 999) // clamps to 360
@@ -249,8 +237,6 @@ describe('useAppSettings persistence', () => {
       autosaveEnabled: true,
       orbitHintSeen: true,
       collisionEnabled: false,
-      lookMode: 'drag',
-      lookSensitivity: 0.75,
       wallHideMode: 'off',
       ceilingsEnabled: false,
       catalogPanelWidth: 360,
