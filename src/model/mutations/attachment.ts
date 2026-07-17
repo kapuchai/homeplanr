@@ -127,19 +127,29 @@ export function detachFurniture(doc: ProjectDocument, id: FurnitureId): void {
  * attached instance; detach the ones whose window is gone. Field writes are
  * change-guarded — never write a value that hasn't changed (the derived
  * reference-stability rule).
+ *
+ * Detach happens in COMMIT mode only — the revalidateOpenings philosophy:
+ * a live drag can pass through transient states (a node snapped exactly
+ * onto its wall's other endpoint makes the wall degenerate for one frame)
+ * that revert before pointer-up, and an overshoot mid-drag must never
+ * strip an attachment permanently. In live mode an uncomputable frame
+ * just leaves the stored transform alone; the commit re-run settles it.
  */
-export function reconcileAttachedFurniture(doc: ProjectDocument): void {
+export function reconcileAttachedFurniture(
+  doc: ProjectDocument,
+  mode: 'live' | 'commit' = 'commit',
+): void {
   for (const f of Object.values(doc.furniture)) {
     const opId = f.attachedOpeningId
     if (!opId) continue
     const op = doc.openings[opId]
     if (!op || op.kind !== 'window') {
-      delete f.attachedOpeningId
+      if (mode === 'commit') delete f.attachedOpeningId
       continue
     }
     const t = windowAttachTransform(doc, op, { x: f.x, y: f.y }, f.size.d)
     if (!t) {
-      delete f.attachedOpeningId
+      if (mode === 'commit') delete f.attachedOpeningId
       continue
     }
     if (Math.abs(f.x - t.x) > EPS) f.x = t.x

@@ -5,6 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-07-17
+
+### Added
+
+- **Wall art with your own images** — three framed pieces (portrait, wide,
+  square) in the new *Decor* catalog section. Upload any photo from the
+  properties panel: it is downscaled and embedded into the `.homeplanr`
+  file itself (plans stay a single portable file) and shown on the frame
+  in 3D. Copying art to another plan carries the image along
+- **Curtains and blinds** — curtains placed near a window snap onto it,
+  size themselves to the window with an overhang, and *follow the window*
+  when it moves or its wall is edited; dragging them away (or pressing
+  Detach) releases them. In walk mode you pass through fabric — curtains
+  over a balcony door don't wall it off
+- **Mirrors** — wall and full-length, with a bright metallic finish
+- **Modular kitchen counters** — straight runs (30/60/90/120 cm), a
+  corner piece, a sink module, and a cooktop module. Same-family pieces
+  click together end-to-end with flush backs, so runs assemble seamlessly
+- **Recolor any furniture** — a *Colors* section in the properties panel
+  recolors each part of an item (fabric, frame, top, …) with a color
+  picker; reset returns the stock look. The finish keeps its material
+  character (a recolored sofa still reads as fabric)
+- **Prices, notes and project cost** — per-item price and notes fields;
+  a multi-selection shows the cost of the selected items, and the plan
+  statistics block (visible when nothing is selected) shows the whole
+  project's cost. Pick your currency symbol (€ $ £ kr or none) in
+  Options → Units
+- **Smarter catalog search** — results are ranked (name matches first)
+  and synonyms work: try "couch", "refrigerator", "wc", "worktop",
+  "poster"
+
+### Changed
+
+- Plans save as schema v6 (older files upgrade automatically on save);
+  the format now carries embedded images with garbage collection of
+  unused ones on save, and crash recovery survives quota pressure by
+  dropping only the images, never the plan
+
 ## [0.8.0] - 2026-07-17
 
 ### Added

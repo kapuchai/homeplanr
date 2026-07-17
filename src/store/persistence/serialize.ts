@@ -19,6 +19,7 @@ import {
 import { normalizeGraph } from '../../model/mutations/walls'
 import { revalidateOpenings } from '../../model/mutations/openings'
 import { reconcileRooms } from '../../model/mutations/rooms'
+import { reconcileAttachedFurniture } from '../../model/mutations/attachment'
 import { MIN_AREA_M2 } from '../../model/mutations/annotations'
 import { area as polygonArea } from '../../geometry/polygon'
 
@@ -469,6 +470,11 @@ export function validateParsedObject(raw: unknown): ParseResult {
   normalizeGraph(doc)
   revalidateOpenings(doc)
   reconcileRooms(doc)
+  // attached furniture follows any load-time window clamps (v6) — same
+  // mandatory post-opening step as the runtime pipeline. Furniture is
+  // outside the heal hash, so this deterministic sync stays SILENT (old
+  // files keep opening clean), like a migration.
+  reconcileAttachedFurniture(doc)
   const after = JSON.stringify([doc.nodes, doc.walls, doc.openings, doc.rooms])
 
   return { doc, warnings, healed: warnings.length > 0 || before !== after }

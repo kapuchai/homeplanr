@@ -1,6 +1,7 @@
 import type { FurnitureInstance, ProjectDocument } from '../types'
 import { newFurnitureId, type AssetId, type FurnitureId, type OpeningId } from '../ids'
 import { addAsset, type AssetContent } from './assets'
+import { reconcileAttachedFurniture } from './attachment'
 
 /**
  * Furniture mutations. Furniture never affects the wall graph, openings, or
@@ -114,6 +115,10 @@ export function resizeFurniture(
   if (size.w !== undefined) f.size.w = clampSize(size.w)
   if (size.d !== undefined) f.size.d = clampSize(size.d)
   if (size.h !== undefined) f.size.h = clampHeight(size.h)
+  // an attached curtain's center offsets by HALF ITS DEPTH from the wall
+  // face — a depth edit must re-sync in the same mutation (no pipeline
+  // runs on furniture mutations, so the write-through won't catch it)
+  if (f.attachedOpeningId && size.d !== undefined) reconcileAttachedFurniture(doc)
 }
 
 export function renameFurniture(doc: ProjectDocument, id: FurnitureId, name: string): void {

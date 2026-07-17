@@ -519,16 +519,22 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
     expect(Object.keys(r.doc.assets)).toEqual(['i_ok'])
   })
 
-  it('dangling assetId / attachedOpeningId are KEPT (placeholder + detach paths own them)', () => {
+  it('dangling assetId is KEPT (placeholder renders); a dangling attachment detaches at load', () => {
     const { doc } = parseDocument(v5Full)
     const item = Object.values(doc.furniture)[0]!
     item.assetId = 'i_gone' as never
     item.attachedOpeningId = 'o_gone' as never
+    const before = { x: item.x, y: item.y }
     const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false)
+    // a stripped-recovery blob must not lose the image REFERENCE
     expect(r.doc.furniture[item.id]!.assetId).toBe('i_gone')
-    expect(r.doc.furniture[item.id]!.attachedOpeningId).toBe('o_gone')
+    // the load-time reconcile IS the commit-time detach for a gone window:
+    // the field resolves away, the item stands at its stored transform
+    expect(r.doc.furniture[item.id]!.attachedOpeningId).toBeUndefined()
+    expect(r.doc.furniture[item.id]!.x).toBe(before.x)
+    expect(r.doc.furniture[item.id]!.y).toBe(before.y)
   })
 
   it('batched v6 fields roundtrip; junk values normalize silently', () => {
@@ -559,6 +565,30 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
     expect(f.lumen).toBeUndefined()
     expect(f.lightOn).toBeUndefined()
     expect(f.assetId).toBeUndefined()
+  })
+
+  it('load-time self-heal re-syncs attached furniture SILENTLY (review fix)', () => {
+    const { doc } = parseDocument(v5Full)
+    const win = Object.values(doc.openings).find((o) => o.kind === 'window')!
+    // a curtain whose stored transform drifted (hand-edit / pre-clamp file)
+    doc.furniture['f_curt1' as never] = {
+      id: 'f_curt1' as never,
+      catalogItemId: 'curtain',
+      x: 0,
+      y: 0,
+      rotation: 0,
+      size: { w: 1.5, d: 0.2, h: 2.4 },
+      elevation: 0,
+      attachedOpeningId: win.id,
+    }
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.warnings).toHaveLength(0)
+    expect(r.healed).toBe(false) // furniture sync is silent, like a migration
+    const curt = r.doc.furniture['f_curt1' as never]!
+    expect(curt.attachedOpeningId).toBe(win.id)
+    // snapped onto the window's wall, no longer at the drifted origin
+    expect(Math.hypot(curt.x, curt.y)).toBeGreaterThan(0.01)
+    expect(curt.size.w).toBeCloseTo(win.width + 0.3)
   })
 
   it('a v5 recovery blob decodes through the migration chokepoint', () => {

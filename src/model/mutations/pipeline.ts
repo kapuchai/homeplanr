@@ -42,6 +42,7 @@ export function runPipeline(
   }
   // both modes: attached furniture (curtains) follows its window live and
   // lands exactly at commit; runs after opening clamps/deletes so a doomed
-  // window detaches its curtain in the same mutation
-  reconcileAttachedFurniture(doc)
+  // window detaches its curtain in the same mutation (detach itself is
+  // commit-only — see reconcileAttachedFurniture)
+  reconcileAttachedFurniture(doc, mode)
 }

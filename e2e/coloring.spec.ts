@@ -14,6 +14,7 @@ test('slot color override commits and resets', async ({ page }) => {
   const original = await input.inputValue()
 
   await input.fill('#ff0000')
+  await page.keyboard.press('Tab') // draft-commit on blur (one undo entry)
   await expect(input).toHaveValue('#ff0000')
   const reset = panel.locator('.color-slot .swatch-none').first()
   await expect(reset).toBeVisible()

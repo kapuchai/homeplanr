@@ -7,11 +7,15 @@ import { assetDataUrl } from '../store/persistence/imageIngest'
 import { PALETTE } from '../catalog/palette'
 
 /**
- * Per-asset art materials (v6 wall art). One material+texture per asset id,
- * REFCOUNTED by the consuming meshes and disposed when the last one
- * unmounts — this is the only textured-material path that follows user
- * data, so unlike the palette singletons it must not cache forever.
- * Assets are immutable after ingest, so an entry can never go stale.
+ * Per-asset art materials (v6 wall art). One material+texture per
+ * (asset id, face aspect) — the aspect is part of the key because the
+ * cover crop is baked into the texture's repeat/offset, and the SAME
+ * image legitimately lands on differently-shaped frames (addAsset
+ * content-dedupes identical uploads). Entries are REFCOUNTED by the
+ * consuming meshes and disposed when the last one unmounts — this is the
+ * only textured-material path that follows user data, so unlike the
+ * palette singletons it must not cache forever. Assets are immutable
+ * after ingest, so an entry can never go stale.
  */
 interface Entry {
   material: MeshStandardMaterial
@@ -19,7 +23,10 @@ interface Entry {
   refs: number
 }
 
-const cache = new Map<AssetId, Entry>()
+const cache = new Map<string, Entry>()
+
+const entryKey = (id: AssetId, face: { w: number; h: number }): string =>
+  `${id}|${(face.w / face.h).toFixed(4)}`
 
 /** Object-fit: cover — fraction of the source shown, centered. */
 export function coverTransform(
@@ -39,7 +46,8 @@ export function coverTransform(
 }
 
 function acquire(asset: ImageAsset, face: { w: number; h: number }, onLoad: () => void): Entry {
-  let entry = cache.get(asset.id)
+  const key = entryKey(asset.id, face)
+  let entry = cache.get(key)
   if (entry) {
     entry.refs++
     return entry
@@ -51,11 +59,11 @@ function acquire(asset: ImageAsset, face: { w: number; h: number }, onLoad: () =
     metalness: spec.metalness,
   })
   const created: Entry = { material, texture: null, refs: 1 }
-  cache.set(asset.id, created)
+  cache.set(key, created)
   const img = new Image()
   img.onload = () => {
     // the entry may have been released while the image decoded
-    const live = cache.get(asset.id)
+    const live = cache.get(key)
     if (live !== created) return
     const texture = new Texture(img)
     texture.colorSpace = SRGBColorSpace
@@ -75,10 +83,10 @@ function acquire(asset: ImageAsset, face: { w: number; h: number }, onLoad: () =
   return created
 }
 
-function release(id: AssetId): void {
-  const entry = cache.get(id)
+function release(key: string): void {
+  const entry = cache.get(key)
   if (!entry || --entry.refs > 0) return
-  cache.delete(id)
+  cache.delete(key)
   entry.texture?.dispose()
   entry.material.dispose()
 }
@@ -94,22 +102,22 @@ export function useArtMaterial(
 ): MeshStandardMaterial | null {
   const invalidate = useThree((s) => s.invalidate)
   const [material, setMaterial] = useState<MeshStandardMaterial | null>(null)
-  const id = asset?.id
+  const key = asset ? entryKey(asset.id, face) : null
   useEffect(() => {
-    if (!asset) {
+    if (!asset || !key) {
       setMaterial(null)
       return
     }
     const entry = acquire(asset, face, invalidate)
     setMaterial(entry.material)
     return () => {
-      release(asset.id)
+      release(key)
       setMaterial(null)
     }
-    // face derives from the catalog item (stable per item id); asset is
-    // immutable per id — the id is the one real dependency
+    // the key covers both real dependencies (asset id + face aspect);
+    // assets are immutable per id
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, invalidate])
+  }, [key, invalidate])
   return material
 }
 

@@ -4,9 +4,37 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.8.0, 2026-07-17)
+## State (as of v0.9.0, 2026-07-17)
 
-0.8.0 "Rooms & Surfaces" (schema v4 → **v5**): **room rig** (rooms move/
+0.9.0 "Furniture & Catalog" (schema v5 → **v6**): **embedded image
+assets** (`doc.assets` top-level map so undo shares it structurally;
+ingest = the ONLY pixel entry — downscale ≤1024, JPEG/WebP-checked/PNG,
+≤400KB ladder in `imageIngest.ts`; gcAssets prunes orphans from FILE
+BYTES only at the three write sites — the store keeps them for undo;
+recovery blob retries once with assets stripped on QuotaExceeded;
+clipboard carries asset CONTENT, paste re-ingests content-deduped;
+`referencedAssetIds` is THE GC oracle — 0.11.0's preview slot must extend
+it), **wall art** (decor category; `CatalogItem.imageSlot` = one flat box
+part, conformance-pinned; refcounted per-asset texture materials in
+`artTexture.ts` — the only disposed material path; cover-crop via texture
+repeat/offset), **curtains/blinds/mirrors** (`passable` items skipped by
+walk collision entirely), **window attachment** (`attachedOpeningId`:
+pipeline WRITE-THROUGH — reconcileAttachedFurniture syncs stored
+x/y/rot/width in both modes, side derived from stored-center perp sign,
+manual x/y/rot/width edits DETACH, opening deletion detaches in the same
+mutation; placement/drag capture within WINDOW_PICK_PX), **counter
+family** (`family` tag + `familyEdge` snap kind, priority 3.5, end-kiss +
+back-flush + rotation adoption; square footprints offer both arms),
+**per-instance coloring** (furnitureSlotMaterial resolve chain + keyed
+(default|hex) cache; hex keeps the base spec's roughness/metalness),
+**price/notes/cost** (setFurnitureMeta key-presence semantics; selection
+sums + plan-stats Project cost line; `currency` device pref +
+deterministic formatCurrency), **ranked search** (KEYWORDS table keyed by
+item id + completeness/hygiene tests — every item MUST have an entry).
+The v6 bump batched 0.10.0's `Opening.style` and 0.12.0's
+`lumen`/`lightOn` (schema-only, lenient).
+
+0.8.0 recap (schema v4 → **v5**): **room rig** (rooms move/
 rotate as rigid units — `roomRig.ts` collect/tear/transform; click-then-
 drag gesture armed only when the room was ALREADY the sole selection;
 tear = raw doc edits inside the gesture tx, neighbor keeps a shared wall
@@ -94,7 +122,7 @@ export + 3D screenshot, file association + single instance, Linux
 |---|---|
 | Dev (native window, HMR) | `npm run tauri dev` |
 | Dev (browser only) | `npm run dev` |
-| Unit tests (724) | `npm test` |
+| Unit tests (853) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Visual baselines (local rig) | `npx playwright test --project=chromium e2e/visual.spec.ts` — add `--update-snapshots` to rebaseline, then EYEBALL the new PNGs |
 | Native smoke (Tier 1) | `npm run smoke:native` — needs a FRESH release binary (`npm run tauri build -- --no-bundle`), `~/.cargo/bin/tauri-driver`, and no running homeplanr instance |
@@ -242,6 +270,21 @@ export + 3D screenshot, file association + single instance, Linux
 - **setRoomType floor suggestion** seeds ONLY when floorMaterialId is
   absent — a user's floor choice is never overwritten; clearing the type
   never touches the floor.
+- **Images enter documents ONLY through `imageIngest.ingestImage`**
+  (decode → downscale ≤1024 → re-encode with a CHECKED result mime →
+  ≤400KB ladder). `doc.assets` is GC'd from FILE BYTES only, never the
+  store (undo can resurrect referencers); `referencedAssetIds` is the
+  single reference oracle — new reference kinds (0.11.0 preview) extend
+  it or GC eats their assets. Assets stay OUT of the self-heal hash.
+- **Attached furniture (0.9.0 curtains) is pipeline WRITE-THROUGH**
+  (`reconcileAttachedFurniture`, both modes, after revalidateOpenings):
+  every consumer reads plain stored x/y/rotation/size.w — never introduce
+  a parallel derived transform. Manual x/y/rotation/width edits DETACH
+  (else the next sync reads as a swallowed edit); elevation/mirror/d/h
+  keep it. Wall side = stored-center perp sign, no schema field.
+- **Every catalog item has a KEYWORDS entry** (`catalog/search.ts`) —
+  the completeness test fails the build for a missing or stale id, and
+  the hygiene test rejects name-redundant keywords.
 - **File writes serialize** through `serializedWrite` (controller.ts) —
   explicit saves AND autosaves; every input is (re)read INSIDE the lock.
   Doc-replacing ops serialize through `serialized()` and cancel pending

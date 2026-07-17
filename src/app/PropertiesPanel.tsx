@@ -285,6 +285,48 @@ function PriceField({
   )
 }
 
+/** Per-slot color input (0.9.0): DRAFT while the native picker is open —
+ * React's onChange is the native `input` event, which fires per scrub —
+ * and ONE commit on blur, like every other panel field. Scrubbing must
+ * not spray undo entries or mint a cached material per intermediate hex. */
+function ColorField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string
+  value: string
+  onCommit: (v: string) => void
+}) {
+  const [draft, setDraft] = useState(value)
+  const [focused, setFocused] = useState(false)
+  useEffect(() => {
+    if (!focused) setDraft(value)
+  }, [value, focused])
+  const { capture, take } = useFocusCommit(draft)
+  return (
+    <input
+      type="color"
+      value={draft}
+      aria-label={label}
+      onFocus={() => {
+        setFocused(true)
+        // commit only a REAL change: an untouched focus/blur pass (tabbing
+        // through) must not mint an override equal to the default color
+        const initial = value
+        capture.current = (raw) => {
+          if (raw !== initial) onCommit(raw)
+        }
+      }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        setFocused(false)
+        take()?.(draft)
+      }}
+    />
+  )
+}
+
 /** Multiline TextField sibling for furniture notes (0.9.0). */
 function NotesField({
   value,
@@ -927,13 +969,10 @@ export function PropertiesPanel() {
                 <Row key={slot}>
                   <span>{slot.charAt(0).toUpperCase() + slot.slice(1)}</span>
                   <div className="color-slot">
-                    <input
-                      type="color"
+                    <ColorField
+                      label={t('props.colorFor', { slot })}
                       value={effectiveSlotColor(defId, override)}
-                      aria-label={t('props.colorFor', { slot })}
-                      onChange={(e) =>
-                        a.setMaterialOverride(furniture.id, slot, e.target.value)
-                      }
+                      onCommit={(v) => a.setMaterialOverride(furniture.id, slot, v)}
                     />
                     {override ? (
                       <button

@@ -136,6 +136,44 @@ describe('manual edits detach', () => {
     resizeFurniture(doc, curtainId, { w: 2 })
     expect(doc.furniture[curtainId]!.attachedOpeningId).toBeUndefined()
   })
+
+  it('a DEPTH edit re-syncs the center in the same mutation (review fix)', () => {
+    const { doc, openingId, curtainId } = setup()
+    attachFurnitureToOpening(doc, curtainId, openingId, vec(2, 1))
+    expect(doc.furniture[curtainId]!.y).toBeCloseTo(0.075 + 0.1) // t/2 + d/2
+    resizeFurniture(doc, curtainId, { d: 0.5 })
+    // still attached, and the center moved out so the back stays flush
+    expect(doc.furniture[curtainId]!.attachedOpeningId).toBe(openingId)
+    expect(doc.furniture[curtainId]!.y).toBeCloseTo(0.075 + 0.25)
+  })
+})
+
+describe('live-mode transients never detach (review fix)', () => {
+  it('degenerate host geometry: live keeps the attachment, commit detaches', () => {
+    const { doc, openingId, curtainId, wallId } = setup()
+    attachFurnitureToOpening(doc, curtainId, openingId, vec(2, 1))
+    const before = { ...doc.furniture[curtainId]! }
+    // collapse the wall for a frame (node snapped onto its other endpoint)
+    const wall = doc.walls[wallId]!
+    const a = doc.nodes[wall.a]!
+    const saved = { x: a.x, y: a.y }
+    const b = doc.nodes[wall.b]!
+    a.x = b.x
+    a.y = b.y
+    reconcileAttachedFurniture(doc, 'live')
+    expect(doc.furniture[curtainId]!.attachedOpeningId).toBe(openingId) // survived
+    expect(doc.furniture[curtainId]!.x).toBe(before.x) // transform untouched
+    // revert the overshoot — the commit re-sync lands normally
+    a.x = saved.x
+    a.y = saved.y
+    reconcileAttachedFurniture(doc, 'commit')
+    expect(doc.furniture[curtainId]!.attachedOpeningId).toBe(openingId)
+    // a commit WITH degenerate geometry does detach
+    a.x = b.x
+    a.y = b.y
+    reconcileAttachedFurniture(doc, 'commit')
+    expect(doc.furniture[curtainId]!.attachedOpeningId).toBeUndefined()
+  })
 })
 
 describe('findWindowNear', () => {
