@@ -202,8 +202,17 @@ export interface ProjectDocument {
   furniture: Record<FurnitureId, FurnitureInstance>
   annotations: Record<AnnotationId, Annotation>
   /** Embedded image assets (v6) — inert leaf data, excluded from graph
-   * self-heal; referenced by FurnitureInstance.assetId. */
+   * self-heal; referenced by FurnitureInstance.assetId and
+   * previewAssetId. */
   assets: Record<AssetId, ImageAsset>
+  /** Save-preview image (0.11.0, additive on v6). Without previewCustom
+   * the preview is AUTO: regenerated into the write-time clone at every
+   * save (the store doc never carries it until a file round-trips).
+   * With previewCustom it is the user's uploaded override — a real,
+   * undoable part of the document. referencedAssetIds counts this field,
+   * so GC keeps the asset; dangling ids are kept like furniture art. */
+  previewAssetId?: AssetId
+  previewCustom?: true
 }
 
 export const SCHEMA_VERSION = 6 as const

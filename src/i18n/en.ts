@@ -233,6 +233,8 @@ export const en = {
   'props.imageUpload': 'Upload…',
   'props.imageReplace': 'Replace…',
   'props.imageRemove': 'Remove',
+  'props.preview': 'Preview image',
+  'props.previewAuto': 'Auto',
   'props.imageFailed.title': 'Image not added',
   'props.imageFailed.body':
     'The file could not be read as an image, or it is too large even after downscaling.',

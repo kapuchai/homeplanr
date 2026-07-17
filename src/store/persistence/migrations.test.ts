@@ -537,6 +537,43 @@ describe('v6: embedded image assets + batched style/lumen/lightOn', () => {
     expect(r.doc.furniture[item.id]!.y).toBe(before.y)
   })
 
+  it('previewAssetId/previewCustom (0.11.0 additive) roundtrip; junk drops; dangling kept', () => {
+    const { doc } = parseDocument(v5Full)
+    doc.assets['i_prev' as never] = {
+      id: 'i_prev' as never,
+      mime: 'image/jpeg',
+      data: 'cHJldg==',
+      w: 512,
+      h: 512,
+    }
+    doc.previewAssetId = 'i_prev' as never
+    doc.previewCustom = true
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.previewAssetId).toBe('i_prev')
+    expect(r.doc.previewCustom).toBe(true)
+    expect(r.doc.assets['i_prev' as never]).toBeDefined()
+
+    // junk values → both fields absent, silent
+    const base = JSON.parse(v5Basic)
+    base.schemaVersion = 6
+    base.previewAssetId = 42
+    base.previewCustom = 'yes'
+    const j = validateParsedObject(base)
+    expect(j.warnings).toHaveLength(0)
+    expect(j.healed).toBe(false)
+    expect(j.doc.previewAssetId).toBeUndefined()
+    expect(j.doc.previewCustom).toBeUndefined()
+
+    // dangling preview id KEPT (the auto path self-corrects at next save)
+    const d2 = parseDocument(v5Full).doc
+    d2.previewAssetId = 'i_gone' as never
+    const r2 = parseDocument(serializeDocument(d2, '2026-07-17T00:00:00.000Z'))
+    expect(r2.healed).toBe(false)
+    expect(r2.doc.previewAssetId).toBe('i_gone')
+  })
+
   it('batched v6 fields roundtrip; junk values normalize silently', () => {
     const { doc } = parseDocument(v5Full)
     const opening = Object.values(doc.openings)[0]!

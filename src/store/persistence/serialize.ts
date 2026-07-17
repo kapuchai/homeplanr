@@ -154,6 +154,12 @@ export function validateParsedObject(raw: unknown): ParseResult {
     name: isStr(obj.name) && obj.name.trim() ? obj.name : 'Untitled',
     createdAt: isStr(obj.createdAt) ? obj.createdAt : new Date().toISOString(),
     updatedAt: isStr(obj.updatedAt) ? obj.updatedAt : new Date().toISOString(),
+    // save preview (0.11.0, additive on v6): dangling ids KEPT like
+    // furniture art; junk drops silently (no warning, healed stays false)
+    ...(isStr(obj.previewAssetId) && obj.previewAssetId
+      ? { previewAssetId: asAssetId(obj.previewAssetId) }
+      : {}),
+    ...(obj.previewCustom === true ? { previewCustom: true as const } : {}),
     settings: defaultSettings(),
     nodes: {},
     walls: {},

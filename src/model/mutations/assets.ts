@@ -28,15 +28,34 @@ export function addAsset(doc: ProjectDocument, content: AssetContent): AssetId {
   return id
 }
 
-/** Every asset id the document references. Wall art is the only reference
- * kind today; 0.11.0's save-preview slot must extend THIS function so GC
- * learns about it. */
+/** Every asset id the document references — THE GC oracle. Reference
+ * kinds: wall-art (FurnitureInstance.assetId) and the save preview
+ * (doc.previewAssetId, 0.11.0). New reference kinds extend THIS
+ * function or gcAssets eats their assets. */
 export function referencedAssetIds(doc: ProjectDocument): Set<AssetId> {
   const refs = new Set<AssetId>()
   for (const f of Object.values(doc.furniture)) {
     if (f.assetId) refs.add(f.assetId)
   }
+  if (doc.previewAssetId) refs.add(doc.previewAssetId)
   return refs
+}
+
+/**
+ * Set/clear the CUSTOM save preview (0.11.0). Setting stores the image
+ * (content-deduped) and flips previewCustom — an undoable, dirtying doc
+ * change, unlike the write-time auto render. Clearing reverts to auto:
+ * both fields go; the orphaned asset leaves the FILE bytes at the next
+ * save while the store keeps it for undo.
+ */
+export function setPreviewImage(doc: ProjectDocument, content: AssetContent | null): void {
+  if (content) {
+    doc.previewAssetId = addAsset(doc, content)
+    doc.previewCustom = true
+  } else {
+    delete doc.previewAssetId
+    delete doc.previewCustom
+  }
 }
 
 /**

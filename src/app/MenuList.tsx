@@ -17,6 +17,8 @@ export interface MenuEntry {
   shortcut?: string
   /** Hover tooltip (e.g. a recent file's full path). */
   title?: string
+  /** Small preview image data-URL (recent files, 0.11.0). */
+  thumb?: string
 }
 
 export function MenuList({ entries, onClose }: { entries: MenuEntry[]; onClose: () => void }) {
@@ -77,6 +79,7 @@ export function MenuList({ entries, onClose }: { entries: MenuEntry[]; onClose: 
               entry.onSelect()
             }}
           >
+            {entry.thumb && <img className="menu-thumb" src={entry.thumb} alt="" />}
             {entry.label}
             {entry.shortcut && <kbd>{entry.shortcut}</kbd>}
           </button>

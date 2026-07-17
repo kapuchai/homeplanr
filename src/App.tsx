@@ -107,6 +107,7 @@ function FileMenu() {
           label: r.name,
           title: r.path,
           separatorBefore: i === 0,
+          ...(r.thumb ? { thumb: r.thumb } : {}),
           onSelect: run(() => openRecent(r.path)),
         }))
       : []),

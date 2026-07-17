@@ -317,8 +317,11 @@ textarea,
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
+  /* flex-start + kbd margin-left:auto ≡ the old space-between for
+     label+kbd rows, and keeps a thumb (0.11.0 recents) beside its label */
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -332,6 +335,18 @@ textarea,
   color: var(--muted);
   font-family: inherit;
   font-size: calc(var(--ui-scale) * 11px);
+  margin-left: auto;
+}
+
+/* recent-file preview thumb (0.11.0) — fixed box, cover-cropped */
+.menu-thumb {
+  width: calc(var(--ui-scale) * 44px);
+  height: calc(var(--ui-scale) * 33px);
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  flex: none;
+  align-self: center;
 }
 
 .menu-sep {

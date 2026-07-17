@@ -56,6 +56,9 @@ export interface DocState {
   /** Ingest-or-dedupe + point the instance at it (null clears); ONE
    * mutation ⇒ one undo entry for the whole upload. */
   setFurnitureImage: (id: FurnitureId, content: assets.AssetContent | null) => void
+  /** Custom save preview (0.11.0): set = upload override, null = back
+   * to the auto render. One undoable mutation either way. */
+  setPreviewImage: (content: assets.AssetContent | null) => void
   // window attachment (v6 curtains)
   attachFurniture: (id: FurnitureId, openingId: OpeningId, ref?: Vec2) => void
   detachFurniture: (id: FurnitureId) => void
@@ -130,6 +133,7 @@ export const useDocStore = create<DocState>()(
             mutate((d) =>
               furniture.setFurnitureAsset(d, id, content ? assets.addAsset(d, content) : undefined),
             ),
+          setPreviewImage: (content) => mutate((d) => assets.setPreviewImage(d, content)),
           attachFurniture: (id, openingId, ref) =>
             mutate((d) => attachment.attachFurnitureToOpening(d, id, openingId, ref)),
           detachFurniture: (id) => mutate((d) => attachment.detachFurniture(d, id)),

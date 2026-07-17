@@ -21,7 +21,10 @@ import {
   RECOVERY_KEY,
   type RecoveryBlob,
 } from './recovery'
-import { gcAssets } from '../../model/mutations/assets'
+import { addAsset, gcAssets } from '../../model/mutations/assets'
+import { assetDataUrl, splitDataUrl, thumbDataUrl } from './imageIngest'
+import { renderScenePreview } from '../../scene3d/scenePreview'
+import { getDerived } from '../derived'
 import { useConfirmStore } from '../../app/confirmStore'
 import { zoomToFitContent } from '../../editor2d/tools/keymap'
 import { useAppSettings } from '../appSettings'
@@ -46,10 +49,55 @@ const MAX_RECENTS = 8
 /** Sentinel: recovery-restored docs are dirty until explicitly saved. */
 const NEVER_SAVED: ProjectDocument | null = null
 
+/** The preview data-URL that went into the LAST buildFileJson bytes —
+ * saveProject reads it to refresh the recents thumb without a rerender. */
+let lastWrittenPreview: string | null = null
+
+/**
+ * File bytes for EVERY write site (explicit save, save-as, autosave —
+ * autosave writes the same bytes by design). 0.11.0: unless the doc
+ * carries a CUSTOM preview, a fresh top-down render is embedded into a
+ * write-time CLONE (the store doc is never touched — no dirty state, no
+ * undo entry; addAsset content-dedup keeps the id stable when the scene
+ * hasn't changed, and gcAssets drops the superseded shot from the
+ * bytes). Any preview hiccup — latched GL, empty scene, encoder oddity —
+ * falls through to plain bytes: a save must NEVER block on the preview.
+ */
+export function buildFileJson(snapshot: ProjectDocument): string {
+  let doc = snapshot
+  lastWrittenPreview = null
+  try {
+    if (snapshot.previewCustom) {
+      const asset = snapshot.previewAssetId ? snapshot.assets[snapshot.previewAssetId] : undefined
+      if (asset) lastWrittenPreview = assetDataUrl(asset)
+    } else {
+      const shot = renderScenePreview(snapshot, getDerived(snapshot))
+      const split = shot ? splitDataUrl(shot.dataUrl) : null
+      if (shot && split) {
+        const clone: ProjectDocument = { ...snapshot, assets: { ...snapshot.assets } }
+        clone.previewAssetId = addAsset(clone, {
+          mime: split.mime,
+          data: split.data,
+          w: shot.w,
+          h: shot.h,
+        })
+        doc = clone
+        lastWrittenPreview = shot.dataUrl
+      }
+    }
+  } catch {
+    doc = snapshot
+  }
+  return serializeDocument(gcAssets(doc))
+}
+
 export interface RecentEntry {
   path: string
   name: string
   at: number
+  /** Small JPEG data-URL of the file's embedded preview (0.11.0) —
+   * best-effort, absent for pre-preview files and non-DOM failures. */
+  thumb?: string
 }
 
 interface PersistState {
@@ -84,19 +132,46 @@ const doc = () => useDocStore.getState().doc
 function loadRecents(): RecentEntry[] {
   try {
     const raw = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? '[]') as RecentEntry[]
-    return Array.isArray(raw) ? raw.filter((r) => typeof r?.path === 'string') : []
+    if (!Array.isArray(raw)) return []
+    return raw
+      .filter((r) => typeof r?.path === 'string')
+      .map((r) =>
+        // tolerate junk thumbs from older/corrupted envelopes
+        typeof r.thumb === 'string' && r.thumb.startsWith('data:image/')
+          ? r
+          : { path: r.path, name: r.name, at: r.at },
+      )
   } catch {
     return []
   }
 }
 
 function pushRecent(path: string, name: string): void {
+  // a re-push (open/save of a known file) keeps the existing thumb until
+  // attachRecentThumb replaces it — the list must never flicker blank
+  const prev = state().recents.find((r) => r.path === path)
   const next = [
-    { path, name, at: Date.now() },
+    { path, name, at: Date.now(), ...(prev?.thumb ? { thumb: prev.thumb } : {}) },
     ...state().recents.filter((r) => r.path !== path),
   ].slice(0, MAX_RECENTS)
   usePersistStore.setState({ recents: next })
   localStorage.setItem(RECENTS_KEY, JSON.stringify(next))
+}
+
+/** Downscale + attach a preview thumb to a recents entry, best-effort:
+ * absent DOM, failed decode, or an entry that has since been evicted all
+ * no-op silently. Never blocks the save/open that triggered it. */
+async function attachRecentThumb(path: string, sourceDataUrl: string): Promise<void> {
+  const thumb = await thumbDataUrl(sourceDataUrl)
+  if (!thumb) return
+  const next = state().recents.map((r) => (r.path === path ? { ...r, thumb } : r))
+  if (!next.some((r) => r.path === path)) return
+  usePersistStore.setState({ recents: next })
+  try {
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(next))
+  } catch {
+    // quota — the in-session list keeps the thumb, storage stays as-is
+  }
 }
 
 function dropRecent(path: string): void {
@@ -198,7 +273,7 @@ async function runFileAutosave(): Promise<void> {
     // GC unreferenced assets from the BYTES only — lastSavedDoc keeps the
     // in-memory reference (dirty is reference equality), and the store
     // keeps orphans so undo can resurrect what references them.
-    const json = serializeDocument(gcAssets(snapshot))
+    const json = buildFileJson(snapshot)
     try {
       await a.savePath(path, json)
       usePersistStore.setState({
@@ -380,7 +455,12 @@ async function applyOpened(
     // later launch (until the next edit's autosave, single-slot caveat)
     if (!opts?.preserveRecovery) clearRecovery()
     recomputeDirty()
-    if (path) pushRecent(path, parsed.name)
+    if (path) {
+      pushRecent(path, parsed.name)
+      // refresh the recents thumb from the file's embedded preview
+      const pv = parsed.previewAssetId ? parsed.assets[parsed.previewAssetId] : undefined
+      if (pv) void attachRecentThumb(path, assetDataUrl(pv))
+    }
     if (healed) {
       await adapter.message(
         t('persist.repaired.title'),
@@ -467,7 +547,7 @@ export async function saveProject(): Promise<boolean> {
     // as of ITS turn, not a stale pre-autosave reference.
     const snapshot = doc()
     // assets GC on the bytes only — see runFileAutosave
-    const json = serializeDocument(gcAssets(snapshot))
+    const json = buildFileJson(snapshot)
     try {
       let path: string | null
       if (currentFilePath && adapter.savePath) {
@@ -483,7 +563,10 @@ export async function saveProject(): Promise<boolean> {
         lastSaveWasAuto: false,
         autosaveError: false,
       })
-      if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
+      if (adapter.kind === 'tauri') {
+        pushRecent(path, snapshot.name)
+        if (lastWrittenPreview) void attachRecentThumb(path, lastWrittenPreview)
+      }
       clearRecovery()
       recomputeDirty()
       // mid-save edits: still dirty, and the clearRecovery above wiped their
@@ -507,7 +590,7 @@ export async function saveProjectAs(): Promise<boolean> {
     const { adapter } = state()
     const snapshot = doc() // see saveProject: one snapshot for file AND state
     // assets GC on the bytes only — see runFileAutosave
-    const json = serializeDocument(gcAssets(snapshot))
+    const json = buildFileJson(snapshot)
     try {
       const path = await adapter.saveAsDialog(json, snapshot.name)
       if (!path) return false
@@ -518,7 +601,10 @@ export async function saveProjectAs(): Promise<boolean> {
         lastSaveWasAuto: false,
         autosaveError: false,
       })
-      if (adapter.kind === 'tauri') pushRecent(path, snapshot.name)
+      if (adapter.kind === 'tauri') {
+        pushRecent(path, snapshot.name)
+        if (lastWrittenPreview) void attachRecentThumb(path, lastWrittenPreview)
+      }
       clearRecovery()
       recomputeDirty()
       if (state().dirty) scheduleRecoveryAutosave()

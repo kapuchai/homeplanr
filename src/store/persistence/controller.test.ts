@@ -549,3 +549,72 @@ describe('autosave-to-file (M8)', () => {
     expect(usePersistStore.getState().autosaveError).toBe(false)
   })
 })
+
+describe('buildFileJson — save-preview embed (0.11.0)', () => {
+  const fakeFactory = () => ({
+    setSize: () => {},
+    setClearColor: () => {},
+    render: () => {},
+    dispose: () => {},
+    domElement: { toDataURL: () => 'data:image/jpeg;base64,cHJldmlldw==' },
+    outputColorSpace: '',
+    toneMapping: 0,
+  })
+
+  it('embeds an auto preview into the BYTES only; the snapshot stays clean', async () => {
+    const { __setPreviewRendererFactoryForTests } = await import('../../scene3d/scenePreview')
+    const { buildFileJson } = await import('./controller')
+    const { buildFixtureDoc } = await import('../../test/fixtureDoc')
+    const { parseDocument } = await import('./serialize')
+    __setPreviewRendererFactoryForTests(fakeFactory)
+    const snapshot = buildFixtureDoc()
+    const parsed = parseDocument(buildFileJson(snapshot)).doc
+    expect(parsed.previewAssetId).toBeDefined()
+    expect(parsed.previewCustom).toBeUndefined()
+    expect(parsed.assets[parsed.previewAssetId!]).toMatchObject({
+      mime: 'image/jpeg',
+      data: 'cHJldmlldw==',
+    })
+    // the in-memory snapshot was never touched
+    expect(snapshot.previewAssetId).toBeUndefined()
+    expect(Object.values(snapshot.assets)).toHaveLength(0)
+    __setPreviewRendererFactoryForTests(null)
+  })
+
+  it('previewCustom docs keep their upload; no render happens', async () => {
+    const { __setPreviewRendererFactoryForTests } = await import('../../scene3d/scenePreview')
+    const { buildFileJson } = await import('./controller')
+    const { buildFixtureDoc } = await import('../../test/fixtureDoc')
+    const { addAsset } = await import('../../model/mutations/assets')
+    const { parseDocument } = await import('./serialize')
+    const factory = vi.fn(fakeFactory)
+    __setPreviewRendererFactoryForTests(factory)
+    const snapshot = buildFixtureDoc()
+    snapshot.previewAssetId = addAsset(snapshot, {
+      mime: 'image/png',
+      data: 'Y3VzdG9t',
+      w: 64,
+      h: 64,
+    })
+    snapshot.previewCustom = true
+    const parsed = parseDocument(buildFileJson(snapshot)).doc
+    expect(factory).not.toHaveBeenCalled()
+    expect(parsed.previewCustom).toBe(true)
+    expect(parsed.assets[parsed.previewAssetId!]).toMatchObject({ data: 'Y3VzdG9t' })
+    __setPreviewRendererFactoryForTests(null)
+  })
+
+  it('a latched/failed preview still writes plain bytes', async () => {
+    const { __setPreviewRendererFactoryForTests } = await import('../../scene3d/scenePreview')
+    const { buildFileJson } = await import('./controller')
+    const { buildFixtureDoc } = await import('../../test/fixtureDoc')
+    const { parseDocument } = await import('./serialize')
+    __setPreviewRendererFactoryForTests(() => {
+      throw new Error('no GL')
+    })
+    const parsed = parseDocument(buildFileJson(buildFixtureDoc())).doc
+    expect(parsed.previewAssetId).toBeUndefined()
+    expect(Object.keys(parsed.walls).length).toBeGreaterThan(0) // real bytes
+    __setPreviewRendererFactoryForTests(null)
+  })
+})

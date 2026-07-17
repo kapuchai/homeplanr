@@ -95,6 +95,17 @@ describe('gcAssets', () => {
     addFurniture(d, item())
     expect(referencedAssetIds(d).size).toBe(0)
   })
+
+  it('previewAssetId (0.11.0) is a reference — gc keeps the preview asset', () => {
+    const d = doc()
+    const preview = addAsset(d, JPEG)
+    d.previewAssetId = preview
+    const orphan = addAsset(d, PNG)
+    const out = gcAssets(d)
+    expect(referencedAssetIds(d).has(preview)).toBe(true)
+    expect(Object.keys(out.assets)).toEqual([preview])
+    expect(d.assets[orphan]).toBeDefined() // input untouched
+  })
 })
 
 describe('duplicateFurniture (v6 fields)', () => {

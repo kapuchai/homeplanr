@@ -61,6 +61,22 @@ async function uploadFurnitureImage(id: FurnitureId): Promise<void> {
   useDocStore.getState().setFurnitureImage(id, content)
 }
 
+/** Custom save-preview upload (0.11.0) — the wall-art shape: pick →
+ * ingest (downscale/cap) → ONE store mutation; null ingest surfaces
+ * through the adapter's native message. */
+async function uploadPreviewImage(): Promise<void> {
+  const adapter = usePersistStore.getState().adapter
+  if (!adapter) return
+  const picked = await adapter.openImageDialog()
+  if (!picked) return
+  const content = await ingestImage(picked.dataUrl)
+  if (!content) {
+    await adapter.message(t('props.imageFailed.title'), t('props.imageFailed.body'))
+    return
+  }
+  useDocStore.getState().setPreviewImage(content)
+}
+
 /** Effective slot color for the picker input: hex override wins, then a
  * PALETTE-id override's color, then the slot default. Always a 6-digit hex
  * (input[type=color] rejects anything else); 3-digit overrides expand. */
@@ -1130,6 +1146,21 @@ export function PropertiesPanel() {
         value={s.defaultWallHeight}
         onCommit={(v) => a.updateSettings({ defaultWallHeight: v })}
       />
+      <Row>
+        <span>{t('props.preview')}</span>
+        {/* auto = a fresh top-down render embedded at every save;
+            custom = the uploaded image, part of the document (undoable) */}
+        <div className="segmented small">
+          <button type="button" onClick={() => void uploadPreviewImage()}>
+            {doc.previewCustom ? t('props.imageReplace') : t('props.imageUpload')}
+          </button>
+          {doc.previewCustom ? (
+            <button type="button" onClick={() => a.setPreviewImage(null)}>
+              {t('props.previewAuto')}
+            </button>
+          ) : null}
+        </div>
+      </Row>
       {(() => {
         // plan statistics (0.8.0 roomType semantics): per-type areas in the
         // registry order + an unspecified bucket; total from derived areas.

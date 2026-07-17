@@ -51,6 +51,33 @@ function hasAlpha(ctx: CanvasRenderingContext2D, w: number, h: number): boolean 
  * be decoded or won't fit the byte budget even after halving twice — the
  * caller owns the user-facing message.
  */
+/**
+ * Small JPEG thumb from any data-URL (recents list, 0.11.0) — one
+ * downscale pass, no byte ladder (128² JPEG is a few KB by construction).
+ * Null on decode/encoder failure or outside a DOM (unit env).
+ */
+export async function thumbDataUrl(sourceDataUrl: string, maxEdge = 128): Promise<string | null> {
+  try {
+    const img = await loadImage(sourceDataUrl)
+    const srcW = img.naturalWidth
+    const srcH = img.naturalHeight
+    if (!srcW || !srcH) return null
+    const scale = Math.min(1, maxEdge / Math.max(srcW, srcH))
+    const w = Math.max(1, Math.round(srcW * scale))
+    const h = Math.max(1, Math.round(srcH * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(img, 0, 0, w, h)
+    const out = canvas.toDataURL('image/jpeg', 0.8)
+    return out.startsWith('data:image/jpeg') ? out : null
+  } catch {
+    return null
+  }
+}
+
 export async function ingestImage(sourceDataUrl: string): Promise<AssetContent | null> {
   let img: HTMLImageElement
   try {
