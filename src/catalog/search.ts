@@ -19,6 +19,7 @@ export const KEYWORDS: Record<string, readonly string[]> = {
   'tv-wall': ['television', 'screen', 'media'],
   bookshelf: ['shelving', 'library', 'storage'],
   'floor-lamp': ['light', 'lighting'],
+  'table-lamp': ['light', 'lighting', 'desk'],
   plant: ['flower', 'greenery', 'pot'],
   rug: ['carpet', 'mat'],
   'side-table': ['end', 'small'],
@@ -65,6 +66,8 @@ export const KEYWORDS: Record<string, readonly string[]> = {
   blinds: ['shades', 'window', 'venetian'],
   'mirror-wall': ['glass', 'reflection'],
   'mirror-full': ['glass', 'dressing', 'reflection'],
+  'ceiling-lamp': ['light', 'lighting', 'pendant'],
+  'wall-sconce': ['light', 'lighting', 'lamp'],
 }
 
 /**

@@ -221,6 +221,24 @@ export const floorLamp: CatalogItem = {
     b.cylinder('pole', { r: 0.015, h: h - 0.3, at: [0, 0, 0.02] })
     b.cylinder('shade', { r: 0.16, h: 0.28, at: [0, 0, h - 0.28] })
   },
+  // 0.12.0: mid-shade anchor (shade spans 1.32–1.6)
+  emitter: { kind: 'point', at: [0, 0, 1.46], slot: 'shade', defaultLumen: 800 },
+}
+
+export const tableLamp: CatalogItem = {
+  id: 'table-lamp',
+  name: 'Table lamp',
+  category: 'living',
+  dims: { w: 0.25, d: 0.25, h: 0.45 }, // 25×25×45 cm
+  wallSnap: false,
+  defaultElevation: 0.75, // sits on a table/desk top; adjust per surface
+  materials: { base: 'metalDark', pole: 'metal', shade: 'linen' },
+  build3d: (b, { h }) => {
+    b.cylinder('base', { r: 0.09, h: 0.02, at: [0, 0, 0] })
+    b.cylinder('pole', { r: 0.012, h: h - 0.2, at: [0, 0, 0.02] })
+    b.cylinder('shade', { r: 0.11, h: 0.18, at: [0, 0, h - 0.18] })
+  },
+  emitter: { kind: 'point', at: [0, 0, 0.36], slot: 'shade', defaultLumen: 450 },
 }
 
 export const plant: CatalogItem = {
@@ -364,6 +382,7 @@ export const EXPANSION_ITEMS: CatalogItem[] = [
   washingMachine,
   sofaCorner,
   floorLamp,
+  tableLamp,
   plant,
   rug,
   tvWall,

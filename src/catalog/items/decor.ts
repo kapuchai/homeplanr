@@ -129,6 +129,43 @@ export const mirrorFull: CatalogItem = {
   },
 }
 
+export const ceilingLamp: CatalogItem = {
+  id: 'ceiling-lamp',
+  name: 'Ceiling lamp',
+  category: 'decor',
+  dims: { w: 0.4, d: 0.4, h: 0.5 }, // shade + cord drop
+  wallSnap: false,
+  // shade hangs under a 2.5m default ceiling (top = 2.5); Furniture3D has
+  // no per-room ceiling lookup, so taller/lower rooms adjust elevation
+  defaultElevation: 2,
+  materials: { cord: 'metalDark', shade: 'metal' },
+  build3d: (b, { h }) => {
+    b.cylinder('shade', { r: 0.19, h: 0.2, at: [0, 0, 0] })
+    b.cylinder('cord', { r: 0.008, h: h - 0.2, at: [0, 0, 0.2] })
+  },
+  // spot: a pendant throws its cone straight down
+  emitter: { kind: 'spot', at: [0, 0, 0.04], slot: 'shade', defaultLumen: 1500 },
+}
+
+export const wallSconce: CatalogItem = {
+  id: 'wall-sconce',
+  name: 'Wall sconce',
+  category: 'decor',
+  dims: { w: 0.2, d: 0.2, h: 0.3 },
+  wallSnap: true,
+  // hugs the wall at head height — its 1.75–2.05m span crosses the walk
+  // EYE band (1.4–1.8), and an invisible wall-hugging blocker is worse
+  // than clipping a sconce (the curtains precedent)
+  passable: true,
+  defaultElevation: 1.75,
+  materials: { mount: 'metalDark', shade: 'linen' },
+  build3d: (b, { d, h }) => {
+    b.box('mount', { size: [0.06, 0.03, 0.16], at: [0, d / 2 - 0.015, (h - 0.16) / 2] })
+    b.cylinder('shade', { r: 0.09, h: 0.26, at: [0, -0.01, 0.04] })
+  },
+  emitter: { kind: 'point', at: [0, -0.01, 0.2], slot: 'shade', defaultLumen: 400 },
+}
+
 export const DECOR_ITEMS: CatalogItem[] = [
   artPortrait,
   artLandscape,
@@ -137,4 +174,6 @@ export const DECOR_ITEMS: CatalogItem[] = [
   blinds,
   mirrorWall,
   mirrorFull,
+  ceilingLamp,
+  wallSconce,
 ]

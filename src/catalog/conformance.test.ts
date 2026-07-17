@@ -158,6 +158,19 @@ describe('catalog conformance', () => {
         }
       })
 
+      if (item.emitter) {
+        it('emitter (0.12.0): anchor inside the dims box, declared slot, sane lumens', () => {
+          const e = item.emitter!
+          expect(Math.abs(e.at[0])).toBeLessThanOrEqual(item.dims.w / 2 + 0.01)
+          expect(Math.abs(e.at[1])).toBeLessThanOrEqual(item.dims.d / 2 + 0.01)
+          expect(e.at[2]).toBeGreaterThanOrEqual(0)
+          expect(e.at[2]).toBeLessThanOrEqual(item.dims.h + 0.01)
+          expect(item.materials[e.slot], `emitter slot '${e.slot}'`).toBeDefined()
+          expect(e.defaultLumen).toBeGreaterThan(0)
+          expect(Number.isFinite(e.defaultLumen)).toBe(true)
+        })
+      }
+
       if (item.wallSnap) {
         it('wallSnap: parts reach within 2cm of the back edge', () => {
           const parts = collectParts((b) => item.build3d(b, item.dims))
