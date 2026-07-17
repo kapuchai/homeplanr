@@ -17,6 +17,7 @@ import { area } from '../geometry/polygon'
 import { FLOOR_GROUPS, FLOOR_MATERIALS, PALETTE, WALL_FINISHES, WALL_PAINTS } from '../catalog/palette'
 import type { MaterialId } from '../catalog/types'
 import { ROOM_TYPES, roomTypeSpec } from '../catalog/roomTypes'
+import { openingStyleSpec, openingStylesFor } from '../catalog/openingStyles'
 import { CATALOG } from '../catalog'
 import { beginTx, commitTx, isTxActive } from '../store/transactions'
 import { usePersistStore } from '../store/persistence/controller'
@@ -804,6 +805,30 @@ export function PropertiesPanel() {
     return (
       <aside className="props-panel" key={opening.id}>
         <h3>{t(opening.kind === 'door' ? 'props.door' : 'props.window')}</h3>
+        <div className="prop-row chip-row">
+          <span>{t('props.style')}</span>
+          <div className="chips">
+            {openingStylesFor(opening.kind).map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`chip${openingStyleSpec(opening.kind, opening.style).id === s.id ? ' active' : ''}`}
+                onClick={() =>
+                  // restyle keeps user dims; restyleSill is the one
+                  // structural exception (full-height → sill 0)
+                  a.updateOpening(opening.id, {
+                    style: s.id,
+                    ...(opening.kind === 'window' && s.restyleSill !== undefined
+                      ? { sillHeight: s.restyleSill }
+                      : {}),
+                  })
+                }
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <LengthField
           label={t('props.width')}
           value={opening.width}

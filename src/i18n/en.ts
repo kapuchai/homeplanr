@@ -182,6 +182,10 @@ export const en = {
   'catalog.searchAria': 'Search catalog',
   'catalog.noMatch': 'Nothing matches “{query}”',
   'catalog.cardTitle': '{name} — {w}×{d} cm',
+  // 0.10.0 mode-aware panel section headers (style NAMES are catalog
+  // content and live in the openingStyles registry, not here)
+  'catalog.doorStyles': 'Door styles',
+  'catalog.windowStyles': 'Window styles',
 
   // ---- properties panel ----
   'props.multiSelected': '{count} selected',
@@ -248,6 +252,7 @@ export const en = {
   'props.floor': 'Floor',
   'props.area': 'Area',
   'props.sillHeight': 'Sill height',
+  'props.style': 'Style',
   'props.hinge': 'Hinge',
   'props.hingeA': 'A-side',
   'props.hingeB': 'B-side',

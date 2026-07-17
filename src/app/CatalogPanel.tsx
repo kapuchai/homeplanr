@@ -3,7 +3,16 @@ import { CATALOG, CATALOG_BY_CATEGORY, CATEGORY_ORDER, type CatalogItem } from '
 import { searchCatalog } from '../catalog/search'
 import { symbolFor } from '../catalog/symbolFromParts'
 import { ensureThumbnails, getThumbnail } from '../catalog/thumbnails'
+import {
+  openingStyleSpec,
+  openingStylesFor,
+  type OpeningStyleSpec,
+} from '../catalog/openingStyles'
 import { SymbolRenderer } from '../editor2d/render/SymbolRenderer'
+import { OpeningInkGlyph } from '../editor2d/render/OpeningInkGlyph'
+import { openingInk } from '../editor2d/render/planGeometry'
+import { useThemeStore } from '../theme/themeStore'
+import { DEFAULTS } from '../model/types'
 import { useUiStore } from '../store/uiStore'
 import { useDocStore } from '../store/docStore'
 import { switchTool } from '../editor2d/tools/toolRegistry'
@@ -157,6 +166,92 @@ function ItemCard({ item }: { item: CatalogItem }) {
   )
 }
 
+/** Wall half-thickness + stub length for the style-card preview glyphs. */
+const CARD_HALF = 0.075
+const CARD_STUB = 0.35
+
+/**
+ * Opening style card (0.10.0) — a drawn preview through the REAL glyph
+ * pipeline (openingInk + OpeningInkGlyph, non-scaling strokes), never a
+ * hand-authored picture. Radio semantics: one style is always armed per
+ * kind (standard by default); clicking re-arms, never disarms.
+ */
+function OpeningStyleCard({ spec }: { spec: OpeningStyleSpec }) {
+  const theme = useThemeStore((s) => s.theme)
+  const armed = useUiStore(
+    (s) =>
+      openingStyleSpec(
+        spec.kind,
+        spec.kind === 'door' ? s.toolParams.doorStyle : s.toolParams.windowStyle,
+      ).id === spec.id,
+  )
+  const width =
+    spec.defaults?.width ?? (spec.kind === 'door' ? DEFAULTS.door.width : DEFAULTS.window.width)
+  const ink = openingInk(
+    (u, v) => ({ x: u, y: v }),
+    0,
+    width,
+    CARD_HALF,
+    spec.kind === 'door'
+      ? { kind: 'door', hinge: 'a', swing: 'front', style: spec.id }
+      : { kind: 'window', style: spec.id },
+  )
+  // fit box over stubs + ink endpoints (the quarter arcs never leave the
+  // rectangle their endpoints span)
+  let minX = -CARD_STUB
+  let maxX = width + CARD_STUB
+  let minY = -CARD_HALF
+  let maxY = CARD_HALF
+  for (const p of ink) {
+    const pts =
+      p.kind === 'line'
+        ? [
+            { x: p.line.x1, y: p.line.y1 },
+            { x: p.line.x2, y: p.line.y2 },
+          ]
+        : [p.arc.from, p.arc.to]
+    for (const q of pts) {
+      minX = Math.min(minX, q.x)
+      maxX = Math.max(maxX, q.x)
+      minY = Math.min(minY, q.y)
+      maxY = Math.max(maxY, q.y)
+    }
+  }
+  const pad = 0.06
+  const scale = 44 / Math.max(maxX - minX + 2 * pad, maxY - minY + 2 * pad)
+  const cx = (minX + maxX) / 2
+  const cy = (minY + maxY) / 2
+
+  return (
+    <button
+      type="button"
+      className={`catalog-card${armed ? ' armed' : ''}`}
+      title={spec.name}
+      onClick={() =>
+        useUiStore
+          .getState()
+          .setToolParams(spec.kind === 'door' ? { doorStyle: spec.id } : { windowStyle: spec.id })
+      }
+    >
+      <svg width={52} height={52} viewBox="0 0 52 52" aria-hidden>
+        {/* the editor renders plan y-up — the card flips the same way */}
+        <g transform={`translate(26 26) scale(${scale} ${-scale}) translate(${-cx} ${-cy})`}>
+          <rect
+            x={-CARD_STUB}
+            y={-CARD_HALF}
+            width={CARD_STUB}
+            height={CARD_HALF * 2}
+            fill={theme.wall}
+          />
+          <rect x={width} y={-CARD_HALF} width={CARD_STUB} height={CARD_HALF * 2} fill={theme.wall} />
+          <OpeningInkGlyph prims={ink} variant="plan" />
+        </g>
+      </svg>
+      <span>{spec.name}</span>
+    </button>
+  )
+}
+
 export function CatalogPanel() {
   // isometric thumbnails warm up in idle slices; each progress tick
   // re-renders the cards so they swap from SVG symbols to renders
@@ -166,8 +261,33 @@ export function CatalogPanel() {
     void ensureThumbnails(Object.values(CATALOG), () => bump())
   }, [])
 
+  // mode-aware body (0.10.0): the opening tools swap the furniture grid
+  // for the matching style cards; every other tool keeps the catalog
+  const openingKind = useUiStore((s) =>
+    s.activeTool === 'place-opening' ? s.toolParams.openingKind : null,
+  )
+
   // ranked search (0.9.0): name-prefix > substring > keyword > category
   const matches = query.trim() ? searchCatalog(query) : null
+
+  if (openingKind) {
+    const styles = openingStylesFor(openingKind)
+    return (
+      <aside className="catalog-panel">
+        <details open className="catalog-section">
+          <summary>
+            {t(openingKind === 'door' ? 'catalog.doorStyles' : 'catalog.windowStyles')}{' '}
+            <span className="count">{styles.length}</span>
+          </summary>
+          <div className="catalog-grid">
+            {styles.map((s) => (
+              <OpeningStyleCard key={s.id} spec={s} />
+            ))}
+          </div>
+        </details>
+      </aside>
+    )
+  }
 
   return (
     <aside className="catalog-panel">

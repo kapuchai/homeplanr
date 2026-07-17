@@ -65,6 +65,27 @@ export async function placeFurniture(page: Page, name = 'Sofa, 3-seat', fx = 0.5
 }
 
 /**
+ * Place a door/window at a canvas fraction (0.10.0): arms the tool via the
+ * toolbar, optionally picks a style card from the mode-aware catalog
+ * panel, clicks the wall, and disarms back to select.
+ */
+export async function placeOpening(
+  page: Page,
+  kind: 'door' | 'window',
+  fx: number,
+  fy: number,
+  style?: string,
+) {
+  await page.getByRole('button', { name: kind === 'door' ? 'Door' : 'Window', exact: true }).click()
+  if (style) {
+    await page.locator('.catalog-panel .catalog-card', { hasText: style }).click()
+  }
+  const p = await canvasPoint(page, fx, fy)
+  await page.mouse.click(p.x, p.y)
+  await page.keyboard.press('Escape')
+}
+
+/**
  * Switch to the 3D view (the subtree lazy-mounts on first use) and wait out
  * the first frame + environment; returns the WebGL canvas locator.
  */
