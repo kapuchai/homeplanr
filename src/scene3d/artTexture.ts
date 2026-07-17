@@ -4,7 +4,7 @@ import { MeshStandardMaterial, SRGBColorSpace, Texture } from 'three'
 import type { ImageAsset } from '../model/types'
 import type { AssetId } from '../model/ids'
 import { assetDataUrl } from '../store/persistence/imageIngest'
-import { PALETTE } from '../catalog/palette'
+import { PALETTE, TEXTURE_BASE_WHITE } from '../catalog/palette'
 
 /**
  * Per-asset art materials (v6 wall art). One material+texture per
@@ -54,7 +54,7 @@ function acquire(asset: ImageAsset, face: { w: number; h: number }, onLoad: () =
   }
   const spec = PALETTE.canvas
   const material = new MeshStandardMaterial({
-    color: '#ffffff',
+    color: TEXTURE_BASE_WHITE,
     roughness: spec.roughness,
     metalness: spec.metalness,
   })

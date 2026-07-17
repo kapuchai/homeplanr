@@ -35,6 +35,13 @@ export const PALETTE: Record<MaterialId, MaterialSpec> = {
   mirror: { color: '#e8f0f2', roughness: 0.06, metalness: 1 },
 }
 
+/**
+ * Pure-white base under image-mapped materials (the texture multiplies the
+ * base color — any tint would tint the artwork). Lives here so consumers
+ * outside the allowed raw-color dirs stay hex-free (lint:colors).
+ */
+export const TEXTURE_BASE_WHITE = '#ffffff'
+
 /** Scene-level materials (not per-item slots). */
 export const SCENE_MATERIALS = {
   wallPaint: { color: '#f5f3ee', roughness: 0.9, metalness: 0 },
