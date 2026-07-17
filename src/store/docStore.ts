@@ -8,6 +8,7 @@ import type { Vec2 } from '../geometry/vec'
 import * as walls from '../model/mutations/walls'
 import * as openings from '../model/mutations/openings'
 import * as furniture from '../model/mutations/furniture'
+import * as assets from '../model/mutations/assets'
 import * as rooms from '../model/mutations/rooms'
 import * as project from '../model/mutations/project'
 import * as annotations from '../model/mutations/annotations'
@@ -50,6 +51,9 @@ export interface DocState {
   transformFurniture: (id: FurnitureId, patch: Parameters<typeof furniture.transformFurniture>[2], opts?: Parameters<typeof furniture.transformFurniture>[3]) => void
   resizeFurniture: (id: FurnitureId, size: Parameters<typeof furniture.resizeFurniture>[2]) => void
   renameFurniture: (id: FurnitureId, name: string) => void
+  /** Ingest-or-dedupe + point the instance at it (null clears); ONE
+   * mutation ⇒ one undo entry for the whole upload. */
+  setFurnitureImage: (id: FurnitureId, content: assets.AssetContent | null) => void
   duplicateFurniture: (ids: readonly FurnitureId[]) => FurnitureId[]
   alignFurniture: (ids: readonly FurnitureId[], edge: furniture.AlignEdge) => void
   distributeFurniture: (ids: readonly FurnitureId[], axis: 'x' | 'y') => void
@@ -114,6 +118,10 @@ export const useDocStore = create<DocState>()(
           transformFurniture: (id, patch, opts) => mutate((d) => furniture.transformFurniture(d, id, patch, opts)),
           resizeFurniture: (id, size) => mutate((d) => furniture.resizeFurniture(d, id, size)),
           renameFurniture: (id, name) => mutate((d) => furniture.renameFurniture(d, id, name)),
+          setFurnitureImage: (id, content) =>
+            mutate((d) =>
+              furniture.setFurnitureAsset(d, id, content ? assets.addAsset(d, content) : undefined),
+            ),
           duplicateFurniture: (ids) => mutate((d) => furniture.duplicateFurniture(d, ids)),
           alignFurniture: (ids, edge) => mutate((d) => furniture.alignFurniture(d, ids, edge)),
           distributeFurniture: (ids, axis) => mutate((d) => furniture.distributeFurniture(d, ids, axis)),

@@ -15,6 +15,25 @@ import { defaultDialogDir, defaultDialogPath, rememberDialogDir } from './defaul
  * scope/rename failures fall back to a direct write (the localStorage
  * recovery blob remains the corruption backstop).
  */
+const IMAGE_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  gif: 'image/gif',
+}
+
+/** btoa needs a binary string; build it in chunks — a spread would blow the
+ * argument limit on multi-MB photos. */
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  }
+  return btoa(bin)
+}
+
 export function createTauriStorage(): StorageAdapter {
   return {
     kind: 'tauri',
@@ -68,6 +87,28 @@ export function createTauriStorage(): StorageAdapter {
       if (!picked) return null
       void rememberDialogDir('save', picked)
       return this.savePath!(picked, json)
+    },
+
+    async openImageDialog() {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const picked = await open({
+        multiple: false,
+        directory: false,
+        defaultPath: await defaultDialogDir('image'),
+        filters: [{ name: 'Images', extensions: Object.keys(IMAGE_MIME) }],
+      })
+      if (!picked || typeof picked !== 'string') return null
+      void rememberDialogDir('image', picked)
+      const { readFile } = await import('@tauri-apps/plugin-fs')
+      const bytes = await readFile(picked)
+      const ext = picked.split('.').pop()?.toLowerCase() ?? ''
+      // extensions are dialog-filtered to the map's keys; png is a safe
+      // decode hint for anything that slips through (Image sniffs content)
+      const mime = IMAGE_MIME[ext] ?? 'image/png'
+      return {
+        dataUrl: `data:${mime};base64,${bytesToBase64(bytes)}`,
+        name: picked.split(/[/\\]/).pop() ?? 'image',
+      }
     },
 
     async saveBinaryDialog(bytes, suggestedName, filter) {

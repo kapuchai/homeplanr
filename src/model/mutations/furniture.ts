@@ -1,5 +1,6 @@
 import type { FurnitureInstance, ProjectDocument } from '../types'
-import { newFurnitureId, type FurnitureId } from '../ids'
+import { newFurnitureId, type AssetId, type FurnitureId } from '../ids'
+import { addAsset, type AssetContent } from './assets'
 
 /**
  * Furniture mutations. Furniture never affects the wall graph, openings, or
@@ -29,6 +30,9 @@ export interface AddFurnitureParams {
   price?: number
   notes?: string
   materialOverrides?: Record<string, string>
+  /** Embedded image CONTENT (v6) — clipboards carry bytes, not ids, so a
+   * cross-document paste re-ingests (content-deduped by addAsset). */
+  asset?: AssetContent
 }
 
 export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): FurnitureId {
@@ -50,6 +54,7 @@ export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): 
     ...(params.price !== undefined ? { price: params.price } : {}),
     ...(params.notes ? { notes: params.notes } : {}),
     ...(params.materialOverrides ? { materialOverrides: { ...params.materialOverrides } } : {}),
+    ...(params.asset ? { assetId: addAsset(doc, params.asset) } : {}),
   }
   return id
 }
@@ -103,6 +108,20 @@ export function renameFurniture(doc: ProjectDocument, id: FurnitureId, name: str
   else delete f.name
 }
 
+/** Point an instance at an embedded asset (set-or-clear; absent = the
+ * item's placeholder art). The asset itself is added via addAsset — orphans
+ * left behind by a swap/clear are shed by gcAssets at file-write time. */
+export function setFurnitureAsset(
+  doc: ProjectDocument,
+  id: FurnitureId,
+  assetId: AssetId | undefined,
+): void {
+  const f = doc.furniture[id]
+  if (!f) return
+  if (assetId) f.assetId = assetId
+  else delete f.assetId
+}
+
 /** Duplicate selected furniture at a +(0.25, 0.25) m offset; returns new ids. */
 export function duplicateFurniture(
   doc: ProjectDocument,
@@ -122,6 +141,11 @@ export function duplicateFurniture(
       // spread copies by REFERENCE — clone the record or duplicates alias it
       ...(f.materialOverrides ? { materialOverrides: { ...f.materialOverrides } } : {}),
     }
+    // assetId rides the spread (same doc, sharing is right); attachment does
+    // NOT — a second curtain landing exactly on the same window would be an
+    // invisible overlapping twin. The duplicate is a detached copy at the
+    // offset position.
+    delete doc.furniture[nid]!.attachedOpeningId
     created.push(nid)
   }
   return created

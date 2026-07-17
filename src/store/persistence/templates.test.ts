@@ -65,6 +65,9 @@ describe('bundled template plans', () => {
 describe('newFromTemplate — the newProject state matrix', () => {
   const adapter: StorageAdapter = {
     kind: 'tauri',
+    async openImageDialog() {
+      return null
+    },
     async openDialog() {
       return null
     },

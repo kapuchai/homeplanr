@@ -58,10 +58,12 @@ export interface AppSettings {
   lastDirSave: string | null
   lastDirExport: string | null
   lastDirOpen: string | null
+  lastDirImage: string | null
 }
 
-/** Native-dialog kinds with independent remembered directories (B7). */
-export type DialogDirKind = 'save' | 'export' | 'open'
+/** Native-dialog kinds with independent remembered directories (B7).
+ * 'image' (v6 wall-art upload) defaults to Pictures. */
+export type DialogDirKind = 'save' | 'export' | 'open' | 'image'
 
 /** Panel width clamps + defaults — shared with the PanelHandle splitter. */
 export const PANEL_LIMITS = {
@@ -98,6 +100,7 @@ const DEFAULTS: AppSettings = {
   lastDirSave: null,
   lastDirExport: null,
   lastDirOpen: null,
+  lastDirImage: null,
 }
 
 const dirOrNull = (value: unknown): string | null =>
@@ -154,6 +157,7 @@ export function parseAppSettings(json: string | null): AppSettings {
       lastDirSave: dirOrNull(r.lastDirSave),
       lastDirExport: dirOrNull(r.lastDirExport),
       lastDirOpen: dirOrNull(r.lastDirOpen),
+      lastDirImage: dirOrNull(r.lastDirImage),
     }
   } catch {
     return { ...DEFAULTS }
@@ -193,6 +197,7 @@ const persist = (s: AppSettings): void => {
         lastDirSave: s.lastDirSave,
         lastDirExport: s.lastDirExport,
         lastDirOpen: s.lastDirOpen,
+        lastDirImage: s.lastDirImage,
       }),
     )
   } catch {
@@ -256,7 +261,9 @@ export const useAppSettings = create<AppSettingsState>()(
             ? { lastDirSave: dir }
             : kind === 'export'
               ? { lastDirExport: dir }
-              : { lastDirOpen: dir },
+              : kind === 'image'
+                ? { lastDirImage: dir }
+                : { lastDirOpen: dir },
         ),
     }
   }),

@@ -25,6 +25,7 @@ const DEFAULTS: AppSettings = {
   lastDirSave: null,
   lastDirExport: null,
   lastDirOpen: null,
+  lastDirImage: null,
 }
 
 describe('parseAppSettings', () => {
@@ -57,6 +58,7 @@ describe('parseAppSettings', () => {
       lastDirSave: '/home/u/Documents/plans',
       lastDirExport: '/home/u/Downloads',
       lastDirOpen: '/mnt/shared',
+      lastDirImage: '/home/u/Pictures',
     }
     expect(parseAppSettings(JSON.stringify({ v: 1, ...s }))).toEqual(s)
   })
@@ -96,6 +98,7 @@ describe('parseAppSettings', () => {
       lastDirSave: null, // '' → unset
       lastDirExport: null, // non-string → unset
       lastDirOpen: null,
+      lastDirImage: null,
     })
     expect(parseAppSettings(JSON.stringify({ v: 1, units: 'inches' }))).toEqual(DEFAULTS)
   })
@@ -171,6 +174,7 @@ describe('useAppSettings persistence', () => {
       lastDirSave: s.lastDirSave,
       lastDirExport: s.lastDirExport,
       lastDirOpen: s.lastDirOpen,
+      lastDirImage: s.lastDirImage,
     }).toEqual(DEFAULTS)
   })
 
@@ -216,6 +220,7 @@ describe('useAppSettings persistence', () => {
       lastDirSave: null,
       lastDirExport: '/mnt/plans',
       lastDirOpen: null,
+      lastDirImage: null,
     })
   })
 

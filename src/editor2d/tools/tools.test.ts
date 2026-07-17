@@ -842,6 +842,7 @@ describe('keymap 3D gate (M6): file ops stay live, editing keys are 2D-only', ()
     const fake: StorageAdapter = {
       kind: 'browser',
       openDialog: async () => null,
+      openImageDialog: async () => null,
       saveAsDialog: async () => {
         saveAsCalls++
         return null // "cancelled" — saveProject bails without state changes

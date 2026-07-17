@@ -8,12 +8,19 @@ import { useAppSettings, type DialogDirKind } from '../appSettings'
  * longer exists is harmless: the GTK/native chooser falls back on its own.
  */
 
-/** Pure policy — remembered dir wins, else the kind's system default. */
+/** Pure policy — remembered dir wins, else the kind's system default
+ * (exports → Downloads, images → Pictures, the rest → Documents). */
 export const pickDefaultDir = (
   kind: DialogDirKind,
   remembered: string | null,
-  sys: { downloads: string; documents: string },
-): string => remembered ?? (kind === 'export' ? sys.downloads : sys.documents)
+  sys: { downloads: string; documents: string; pictures?: string },
+): string =>
+  remembered ??
+  (kind === 'export'
+    ? sys.downloads
+    : kind === 'image'
+      ? (sys.pictures ?? sys.documents)
+      : sys.documents)
 
 /** Default dir joined with the suggested name, or bare name if the path
  * API is unavailable (dialog then opens wherever the OS decides). */
@@ -22,10 +29,20 @@ export async function defaultDialogPath(kind: DialogDirKind, name: string): Prom
     const path = await import('@tauri-apps/api/path')
     const s = useAppSettings.getState()
     const remembered =
-      kind === 'save' ? s.lastDirSave : kind === 'export' ? s.lastDirExport : s.lastDirOpen
+      kind === 'save'
+        ? s.lastDirSave
+        : kind === 'export'
+          ? s.lastDirExport
+          : kind === 'image'
+            ? s.lastDirImage
+            : s.lastDirOpen
+    const documents = await path.documentDir()
     const dir = pickDefaultDir(kind, remembered, {
       downloads: await path.downloadDir(),
-      documents: await path.documentDir(),
+      documents,
+      // xdg Pictures may be unset on minimal setups — never let that break
+      // the dialog, just fall back to Documents
+      pictures: kind === 'image' ? await path.pictureDir().catch(() => documents) : undefined,
     })
     return name ? await path.join(dir, name) : dir
   } catch {

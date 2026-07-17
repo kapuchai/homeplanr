@@ -40,6 +40,35 @@ export function createBrowserStorage(): StorageAdapter {
       })
     },
 
+    openImageDialog() {
+      return new Promise((resolve, reject) => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/png,image/jpeg,image/webp,image/bmp,image/gif'
+        let fileChosen = false
+        input.onchange = () => {
+          fileChosen = true
+          const file = input.files?.[0]
+          if (!file) return resolve(null)
+          const reader = new FileReader()
+          reader.onload = () => resolve({ dataUrl: String(reader.result), name: file.name })
+          reader.onerror = () => reject(new Error(`Could not read ${file.name}`))
+          reader.readAsDataURL(file)
+        }
+        // same cancel detection as openDialog: focus returning without a
+        // chosen file reads as cancel (slow readers must not lose the race)
+        window.addEventListener(
+          'focus',
+          () =>
+            setTimeout(() => {
+              if (!fileChosen) resolve(null)
+            }, 400),
+          { once: true },
+        )
+        input.click()
+      })
+    },
+
     async saveAsDialog(json, suggestedName) {
       const name = suggestedName.endsWith('.homeplanr')
         ? suggestedName

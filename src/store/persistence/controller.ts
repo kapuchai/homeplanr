@@ -21,6 +21,7 @@ import {
   RECOVERY_KEY,
   type RecoveryBlob,
 } from './recovery'
+import { gcAssets } from '../../model/mutations/assets'
 import { useConfirmStore } from '../../app/confirmStore'
 import { zoomToFitContent } from '../../editor2d/tools/keymap'
 import { useAppSettings } from '../appSettings'
@@ -123,19 +124,28 @@ function scheduleRecoveryAutosave(): void {
   recoveryTimer = setTimeout(() => {
     recoveryTimer = null
     if (!state().dirty) return // skip-when-clean kills the launch race
+    const blob = (d: ProjectDocument) =>
+      encodeRecovery({
+        v: 1,
+        filePath: state().currentFilePath,
+        docId: d.id,
+        savedAt: Date.now(),
+        doc: d,
+      })
     try {
-      localStorage.setItem(
-        RECOVERY_KEY,
-        encodeRecovery({
-          v: 1,
-          filePath: state().currentFilePath,
-          docId: doc().id,
-          savedAt: Date.now(),
-          doc: doc(),
-        }),
-      )
+      localStorage.setItem(RECOVERY_KEY, blob(doc()))
     } catch {
-      // QuotaExceeded — recovery is best-effort; real saves still work
+      // QuotaExceeded — likely base64 assets. Retry once with assets
+      // stripped: recovering the geometry beats losing the whole blob, and
+      // dangling assetIds render as placeholder art by design.
+      try {
+        const d = doc()
+        if (Object.keys(d.assets).length) {
+          localStorage.setItem(RECOVERY_KEY, blob({ ...d, assets: {} }))
+        }
+      } catch {
+        // still over quota — recovery is best-effort; real saves still work
+      }
     }
   }, 500)
 }
@@ -185,7 +195,10 @@ async function runFileAutosave(): Promise<void> {
       return
     }
     const snapshot = doc()
-    const json = serializeDocument(snapshot)
+    // GC unreferenced assets from the BYTES only — lastSavedDoc keeps the
+    // in-memory reference (dirty is reference equality), and the store
+    // keeps orphans so undo can resurrect what references them.
+    const json = serializeDocument(gcAssets(snapshot))
     try {
       await a.savePath(path, json)
       usePersistStore.setState({
@@ -453,7 +466,8 @@ export async function saveProject(): Promise<boolean> {
     // Snapshot INSIDE the lock: a queued explicit save must persist the doc
     // as of ITS turn, not a stale pre-autosave reference.
     const snapshot = doc()
-    const json = serializeDocument(snapshot)
+    // assets GC on the bytes only — see runFileAutosave
+    const json = serializeDocument(gcAssets(snapshot))
     try {
       let path: string | null
       if (currentFilePath && adapter.savePath) {
@@ -492,7 +506,8 @@ export async function saveProjectAs(): Promise<boolean> {
     if (!(await whenTxIdle())) return false // a drag started while queued
     const { adapter } = state()
     const snapshot = doc() // see saveProject: one snapshot for file AND state
-    const json = serializeDocument(snapshot)
+    // assets GC on the bytes only — see runFileAutosave
+    const json = serializeDocument(gcAssets(snapshot))
     try {
       const path = await adapter.saveAsDialog(json, snapshot.name)
       if (!path) return false

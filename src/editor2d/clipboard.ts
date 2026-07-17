@@ -2,6 +2,7 @@ import type { ProjectDocument, Room } from '../model/types'
 import type { FurnitureId, RoomId, WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import type { AddFurnitureParams } from '../model/mutations/furniture'
+import type { AssetContent } from '../model/mutations/assets'
 import type { GraphPayload } from '../model/mutations/paste'
 import type { DerivedGeometry } from '../store/derived'
 import { pointInPolygonWithHoles } from '../geometry/polygon'
@@ -28,6 +29,12 @@ interface ClipboardItem {
   price?: number
   notes?: string
   materialOverrides?: Record<string, string>
+  // v6 wall-art image, carried as CONTENT (not an id): the clipboard
+  // survives New/Open, so a paste may land in a document that never had
+  // the asset — addFurniture re-ingests, content-deduped.
+  // attachedOpeningId deliberately does NOT ride copies (the target
+  // window isn't part of the furniture half; pastes land detached).
+  asset?: AssetContent
 }
 
 export interface ClipboardPayload {
@@ -132,6 +139,10 @@ export function buildPayload(
       ...(f.price !== undefined ? { price: f.price } : {}),
       ...(f.notes ? { notes: f.notes } : {}),
       ...(f.materialOverrides ? { materialOverrides: { ...f.materialOverrides } } : {}),
+      ...(() => {
+        const a = f.assetId ? doc.assets[f.assetId] : undefined
+        return a ? { asset: { mime: a.mime, data: a.data, w: a.w, h: a.h } } : {}
+      })(),
     })),
     graph,
   }
@@ -180,6 +191,7 @@ export function materializeItems(p: ClipboardPayload, target: Vec2): AddFurnitur
     ...(it.price !== undefined ? { price: it.price } : {}),
     ...(it.notes ? { notes: it.notes } : {}),
     ...(it.materialOverrides ? { materialOverrides: { ...it.materialOverrides } } : {}),
+    ...(it.asset ? { asset: { ...it.asset } } : {}),
   }))
 }
 

@@ -89,6 +89,9 @@ describe('openPath recovery preservation (applyOpened)', () => {
   }
   const adapter: StorageAdapter = {
     kind: 'tauri',
+    async openImageDialog() {
+      return null
+    },
     async openDialog() {
       return null
     },
@@ -147,6 +150,9 @@ describe('save race (S1, 0.3.0): edits during an in-flight save', () => {
     savePath: (path: string, json: string) => Promise<string>,
   ): StorageAdapter => ({
     kind: 'tauri',
+    async openImageDialog() {
+      return null
+    },
     async openDialog() {
       return null
     },
@@ -237,6 +243,9 @@ describe('tx-idle wait (R4, 0.3.0)', () => {
     usePersistStore.setState({
       adapter: {
         kind: 'tauri',
+        async openImageDialog() {
+          return null
+        },
         async openDialog() {
           return null
         },
@@ -286,6 +295,9 @@ describe('guardDirty re-guards mid-save edits (S1 follow-through)', () => {
     usePersistStore.setState({
       adapter: {
         kind: 'tauri',
+        async openImageDialog() {
+          return null
+        },
         async openDialog() {
           return null
         },
@@ -346,6 +358,9 @@ describe('op serialization (queued guards cannot interleave flows)', () => {
     usePersistStore.setState({
       adapter: {
         kind: 'tauri',
+        async openImageDialog() {
+          return null
+        },
         async openDialog() {
           return null
         },
@@ -388,6 +403,9 @@ describe('recovery prompt Esc = dismiss (R1b, 0.3.0)', () => {
     usePersistStore.setState({
       adapter: {
         kind: 'tauri',
+        async openImageDialog() {
+          return null
+        },
         async openDialog() {
           return null
         },
@@ -429,6 +447,9 @@ describe('autosave-to-file (M8)', () => {
   let failNext = false
   const autosaveAdapter = (): StorageAdapter => ({
     kind: 'tauri',
+    async openImageDialog() {
+      return null
+    },
     async openDialog() {
       return null
     },

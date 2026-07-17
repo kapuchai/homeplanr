@@ -30,6 +30,10 @@ export interface StorageAdapter {
     suggestedName: string,
     filter: { name: string; extensions: string[] },
   ): Promise<string | null>
+  /** Pick an image (wall-art upload). Returns the RAW file as a data-URL —
+   * ingest (downscale/re-encode/cap) is the caller's job, never the
+   * adapter's. null = cancelled. Throws on read errors. */
+  openImageDialog(): Promise<{ dataUrl: string; name: string } | null>
   /** File mtime in epoch ms; null when missing/unstattable. */
   statMtime?(path: string): Promise<number | null>
   /** Window title (dirty marker). No-op in browser. */
