@@ -5,7 +5,7 @@ import { closestPointOnSegment, distToSegment } from '../../geometry/segment'
 import { findOpeningSlot } from '../../model/mutations/openings'
 import { openingInk } from '../render/planGeometry'
 import { openingStyleSpec, type OpeningStyleSpec } from '../../catalog/openingStyles'
-import { OPENING_FLUSH_SNAP_PX } from '../../geometry/snapping'
+import { OPENING_FLUSH_SNAP_PX, WALL_PICK_PX } from '../../geometry/snapping'
 import { useAppSettings } from '../../store/appSettings'
 import { DEFAULTS } from '../../model/types'
 import type { WallId } from '../../model/ids'
@@ -17,8 +17,6 @@ import type { WallId } from '../../model/ids'
  * show a placement the commit would reject. Click commits and STAYS armed
  * (door rows); Esc/right-click → select (via keymap ladder / Editor2D).
  */
-const WALL_PICK_PX = 14
-
 /** Swing side = the side of the centerline the cursor is on ('front' = +perp of a→b). */
 const swingFor = (world: Vec2, na: Vec2, dir: Vec2): 'front' | 'back' => {
   const v = (world.x - na.x) * dir.y - (world.y - na.y) * dir.x

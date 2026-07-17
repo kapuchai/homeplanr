@@ -11,7 +11,7 @@ import {
   splitWall,
   updateWall,
 } from './walls'
-import { addOpening, findOpeningSlot, updateOpening } from './openings'
+import { addOpening, findOpeningSlot, rehomeOpening, updateOpening } from './openings'
 import { runPipeline } from './pipeline'
 import { paintRoomWalls, renameRoom, setRoomType } from './rooms'
 import { addDimension, addLabel, updateAnnotation } from './annotations'
@@ -332,6 +332,51 @@ describe('0.10.0 M1: opening style plumbing', () => {
     expect(blocked === null || Math.abs(blocked - u) > 0.4).toBe(true)
     // with exclude, the same request resolves in place
     expect(findOpeningSlot(d, r.wallId!, u, 0.9, { exclude: id })).toBeCloseTo(u, 9)
+  })
+
+  it('rehomeOpening moves an opening across walls; dims/hinge/style ride along', () => {
+    const d = doc()
+    square(d, 6)
+    const [w1, w2] = Object.values(d.walls)
+    const id = addOpening(d, {
+      kind: 'door',
+      wallId: w1!.id,
+      t: 0.5,
+      hinge: 'b',
+      swing: 'back',
+      style: 'sliding',
+    })!
+    rehomeOpening(d, id, w2!.id, 0.4)
+    const op = d.openings[id]!
+    expect(op.wallId).toBe(w2!.id)
+    expect(op.t).toBeCloseTo(0.4, 6)
+    expect(op.kind === 'door' && op.hinge).toBe('b')
+    expect(op.kind === 'door' && op.swing).toBe('back')
+    expect(op.style).toBe('sliding')
+    // unknown target wall = no-op
+    rehomeOpening(d, id, 'w_nope' as WallId, 0.9)
+    expect(d.openings[id]!.wallId).toBe(w2!.id)
+  })
+
+  it('rehoming a window drags its attached curtain to the new wall (write-through)', () => {
+    const d = doc()
+    square(d, 6)
+    const walls = Object.values(d.walls)
+    const win = addOpening(d, { kind: 'window', wallId: walls[0]!.id, t: 0.5 })!
+    const fid = addFurniture(d, {
+      catalogItemId: 'curtain',
+      x: 3,
+      y: 0.5,
+      size: { w: 1.6, d: 0.2, h: 2.4 },
+    })
+    d.furniture[fid]!.attachedOpeningId = win
+    runPipeline(d, 'commit')
+    const before = { x: d.furniture[fid]!.x, y: d.furniture[fid]!.y }
+    rehomeOpening(d, win, walls[1]!.id, 0.5)
+    const f = d.furniture[fid]!
+    expect(f.attachedOpeningId).toBe(win) // still attached
+    // and it MOVED with the window (different wall = different position)
+    expect(Math.hypot(f.x - before.x, f.y - before.y)).toBeGreaterThan(0.5)
   })
 
   it('pasteSubgraph carries opening style', () => {

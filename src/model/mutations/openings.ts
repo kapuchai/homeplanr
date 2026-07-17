@@ -175,6 +175,28 @@ export function addOpening(
   return doc.openings[id] ? id : null // revalidation may have deleted it
 }
 
+/**
+ * Move an opening to ANOTHER wall (0.10.0 wall-to-wall drag). The caller
+ * is responsible for choosing a legal center (findOpeningSlot on the
+ * target wall) — revalidation still clamps defensively. Width/height/
+ * hinge/swing/style ride along untouched; attached furniture follows via
+ * the pipeline's write-through reconcile.
+ */
+export function rehomeOpening(
+  doc: ProjectDocument,
+  id: OpeningId,
+  wallId: WallId,
+  t: number,
+  opts: { mode?: MutationMode } = {},
+): void {
+  const op = doc.openings[id]
+  const wall = doc.walls[wallId]
+  if (!op || !wall) return
+  op.wallId = wallId
+  op.t = t
+  runPipeline(doc, opts.mode ?? 'commit')
+}
+
 export function updateOpening(
   doc: ProjectDocument,
   id: OpeningId,

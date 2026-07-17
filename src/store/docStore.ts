@@ -46,6 +46,7 @@ export interface DocState {
   // openings
   addOpening: (params: openings.AddOpeningParams, opts?: { mode?: MutationMode }) => OpeningId | null
   updateOpening: (id: OpeningId, patch: Parameters<typeof openings.updateOpening>[2], opts?: { mode?: MutationMode }) => void
+  rehomeOpening: (id: OpeningId, wallId: WallId, t: number, opts?: { mode?: MutationMode }) => void
   // furniture
   addFurniture: (params: Parameters<typeof furniture.addFurniture>[1]) => FurnitureId
   addFurnitureBatch: (items: Parameters<typeof furniture.addFurnitureBatch>[1]) => FurnitureId[]
@@ -119,6 +120,7 @@ export const useDocStore = create<DocState>()(
           deleteEntities: (ids, opts) => mutate((d) => walls.deleteEntities(d, ids, opts)),
           addOpening: (params, opts) => mutate((d) => openings.addOpening(d, params, opts)),
           updateOpening: (id, patch, opts) => mutate((d) => openings.updateOpening(d, id, patch, opts)),
+          rehomeOpening: (id, wallId, t, opts) => mutate((d) => openings.rehomeOpening(d, id, wallId, t, opts)),
           addFurniture: (params) => mutate((d) => furniture.addFurniture(d, params)),
           addFurnitureBatch: (items) => mutate((d) => furniture.addFurnitureBatch(d, items)),
           transformFurniture: (id, patch, opts) => mutate((d) => furniture.transformFurniture(d, id, patch, opts)),

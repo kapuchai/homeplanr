@@ -94,6 +94,10 @@ export const WINDOW_PICK_PX = 24
  * gap edge (adjacent opening or core end) — 0.10.0 flush-snap. */
 export const OPENING_FLUSH_SNAP_PX = 8
 
+/** px band beyond the half-thickness inside which a wall captures an
+ * opening ghost/drag (place tool + 0.10.0 wall-to-wall re-homing). */
+export const WALL_PICK_PX = 14
+
 const PRIORITY: Record<SnapKind, number> = {
   node: 1,
   wallPoint: 2,

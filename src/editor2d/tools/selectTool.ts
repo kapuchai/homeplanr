@@ -3,9 +3,10 @@ import type { EntityRef } from '../hit/hitTest'
 import { hitTestAll, hitTestRect } from '../hit/hitTest'
 import type { Vec2 } from '../../geometry/vec'
 import { add, dist, dot, normalize, perp, rotate, scale, sub } from '../../geometry/vec'
-import { closestPointOnSegment } from '../../geometry/segment'
+import { closestPointOnSegment, distToSegment } from '../../geometry/segment'
 import {
   OPENING_FLUSH_SNAP_PX,
+  WALL_PICK_PX,
   WINDOW_PICK_PX,
   resolveSnap,
   type SnapResult,
@@ -674,17 +675,54 @@ export function createSelectTool(): Tool {
           const na = wall && doc.nodes[wall.a]
           const nb = wall && doc.nodes[wall.b]
           if (!op || !wall || !na || !nb) return
-          const { t } = closestPointOnSegment(e.world, na, nb)
-          // flush-snap (0.10.0): the slot oracle snaps onto gap edges
-          // within radius; self is excluded from its own obstacles. Ctrl
-          // suspends like every other snap. Null (no gap) falls back to
-          // the raw projection — live revalidation still clamps.
-          const L = dist(na, nb)
+          const px = ctx.pxToWorld()
           const snap = useAppSettings.getState().snapEnabled && !e.mods.ctrl
+          const snapRadius = snap ? OPENING_FLUSH_SNAP_PX * px : 0
+
+          // wall-to-wall re-homing (0.10.0): the nearest OTHER wall within
+          // the pick band takes the opening — with a 2px hysteresis toward
+          // the home wall so junction crossings don't flicker — but only
+          // where its slot oracle answers; otherwise the drag stays home.
+          const dHome = distToSegment(e.world, na, nb)
+          let other: { wall: (typeof doc.walls)[WallId]; d: number } | null = null
+          for (const w of Object.values(doc.walls)) {
+            if (w.id === op.wallId) continue
+            const wa = doc.nodes[w.a]
+            const wb = doc.nodes[w.b]
+            if (!wa || !wb) continue
+            const d = distToSegment(e.world, wa, wb)
+            if (d <= w.thickness / 2 + WALL_PICK_PX * px && (!other || d < other.d)) {
+              other = { wall: w, d }
+            }
+          }
+          if (other && other.d < dHome - 2 * px) {
+            const wa = doc.nodes[other.wall.a]!
+            const wb = doc.nodes[other.wall.b]!
+            const L2 = dist(wa, wb)
+            const proj = closestPointOnSegment(e.world, wa, wb)
+            const slot = findOpeningSlot(doc, other.wall.id, proj.t * L2, op.width, {
+              snapRadius,
+            })
+            if (slot !== null) {
+              ctx.actions().rehomeOpening(state.openingId, other.wall.id, slot / L2, {
+                mode: 'live',
+              })
+              ctx.interaction().set({
+                pills: openingDragPills(measureInput(ctx), state.openingId, e.world),
+              })
+              return
+            }
+          }
+
+          // home-wall path: flush-snap through the slot oracle (self
+          // excluded); null falls back to the raw projection — live
+          // revalidation still clamps
+          const { t } = closestPointOnSegment(e.world, na, nb)
+          const L = dist(na, nb)
           const slot = snap
             ? findOpeningSlot(doc, op.wallId, t * L, op.width, {
                 exclude: op.id,
-                snapRadius: OPENING_FLUSH_SNAP_PX * ctx.pxToWorld(),
+                snapRadius,
               })
             : null
           ctx.actions().updateOpening(
