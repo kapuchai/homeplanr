@@ -12,9 +12,10 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { useThemeStore } from '../theme/themeStore'
-import { getDerived, type DerivedRoom } from '../store/derived'
+import { getDerived, type DerivedGeometry, type DerivedRoom } from '../store/derived'
 import { useSceneDoc } from './useSceneDoc'
 import {
+  buildCeilingMeshData,
   buildFloorMeshData,
   buildPrismMeshData,
   buildWallFaceMeshData,
@@ -45,6 +46,9 @@ import { useWalkStore } from './walk/walkStore'
 import { attemptLock } from './walk/pointerLock'
 import { getCollisionSet, validateTeleport } from './walk/collision'
 import { worldToPlan } from './walk/walkMath'
+import { hiddenWallIds, sameWallSet } from './wallOcclusion'
+import type { WallId } from '../model/ids'
+import type { Vec2 } from '../geometry/vec'
 import { captureAndSave, type CaptureApi } from './screenshot'
 import { CATALOG } from '../catalog'
 import { realizeItem } from '../catalog/realize'
@@ -74,7 +78,17 @@ import { t } from '../i18n'
  * wallFaceMaterial(paint, finish); trim (end caps, miter slants, jambs,
  * top/bottom caps) keeps the neutral default wallPaint.
  */
-function WallMeshes({ solid, wall }: { solid: WallSolid; wall: Wall | undefined }) {
+function WallMeshes({
+  solid,
+  wall,
+  visible = true,
+}: {
+  solid: WallSolid
+  wall: Wall | undefined
+  /** Occluder verdict (M3) — false keeps the meshes mounted but skips
+   * render AND shadow casting; geometry survives for flicker-free undo. */
+  visible?: boolean
+}) {
   const paintFront = wall?.paintFront
   const paintBack = wall?.paintBack
   const finishFront = wall?.finishFront
@@ -108,7 +122,11 @@ function WallMeshes({ solid, wall }: { solid: WallSolid; wall: Wall | undefined 
   useEffect(() => () => meshes.forEach((m) => m.geo.dispose()), [meshes])
   const angle = Math.atan2(solid.frame.dir.y, solid.frame.dir.x)
   return (
-    <group position={[solid.frame.origin.x, solid.frame.origin.y, 0]} rotation={[0, 0, angle]}>
+    <group
+      position={[solid.frame.origin.x, solid.frame.origin.y, 0]}
+      rotation={[0, 0, angle]}
+      visible={visible}
+    >
       {meshes.map((m, i) => (
         <mesh key={i} geometry={m.geo} material={m.material} castShadow receiveShadow />
       ))}
@@ -116,13 +134,21 @@ function WallMeshes({ solid, wall }: { solid: WallSolid; wall: Wall | undefined 
   )
 }
 
-function PatchMesh({ patch }: { patch: PatchSolid }) {
+function PatchMesh({ patch, visible = true }: { patch: PatchSolid; visible?: boolean }) {
   const geo = useMemo(
     () => toBufferGeometry(buildPrismMeshData({ polygon: patch.polygon, z0: patch.z0, z1: patch.z1 })),
     [patch],
   )
   useEffect(() => () => geo.dispose(), [geo])
-  return <mesh geometry={geo} material={sceneMaterial('wallPaint')} castShadow receiveShadow />
+  return (
+    <mesh
+      geometry={geo}
+      material={sceneMaterial('wallPaint')}
+      castShadow
+      receiveShadow
+      visible={visible}
+    />
+  )
 }
 
 function FloorMesh({
@@ -142,6 +168,21 @@ function FloorMesh({
       onClick={onClick}
     />
   )
+}
+
+/**
+ * Per-room ceiling slab (0.11.0) at the room's lowest wall height.
+ * Single-sided facing DOWN — backface-culled from above, so top and
+ * high-orbit views see into rooms with zero occluder logic while walk
+ * mode gets a ceiling. castShadow stays false BY DESIGN: hemisphere/
+ * ambient/IBL are unshadowed in three.js, so only the directional
+ * caster could darken a covered room — an uncasting ceiling keeps
+ * interiors exactly as bright as today (revisit with 0.12.0 lighting).
+ */
+function CeilingMesh({ room, z }: { room: DerivedRoom; z: number }) {
+  const geo = useMemo(() => toBufferGeometry(buildCeilingMeshData(room.floor, z)), [room, z])
+  useEffect(() => () => geo.dispose(), [geo])
+  return <mesh geometry={geo} material={sceneMaterial('ceiling')} />
 }
 
 /** Window/door frame strip thickness (m). */
@@ -398,12 +439,26 @@ function DoorFixture({
 }
 
 /** Door leaves + window glass/frames from the REALIZED intervals. */
-function OpeningFixtures({ doc, solid }: { doc: ProjectDocument; solid: WallSolid }) {
+function OpeningFixtures({
+  doc,
+  solid,
+  visible = true,
+}: {
+  doc: ProjectDocument
+  solid: WallSolid
+  /** Follows the wall's occluder verdict — a hidden wall's fixtures
+   * must not float in the opening it no longer carves visibly. */
+  visible?: boolean
+}) {
   const wall = doc.walls[solid.wallId]
   if (!wall) return null
   const angle = Math.atan2(solid.frame.dir.y, solid.frame.dir.x)
   return (
-    <group position={[solid.frame.origin.x, solid.frame.origin.y, 0]} rotation={[0, 0, angle]}>
+    <group
+      position={[solid.frame.origin.x, solid.frame.origin.y, 0]}
+      rotation={[0, 0, angle]}
+      visible={visible}
+    >
       {solid.openings.map((op) => {
         const cx = (op.u0 + op.u1) / 2
         const model = doc.openings[op.openingId]
@@ -558,6 +613,74 @@ function ThemeBridge3D() {
   return null
 }
 
+/** Orbit-change throttle for the wall occluder (ms). */
+const OCCLUDER_THROTTLE_MS = 80
+
+/**
+ * Bridge: orbit-camera movement → occluder recompute → hidden-wall set
+ * (state up in PlannerCanvas) → invalidate. The recompute also runs on
+ * mount and whenever geometry/anchor/enabled change, so toggling the
+ * pref or entering walk mode restores every wall immediately.
+ */
+function OccluderBridge({
+  derived,
+  anchor,
+  enabled,
+  onHidden,
+}: {
+  derived: DerivedGeometry
+  anchor: Vec2
+  enabled: boolean
+  onHidden: (ids: Set<WallId>) => void
+}) {
+  const camera = useThree((s) => s.camera)
+  const controls = useThree((s) => s.controls) as unknown as {
+    addEventListener?: (type: string, fn: () => void) => void
+    removeEventListener?: (type: string, fn: () => void) => void
+  } | null
+  const invalidate = useThree((s) => s.invalidate)
+  const prev = useRef<Set<WallId>>(new Set())
+  useEffect(() => {
+    const recompute = () => {
+      const next = enabled
+        ? hiddenWallIds(
+            worldToPlan([camera.position.x, camera.position.y, camera.position.z]),
+            anchor,
+            Object.values(derived.wallSolids),
+          )
+        : new Set<WallId>()
+      if (!sameWallSet(prev.current, next)) {
+        prev.current = next
+        onHidden(next)
+        invalidate()
+      }
+    }
+    let last = 0
+    let timer: number | null = null
+    const onOrbitChange = () => {
+      const now = performance.now()
+      if (now - last >= OCCLUDER_THROTTLE_MS) {
+        last = now
+        recompute()
+      } else if (timer === null) {
+        // trailing edge — the final camera pose must always settle
+        timer = window.setTimeout(() => {
+          timer = null
+          last = performance.now()
+          recompute()
+        }, OCCLUDER_THROTTLE_MS)
+      }
+    }
+    recompute()
+    controls?.addEventListener?.('change', onOrbitChange)
+    return () => {
+      controls?.removeEventListener?.('change', onOrbitChange)
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [camera, controls, derived, anchor, enabled, onHidden, invalidate])
+  return null
+}
+
 /** Bridge: store → invalidate(), gated by view mode (zero hidden work). */
 function InvalidateBridge() {
   const invalidate = useThree((s) => s.invalidate)
@@ -675,6 +798,38 @@ export function PlannerCanvas() {
   const walkHint = useWalkStore((s) => s.hint)
   const walkLocked = useWalkStore((s) => s.locked)
   const captureApi = useRef<CaptureApi | null>(null)
+  const wallHideMode = useAppSettings((s) => s.wallHideMode)
+  const [hiddenWalls, setHiddenWalls] = useState<Set<WallId>>(() => new Set())
+  const occluderAnchor = useMemo(() => ({ x: box.cx, y: box.cy }), [box])
+  // node → incident walls, for the patch-follows-walls occluder rule: a
+  // junction pillar hides only when EVERY wall it bridges is hidden
+  // (else a visible wall's end would lose its cap and show a notch)
+  const nodeWalls = useMemo(() => {
+    const map = new Map<string, WallId[]>()
+    for (const w of Object.values(doc.walls)) {
+      for (const n of [w.a, w.b]) {
+        const list = map.get(n)
+        if (list) list.push(w.id)
+        else map.set(n, [w.id])
+      }
+    }
+    return map
+  }, [doc.walls])
+  const patchHidden = (nodeId: string): boolean => {
+    const incident = nodeWalls.get(nodeId)
+    return !!incident && incident.length > 0 && incident.every((id) => hiddenWalls.has(id))
+  }
+  const ceilingsEnabled = useAppSettings((s) => s.ceilingsEnabled)
+  // ceiling height = the room's LOWEST wall (the patch precedent: mixed
+  // heights get the safe minimum; degenerate cycles fall back to default)
+  const ceilingZ = (room: DerivedRoom): number => {
+    let h = Infinity
+    for (const wid of room.room.wallCycle) {
+      const w = doc.walls[wid]
+      if (w) h = Math.min(h, w.height)
+    }
+    return Number.isFinite(h) ? h : doc.settings.defaultWallHeight
+  }
 
   // shared by every floor AND the ground disc — walk-mode click-to-go
   const handleFloorClick = (e: ThreeEvent<MouseEvent>) => {
@@ -764,6 +919,12 @@ export function PlannerCanvas() {
       >
         <ContextGuard onLost={() => setGlError(t('view3d.glContextLost'))} />
         <InvalidateBridge />
+        <OccluderBridge
+          derived={derived}
+          anchor={occluderAnchor}
+          enabled={wallHideMode === 'hide' && walkMode !== 'walking'}
+          onHidden={setHiddenWalls}
+        />
         <ThemeBridge3D />
         <CaptureBridge apiRef={captureApi} />
         <WalkControls doc={doc} derived={derived} />
@@ -784,17 +945,33 @@ export function PlannerCanvas() {
         <CameraPresetApplier request={presetReq} />
         <group rotation-x={-Math.PI / 2}>
           {Object.values(derived.wallSolids).map((s) => (
-            <WallMeshes key={s.wallId} solid={s} wall={doc.walls[s.wallId]} />
+            <WallMeshes
+              key={s.wallId}
+              solid={s}
+              wall={doc.walls[s.wallId]}
+              visible={!hiddenWalls.has(s.wallId)}
+            />
           ))}
           {Object.values(derived.wallSolids).map((s) =>
-            s.openings.length ? <OpeningFixtures key={`fx-${s.wallId}`} doc={doc} solid={s} /> : null,
+            s.openings.length ? (
+              <OpeningFixtures
+                key={`fx-${s.wallId}`}
+                doc={doc}
+                solid={s}
+                visible={!hiddenWalls.has(s.wallId)}
+              />
+            ) : null,
           )}
           {derived.patchSolids.map((p) => (
-            <PatchMesh key={p.nodeId} patch={p} />
+            <PatchMesh key={p.nodeId} patch={p} visible={!patchHidden(p.nodeId)} />
           ))}
           {Object.values(derived.rooms).map((r) => (
             <FloorMesh key={r.roomId} room={r} onClick={handleFloorClick} />
           ))}
+          {ceilingsEnabled &&
+            Object.values(derived.rooms).map((r) => (
+              <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} />
+            ))}
           {Object.values(doc.furniture).map((f) => (
             <Furniture3D key={f.id} f={f} />
           ))}

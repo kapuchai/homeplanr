@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildCeilingMeshData,
   buildFloorMeshData,
   buildPrismMeshData,
   buildWallFaceMeshData,
@@ -184,5 +185,42 @@ describe('buildFloorMeshData', () => {
     for (const { world } of triangleWindingNormals(mesh)) {
       expect(world[1]).toBeGreaterThan(0.99)
     }
+  })
+})
+
+describe('buildCeilingMeshData (0.11.0)', () => {
+  it('ceiling triangles face world −Y (single-sided, down) at the given z', () => {
+    const tri = triangulate([vec(0, 0), vec(5, 0), vec(5, 4), vec(0, 4)])
+    const mesh = buildCeilingMeshData(tri, 2.6)
+    for (const { world } of triangleWindingNormals(mesh)) {
+      expect(world[1]).toBeLessThan(-0.99)
+    }
+    for (let i = 2; i < mesh.positions.length; i += 3) {
+      expect(mesh.positions[i]).toBeCloseTo(2.6, 6)
+    }
+    // attribute normals agree with the winding (−z in plan space)
+    for (let i = 2; i < mesh.normals.length; i += 3) {
+      expect(mesh.normals[i]).toBe(-1)
+    }
+  })
+
+  it('keeps the room holes (island cutouts stay open)', () => {
+    const outer = [vec(0, 0), vec(6, 0), vec(6, 6), vec(0, 6)]
+    const hole = [vec(2, 2), vec(4, 2), vec(4, 4), vec(2, 4)]
+    const tri = triangulate(outer, [hole])
+    const mesh = buildCeilingMeshData(tri, 2.4)
+    // hole-aware triangulation area = 36 − 4 = 32 m²
+    let area = 0
+    const p = mesh.positions
+    for (let i = 0; i < mesh.indices.length; i += 3) {
+      const a = mesh.indices[i]! * 3
+      const b = mesh.indices[i + 1]! * 3
+      const c = mesh.indices[i + 2]! * 3
+      area +=
+        Math.abs(
+          (p[b]! - p[a]!) * (p[c + 1]! - p[a + 1]!) - (p[c]! - p[a]!) * (p[b + 1]! - p[a + 1]!),
+        ) / 2
+    }
+    expect(area).toBeCloseTo(32, 5)
   })
 })

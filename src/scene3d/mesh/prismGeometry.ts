@@ -217,3 +217,40 @@ export function buildFloorMeshData(tri: {
   }
   return { positions, normals, uvs, indices: Uint32Array.from(tri.indices) }
 }
+
+/**
+ * Flat ceiling slab from the SAME room triangulation, lifted to z and
+ * facing −z (0.11.0). Deliberately single-sided: backface culling makes
+ * it invisible from above, so top/orbit views see into rooms with no
+ * occluder logic while walk mode (below it) sees a ceiling. Winding is
+ * reversed per triangle — emitCap's up=false trick — so the faces match
+ * the −z normals (the orientation tests compute normals FROM winding).
+ */
+export function buildCeilingMeshData(
+  tri: { positions: Float32Array; indices: Uint32Array },
+  z: number,
+): MeshData {
+  const verts = tri.positions.length / 2
+  const positions = new Float32Array(verts * 3)
+  const normals = new Float32Array(verts * 3)
+  const uvs = new Float32Array(verts * 2)
+  for (let i = 0; i < verts; i++) {
+    const x = tri.positions[i * 2]!
+    const y = tri.positions[i * 2 + 1]!
+    positions[i * 3] = x
+    positions[i * 3 + 1] = y
+    positions[i * 3 + 2] = z
+    normals[i * 3] = 0
+    normals[i * 3 + 1] = 0
+    normals[i * 3 + 2] = -1
+    uvs[i * 2] = x
+    uvs[i * 2 + 1] = y
+  }
+  const indices = new Uint32Array(tri.indices.length)
+  for (let i = 0; i < tri.indices.length; i += 3) {
+    indices[i] = tri.indices[i + 2]!
+    indices[i + 1] = tri.indices[i + 1]!
+    indices[i + 2] = tri.indices[i]!
+  }
+  return { positions, normals, uvs, indices }
+}

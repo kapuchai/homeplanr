@@ -46,6 +46,9 @@ export const TEXTURE_BASE_WHITE = '#ffffff'
 export const SCENE_MATERIALS = {
   wallPaint: { color: '#f5f3ee', roughness: 0.9, metalness: 0 },
   ground: { color: '#dcdcd8', roughness: 1.0, metalness: 0 },
+  // 0.11.0 per-room ceiling slabs — matte near-white, a hair brighter
+  // than wallPaint so the plane reads as its own surface from below
+  ceiling: { color: '#f8f7f3', roughness: 0.95, metalness: 0 },
 } as const
 
 /** Floor registry — the single source; sceneMaterials/PropertiesPanel/2D tint all read this. */
