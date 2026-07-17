@@ -251,6 +251,151 @@ function WindowFixture({ op, wall, style }: { op: RealizedOpening; wall: Wall; s
   )
 }
 
+/** Door leaf thickness (m) — a real leaf, no longer the wall-filling slab. */
+const LEAF_T = 0.05
+/**
+ * Ajar angle (~75% of a full 90° swing — the release decision). The
+ * rotation sign MUST mirror the 2D doorGlyph semantics (front ≡ +perp,
+ * empirically pinned): fully open, the leaf points toward swingSign·y from
+ * the hinge jamb, so φ = dirSign·swingSign·θ with dirSign +1 at hinge 'a'
+ * (closed leaf points +x) and −1 at hinge 'b' (closed leaf points −x).
+ * Verified against the 2D arcs for all four hinge/swing combos ×
+ * both wall directions (the 0.10.0 checklist matrix).
+ */
+const AJAR = 0.75 * (Math.PI / 2)
+/** Sliding door: fraction of the gap the leaf stands open. */
+const SLID = 0.35
+/** Garage door: target slat pitch (m). */
+const SLAT = 0.35
+
+/**
+ * One door in the wall-local frame, rendered at absolute u coordinates
+ * (the pivot lives at a jamb, not the gap center). Style-dispatched
+ * (0.10.0): standard/balcony hang an ajar leaf at the hinge jamb (balcony
+ * = glazed leaf); double hangs two mirrored half-leaves; sliding mounts a
+ * barn-style panel on the swing-side face, parked toward the hinge end
+ * (matching the 2D active panel); garage stacks slats across the gap;
+ * passage renders nothing. All leaves are VISUAL ONLY — walk collision
+ * reads realized door intervals and never sees these meshes.
+ */
+function DoorFixture({
+  op,
+  wall,
+  style,
+  hinge,
+  swing,
+}: {
+  op: RealizedOpening
+  wall: Wall
+  style: string
+  hinge: 'a' | 'b'
+  swing: 'front' | 'back'
+}) {
+  const w = op.u1 - op.u0
+  const h = op.z1 - op.z0
+  const dirSign = hinge === 'a' ? 1 : -1
+  const swingSign = swing === 'front' ? 1 : -1
+  const hingeU = hinge === 'a' ? op.u0 : op.u1
+
+  if (style === 'passage') return null
+
+  if (style === 'sliding') {
+    const slideSign = -dirSign // parked past the hinge jamb
+    const panelX = (op.u0 + op.u1) / 2 + slideSign * SLID * w
+    const faceY = swingSign * (wall.thickness / 2 + 0.03)
+    return (
+      <>
+        <mesh position={[panelX, faceY, h / 2]} castShadow receiveShadow material={itemMaterial('woodDark')}>
+          <boxGeometry args={[w, 0.04, h - 0.02]} />
+        </mesh>
+        {/* overhead track spanning the closed + parked travel */}
+        <mesh
+          position={[(op.u0 + op.u1) / 2 + slideSign * ((SLID / 2) * w), faceY, h + 0.03]}
+          material={itemMaterial('metalDark')}
+        >
+          <boxGeometry args={[w * (1 + SLID), 0.05, 0.05]} />
+        </mesh>
+      </>
+    )
+  }
+
+  if (style === 'garage') {
+    const slats = Math.max(2, Math.ceil(h / SLAT))
+    const slatH = h / slats
+    return (
+      <>
+        {Array.from({ length: slats }, (_, i) => (
+          <mesh
+            key={i}
+            position={[(op.u0 + op.u1) / 2, 0, (i + 0.5) * slatH]}
+            castShadow
+            receiveShadow
+            material={itemMaterial('metal')}
+          >
+            <boxGeometry args={[w - 0.04, 0.05, slatH - 0.015]} />
+          </mesh>
+        ))}
+      </>
+    )
+  }
+
+  // leaves hinge at the swing-side FACE (like the 2D glyph's jamb corner
+  // and a physical hinge), inset by half the leaf thickness
+  const faceY = swingSign * (wall.thickness / 2 - LEAF_T / 2)
+
+  if (style === 'double') {
+    const half = w / 2
+    return (
+      <>
+        {/* left leaf hinged at u0, right at u1 — mirrored ajar */}
+        <group position={[op.u0, faceY, 0]} rotation={[0, 0, swingSign * AJAR]}>
+          <mesh position={[(half - 0.02) / 2, 0, h / 2]} castShadow receiveShadow material={itemMaterial('woodDark')}>
+            <boxGeometry args={[half - 0.02, LEAF_T, h - 0.02]} />
+          </mesh>
+        </group>
+        <group position={[op.u1, faceY, 0]} rotation={[0, 0, -swingSign * AJAR]}>
+          <mesh position={[-(half - 0.02) / 2, 0, h / 2]} castShadow receiveShadow material={itemMaterial('woodDark')}>
+            <boxGeometry args={[half - 0.02, LEAF_T, h - 0.02]} />
+          </mesh>
+        </group>
+      </>
+    )
+  }
+
+  // standard + balcony: one ajar leaf pivoted at the hinge jamb
+  const leafW = w - 0.02
+  const leafCx = (dirSign * leafW) / 2
+  const glazed = style === 'balcony'
+  return (
+    <group position={[hingeU, faceY, 0]} rotation={[0, 0, dirSign * swingSign * AJAR]}>
+      {glazed ? (
+        <>
+          {/* glazed balcony leaf: frame strips + glass */}
+          <mesh position={[leafCx, 0, 0.04]} castShadow material={itemMaterial('whiteLacquer')}>
+            <boxGeometry args={[leafW, LEAF_T, 0.08]} />
+          </mesh>
+          <mesh position={[leafCx, 0, h - 0.05]} castShadow material={itemMaterial('whiteLacquer')}>
+            <boxGeometry args={[leafW, LEAF_T, 0.08]} />
+          </mesh>
+          <mesh position={[dirSign * 0.04, 0, h / 2]} castShadow material={itemMaterial('whiteLacquer')}>
+            <boxGeometry args={[0.08, LEAF_T, h - 0.02]} />
+          </mesh>
+          <mesh position={[dirSign * (leafW - 0.04), 0, h / 2]} castShadow material={itemMaterial('whiteLacquer')}>
+            <boxGeometry args={[0.08, LEAF_T, h - 0.02]} />
+          </mesh>
+          <mesh position={[leafCx, 0, h / 2]} material={itemMaterial('glass')}>
+            <boxGeometry args={[leafW - 0.1, 0.02, h - 0.15]} />
+          </mesh>
+        </>
+      ) : (
+        <mesh position={[leafCx, 0, h / 2]} castShadow receiveShadow material={itemMaterial('woodDark')}>
+          <boxGeometry args={[leafW, LEAF_T, h - 0.02]} />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
 /** Door leaves + window glass/frames from the REALIZED intervals. */
 function OpeningFixtures({ doc, solid }: { doc: ProjectDocument; solid: WallSolid }) {
   const wall = doc.walls[solid.wallId]
@@ -259,17 +404,20 @@ function OpeningFixtures({ doc, solid }: { doc: ProjectDocument; solid: WallSoli
   return (
     <group position={[solid.frame.origin.x, solid.frame.origin.y, 0]} rotation={[0, 0, angle]}>
       {solid.openings.map((op) => {
-        const w = op.u1 - op.u0
         const cx = (op.u0 + op.u1) / 2
         const model = doc.openings[op.openingId]
         const style = openingStyleSpec(op.kind, model?.style).id
         if (op.kind === 'door') {
+          const door = model?.kind === 'door' ? model : undefined
           return (
             <group key={op.openingId}>
-              {/* closed leaf centered in the wall, inset from the faces */}
-              <mesh position={[cx, 0, (op.z1 - op.z0) / 2]} castShadow receiveShadow material={itemMaterial('woodDark')}>
-                <boxGeometry args={[w - 0.04, Math.max(0.04, wall.thickness - 0.02), op.z1 - op.z0 - 0.02]} />
-              </mesh>
+              <DoorFixture
+                op={op}
+                wall={wall}
+                style={style}
+                hinge={door?.hinge ?? 'a'}
+                swing={door?.swing ?? 'front'}
+              />
             </group>
           )
         }
