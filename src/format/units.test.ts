@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
 import {
   formatArea,
+  formatCurrency,
   formatLength,
   fromDisplayLength,
   lengthUnitLabel,
@@ -93,5 +94,28 @@ describe('display length conversions', () => {
         },
       ),
     )
+  })
+})
+
+describe('formatCurrency (0.9.0)', () => {
+  it('suffix currencies trail with a space; prefix currencies lead', () => {
+    expect(formatCurrency(1234.5, 'eur')).toBe('1 234.50 €')
+    expect(formatCurrency(1234567, 'usd')).toBe('$1 234 567')
+    expect(formatCurrency(99.9, 'gbp')).toBe('£99.90')
+    expect(formatCurrency(800, 'kr')).toBe('800 kr')
+  })
+
+  it('integers stay whole; fractions get exactly two decimals', () => {
+    expect(formatCurrency(0, 'eur')).toBe('0 €')
+    expect(formatCurrency(19.999, 'eur')).toBe('20.00 €') // toFixed rounding
+  })
+
+  it("'none' and unknown ids render the bare number", () => {
+    expect(formatCurrency(5000, 'none')).toBe('5 000')
+    expect(formatCurrency(5000, 'doubloons')).toBe('5 000')
+  })
+
+  it('negative values use the minus glyph before the grouped number', () => {
+    expect(formatCurrency(-1234, 'eur')).toBe('−1 234 €')
   })
 })

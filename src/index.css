@@ -541,6 +541,17 @@ textarea,
   cursor: pointer;
 }
 
+/* notes textarea (0.9.0) — the prop-field grid, grown a row */
+.prop-notes {
+  align-items: flex-start;
+}
+
+.prop-notes textarea {
+  resize: vertical;
+  min-height: calc(var(--ui-scale) * 48px);
+  font: inherit;
+}
+
 .readonly {
   color: var(--muted);
 }

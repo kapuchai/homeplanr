@@ -23,6 +23,7 @@ import {
   addFurnitureBatch,
   duplicateFurniture,
   resizeFurniture,
+  setFurnitureMeta,
   setMaterialOverride,
   transformFurniture,
 } from './furniture'
@@ -466,6 +467,25 @@ describe('furniture', () => {
     expect(c.price).toBe(499)
     expect(c.materialOverrides).toEqual({ fabric: '#aabbcc' })
     expect(c.materialOverrides).not.toBe(f.materialOverrides) // no aliasing
+  })
+
+  it('setFurnitureMeta: key presence is intent; junk prices clear; notes trim', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'sofa-3',
+      x: 1,
+      y: 2,
+      size: { w: 2.2, d: 0.95, h: 0.85 },
+    })
+    setFurnitureMeta(d, id, { price: 499.999 })
+    expect(d.furniture[id]!.price).toBe(500) // 2-decimal rounding
+    setFurnitureMeta(d, id, { notes: '  IKEA 2026  ' })
+    expect(d.furniture[id]!.notes).toBe('IKEA 2026')
+    setFurnitureMeta(d, id, { price: -5 }) // invalid clears
+    expect('price' in d.furniture[id]!).toBe(false)
+    expect(d.furniture[id]!.notes).toBe('IKEA 2026') // untouched key untouched
+    setFurnitureMeta(d, id, { notes: '   ' })
+    expect('notes' in d.furniture[id]!).toBe(false)
   })
 
   it('setMaterialOverride sets, replaces, clears per slot; empty record leaves the doc', () => {

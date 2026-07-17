@@ -13,6 +13,7 @@ import { ACCENTS } from '../theme/accents'
 import { useThemeStore } from '../theme/themeStore'
 import { t } from '../i18n'
 import type { UnitSystem } from '../format/units'
+import { CURRENCIES } from '../format/units'
 
 /**
  * App options modal — every control applies instantly to useAppSettings.
@@ -116,6 +117,23 @@ export function OptionsDialog() {
                   onClick={() => settings.setUnits(u.value)}
                 >
                   {u.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="options-row">
+            <span>{t('options.currency')}</span>
+            <div className="segmented small">
+              {CURRENCIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  aria-pressed={settings.currency === c.id}
+                  className={settings.currency === c.id ? 'active' : ''}
+                  aria-label={c.id === 'none' ? t('options.currencyNone') : c.id}
+                  onClick={() => settings.setCurrency(c.id)}
+                >
+                  {c.symbol || t('options.currencyNone')}
                 </button>
               ))}
             </div>

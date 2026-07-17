@@ -50,3 +50,38 @@ export function lengthUnitLabel(units: UnitSystem): string {
   if (units === 'ftin') return 'ft'
   return 'm'
 }
+
+/**
+ * Currency display (0.9.0 cost tracking). Prices are unit-less numbers in
+ * the document; only the DISPLAY dresses them in the device-pref symbol.
+ * `suffix` follows each currency's convention (1 234.50 € vs $1 234.50).
+ */
+export interface CurrencySpec {
+  id: string
+  symbol: string
+  suffix: boolean
+}
+
+export const CURRENCIES: CurrencySpec[] = [
+  { id: 'eur', symbol: '€', suffix: true },
+  { id: 'usd', symbol: '$', suffix: false },
+  { id: 'gbp', symbol: '£', suffix: false },
+  { id: 'kr', symbol: 'kr', suffix: true },
+  { id: 'none', symbol: '', suffix: true },
+]
+
+export const currencySpec = (id: string): CurrencySpec =>
+  CURRENCIES.find((c) => c.id === id) ?? CURRENCIES[CURRENCIES.length - 1]!
+
+/** Deterministic (locale-free): space thousands grouping, '.' decimals,
+ * two decimals only when fractional. */
+export function formatCurrency(value: number, currencyId: string): string {
+  const spec = currencySpec(currencyId)
+  const abs = Math.abs(value)
+  const fixed = Number.isInteger(abs) ? String(abs) : abs.toFixed(2)
+  const [int, frac] = fixed.split('.')
+  const grouped = int!.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const num = `${value < 0 ? '−' : ''}${grouped}${frac ? `.${frac}` : ''}`
+  if (!spec.symbol) return num
+  return spec.suffix ? `${num} ${spec.symbol}` : `${spec.symbol}${num}`
+}

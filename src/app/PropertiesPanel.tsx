@@ -2,7 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDocStore } from '../store/docStore'
 import { useUiStore } from '../store/uiStore'
 import { useAppSettings } from '../store/appSettings'
-import { formatArea, formatLength, fromDisplayLength, lengthUnitLabel, toDisplayLength } from '../format/units'
+import {
+  currencySpec,
+  formatArea,
+  formatCurrency,
+  formatLength,
+  fromDisplayLength,
+  lengthUnitLabel,
+  toDisplayLength,
+} from '../format/units'
 import { getDerived } from '../store/derived'
 import { dist } from '../geometry/vec'
 import { area } from '../geometry/polygon'
@@ -221,6 +229,104 @@ function Row({ children }: { children: React.ReactNode }) {
   return <div className="prop-row">{children}</div>
 }
 
+/** Price draft field (0.9.0): empty ⇒ NO price (field absent) — a phantom
+ * 0 would count into the cost totals. Same draft-commit discipline as
+ * NumField; the unit is the currency device pref's symbol. */
+function PriceField({
+  value,
+  onCommit,
+}: {
+  value: number | undefined
+  onCommit: (v: number | undefined) => void
+}) {
+  const currency = useAppSettings((s) => s.currency)
+  const text = value === undefined ? '' : String(value)
+  const [draft, setDraft] = useState(text)
+  const [focused, setFocused] = useState(false)
+  useEffect(() => {
+    if (!focused) setDraft(text)
+  }, [text, focused])
+  const { capture, take } = useFocusCommit(draft)
+  return (
+    <label className="prop-field">
+      <span>{t('props.price')}</span>
+      <span className="prop-input">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={draft}
+          onFocus={() => {
+            setFocused(true)
+            capture.current = (raw) => {
+              const trimmed = raw.trim().replace(',', '.')
+              if (!trimmed) return onCommit(undefined)
+              const parsed = Number(trimmed)
+              if (Number.isFinite(parsed) && parsed >= 0) onCommit(parsed)
+            }
+          }}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            setFocused(false)
+            take()?.(draft)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') {
+              capture.current = null
+              setDraft(text)
+              ;(e.target as HTMLInputElement).blur()
+            }
+          }}
+        />
+        <em>{currencySpec(currency).symbol}</em>
+      </span>
+    </label>
+  )
+}
+
+/** Multiline TextField sibling for furniture notes (0.9.0). */
+function NotesField({
+  value,
+  onCommit,
+}: {
+  value: string
+  onCommit: (v: string) => void
+}) {
+  const [draft, setDraft] = useState(value)
+  const [focused, setFocused] = useState(false)
+  useEffect(() => {
+    if (!focused) setDraft(value)
+  }, [value, focused])
+  const { capture, take } = useFocusCommit(draft)
+  return (
+    <label className="prop-field prop-notes">
+      <span>{t('props.notes')}</span>
+      <textarea
+        rows={3}
+        value={draft}
+        onFocus={() => {
+          setFocused(true)
+          capture.current = (raw) => onCommit(raw)
+        }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setFocused(false)
+          take()?.(draft)
+        }}
+        onKeyDown={(e) => {
+          // Enter stays a newline (multiline field); Esc reverts
+          if (e.key === 'Escape') {
+            capture.current = null
+            setDraft(value)
+            ;(e.target as HTMLTextAreaElement).blur()
+          }
+        }}
+      />
+    </label>
+  )
+}
+
 
 /**
  * One ∅-default swatch + the 14 WALL_PAINTS presets.
@@ -336,11 +442,24 @@ function FinishSwatchRow({
  */
 function MultiPanel({ selection }: { selection: string[] }) {
   const doc = useDocStore((s) => s.doc)
+  const currency = useAppSettings((s) => s.currency)
   const a = useDocStore.getState()
 
   const wallIds = selection.filter((id) => doc.walls[id as WallId]) as WallId[]
   const openingIds = selection.filter((id) => doc.openings[id as OpeningId]) as OpeningId[]
   const furnitureIds = selection.filter((id) => doc.furniture[id as FurnitureId]) as FurnitureId[]
+
+  // selection cost (0.9.0): only items that HAVE a price count
+  const priced = furnitureIds
+    .map((id) => doc.furniture[id]!)
+    .filter((f) => f.price !== undefined)
+  const selectionCost = priced.reduce((s, f) => s + f.price!, 0)
+  const costRow = priced.length ? (
+    <Row>
+      <span>{t('props.priceSum', { count: priced.length })}</span>
+      <span className="readonly">{formatCurrency(selectionCost, currency)}</span>
+    </Row>
+  ) : null
 
   const batch = (fn: () => void) => {
     // a live canvas gesture owns the tx (e.g. an input blur firing after a
@@ -412,6 +531,7 @@ function MultiPanel({ selection }: { selection: string[] }) {
     return (
       <aside className="props-panel" key={`items:${furnitureIds.join()}`}>
         <h3>{t('props.countItems', { count: furnitureIds.length })}</h3>
+        {costRow}
         <NumField
           label={t('props.rotation')}
           value={first.rotation}
@@ -488,6 +608,7 @@ function MultiPanel({ selection }: { selection: string[] }) {
     <aside className="props-panel">
       <h3>{t('props.multiSelected', { count: selection.length })}</h3>
       {parts.length > 0 && <p className="hint">{parts.join(' · ')}</p>}
+      {costRow}
       <p className="hint">{t('props.hint.multiMixed')}</p>
     </aside>
   )
@@ -497,6 +618,7 @@ export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection)
   const doc = useDocStore((s) => s.doc)
   const units = useAppSettings((s) => s.units)
+  const currency = useAppSettings((s) => s.currency)
   const snapEnabled = useAppSettings((s) => s.snapEnabled)
   const setSnapEnabled = useAppSettings((s) => s.setSnapEnabled)
   const a = useDocStore.getState()
@@ -730,6 +852,14 @@ export function PropertiesPanel() {
           {...(item ? { placeholder: item.name } : {})}
           onCommit={(v) => a.renameFurniture(furniture.id, v)}
         />
+        <PriceField
+          value={furniture.price}
+          onCommit={(v) => a.setFurnitureMeta(furniture.id, { price: v })}
+        />
+        <NotesField
+          value={furniture.notes ?? ''}
+          onCommit={(v) => a.setFurnitureMeta(furniture.id, { notes: v || undefined })}
+        />
         <LengthField label={t('props.x')} value={furniture.x} onCommit={(v) => a.transformFurniture(furniture.id, { x: v })} />
         <LengthField label={t('props.y')} value={furniture.y} onCommit={(v) => a.transformFurniture(furniture.id, { y: v })} />
         <NumField
@@ -938,9 +1068,13 @@ export function PropertiesPanel() {
       />
       {(() => {
         // plan statistics (0.8.0 roomType semantics): per-type areas in the
-        // registry order + an unspecified bucket; total from derived areas
+        // registry order + an unspecified bucket; total from derived areas.
+        // 0.9.0 adds the project cost line (user-picked surface) — priced
+        // items only, so price-less projects keep a clean stats block.
         const drs = Object.values(getDerived(doc).rooms)
-        if (!drs.length) return null
+        const priced = Object.values(doc.furniture).filter((f) => f.price !== undefined)
+        const cost = priced.reduce((s, f) => s + f.price!, 0)
+        if (!drs.length && !priced.length) return null
         const total = drs.reduce((acc, r) => acc + r.areaM2, 0)
         const byType = new Map<string, { count: number; area: number }>()
         for (const r of drs) {
@@ -962,16 +1096,24 @@ export function PropertiesPanel() {
         return (
           <div className="plan-stats">
             <h4>{t('props.stats')}</h4>
-            <Row>
-              <span>{t('props.statsRooms', { count: drs.length })}</span>
-              <span className="readonly">{formatArea(total, units)}</span>
-            </Row>
+            {drs.length > 0 && (
+              <Row>
+                <span>{t('props.statsRooms', { count: drs.length })}</span>
+                <span className="readonly">{formatArea(total, units)}</span>
+              </Row>
+            )}
             {rows.map((row) => (
               <div className="prop-row stat-row" key={row.label}>
                 <span>{row.count > 1 ? `${row.label} × ${row.count}` : row.label}</span>
                 <span className="readonly">{formatArea(row.area, units)}</span>
               </div>
             ))}
+            {priced.length > 0 && (
+              <Row>
+                <span>{t('props.statsCost', { count: priced.length })}</span>
+                <span className="readonly">{formatCurrency(cost, currency)}</span>
+              </Row>
+            )}
           </div>
         )
       })()}

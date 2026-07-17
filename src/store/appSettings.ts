@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import type { UnitSystem } from '../format/units'
+import { CURRENCIES } from '../format/units'
 
 /**
  * App-level preferences — device-local, never part of the document and never
@@ -33,6 +34,9 @@ export interface AppSettings {
    * chrome. World-sized text (label annotations, meters) never scales.
    * Orthogonal to the viewport zoom k. */
   uiScale: UiScale
+  /** Currency DISPLAY for furniture prices (0.9.0) — a device pref like
+   * units: prices in the doc stay unit-less numbers. CURRENCIES id. */
+  currency: string
   dimensionLevel: DimensionLevel
   /** Visibility of user annotations (persisted measures + text labels) —
    * view-only: annotations stay document content and always export.
@@ -87,6 +91,7 @@ const DEFAULTS: AppSettings = {
   units: 'm',
   wheelMode: 'zoom',
   uiScale: 1,
+  currency: 'eur',
   dimensionLevel: 'off',
   showAnnotations: true,
   snapEnabled: true,
@@ -129,6 +134,11 @@ export function parseAppSettings(json: string | null): AppSettings {
       units: pick(r.units, UNIT_SYSTEMS, DEFAULTS.units),
       wheelMode: pick(r.wheelMode, WHEEL_MODES, DEFAULTS.wheelMode),
       uiScale: pick(r.uiScale, UI_SCALES, DEFAULTS.uiScale),
+      currency: pick(
+        r.currency,
+        CURRENCIES.map((c) => c.id),
+        DEFAULTS.currency,
+      ),
       // pre-0.7.0 envelopes stored the boolean `showDimensions`; honor it
       // when the enum key is absent (true was exactly today's 'walls')
       dimensionLevel: pick(
@@ -184,6 +194,7 @@ const persist = (s: AppSettings): void => {
         units: s.units,
         wheelMode: s.wheelMode,
         uiScale: s.uiScale,
+        currency: s.currency,
         dimensionLevel: s.dimensionLevel,
         showAnnotations: s.showAnnotations,
         snapEnabled: s.snapEnabled,
@@ -211,6 +222,7 @@ interface AppSettingsState extends AppSettings {
   setUnits: (units: UnitSystem) => void
   setWheelMode: (mode: WheelMode) => void
   setUiScale: (scale: UiScale) => void
+  setCurrency: (currency: string) => void
   setDimensionLevel: (level: DimensionLevel) => void
   setShowAnnotations: (show: boolean) => void
   setSnapEnabled: (enabled: boolean) => void
@@ -237,6 +249,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setUnits: (units) => apply({ units }),
       setWheelMode: (wheelMode) => apply({ wheelMode }),
       setUiScale: (uiScale) => apply({ uiScale }),
+      setCurrency: (currency) => apply({ currency }),
       setDimensionLevel: (dimensionLevel) => apply({ dimensionLevel }),
       setShowAnnotations: (showAnnotations) => apply({ showAnnotations }),
       setSnapEnabled: (snapEnabled) => apply({ snapEnabled }),

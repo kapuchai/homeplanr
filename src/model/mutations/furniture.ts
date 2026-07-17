@@ -124,6 +124,32 @@ export function renameFurniture(doc: ProjectDocument, id: FurnitureId, name: str
   else delete f.name
 }
 
+/** Price/notes (0.9.0 UI for the v4 fields). Key presence = intent (the
+ * updateWall convention): an explicit undefined clears the field; invalid
+ * prices clear rather than store junk. Prices are unit-less — display
+ * dresses them in the currency device pref. */
+export function setFurnitureMeta(
+  doc: ProjectDocument,
+  id: FurnitureId,
+  patch: { price?: number | undefined; notes?: string | undefined },
+): void {
+  const f = doc.furniture[id]
+  if (!f) return
+  if ('price' in patch) {
+    const p = patch.price
+    if (p !== undefined && Number.isFinite(p) && p >= 0) {
+      f.price = Math.round(p * 100) / 100
+    } else {
+      delete f.price
+    }
+  }
+  if ('notes' in patch) {
+    const trimmed = patch.notes?.trim()
+    if (trimmed) f.notes = trimmed
+    else delete f.notes
+  }
+}
+
 /** Per-slot recolor (v6 coloring UI): value = PALETTE id or hex; undefined
  * clears the slot; an emptied record leaves the document (files stay
  * clean). Values are NOT validated here — the render side falls back on
