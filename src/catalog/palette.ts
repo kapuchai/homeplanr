@@ -42,6 +42,13 @@ export const PALETTE: Record<MaterialId, MaterialSpec> = {
  */
 export const TEXTURE_BASE_WHITE = '#ffffff'
 
+/**
+ * Default emitter glow (0.12.0) — warm incandescent white for lamp light
+ * AND shade emissive when `emitter.color` is absent. Lives here so
+ * sceneMaterials/PlannerCanvas (outside the raw-color dirs) stay hex-free.
+ */
+export const EMITTER_DEFAULT_COLOR = '#ffd9a0'
+
 /** Scene-level materials (not per-item slots). */
 export const SCENE_MATERIALS = {
   wallPaint: { color: '#f5f3ee', roughness: 0.9, metalness: 0 },

@@ -35,6 +35,10 @@ interface ClipboardItem {
   // attachedOpeningId deliberately does NOT ride copies (the target
   // window isn't part of the furniture half; pastes land detached).
   asset?: AssetContent
+  // v6 emitter state (0.12.0) — a copied lamp keeps its brightness and
+  // on/off; absent lightOn means ON, so only stored values ride
+  lumen?: number
+  lightOn?: boolean
 }
 
 export interface ClipboardPayload {
@@ -144,6 +148,8 @@ export function buildPayload(
         const a = f.assetId ? doc.assets[f.assetId] : undefined
         return a ? { asset: { mime: a.mime, data: a.data, w: a.w, h: a.h } } : {}
       })(),
+      ...(f.lumen !== undefined ? { lumen: f.lumen } : {}),
+      ...(f.lightOn !== undefined ? { lightOn: f.lightOn } : {}),
     })),
     graph,
   }
@@ -193,6 +199,8 @@ export function materializeItems(p: ClipboardPayload, target: Vec2): AddFurnitur
     ...(it.notes ? { notes: it.notes } : {}),
     ...(it.materialOverrides ? { materialOverrides: { ...it.materialOverrides } } : {}),
     ...(it.asset ? { asset: { ...it.asset } } : {}),
+    ...(it.lumen !== undefined ? { lumen: it.lumen } : {}),
+    ...(it.lightOn !== undefined ? { lightOn: it.lightOn } : {}),
   }))
 }
 

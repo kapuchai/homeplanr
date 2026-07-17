@@ -151,6 +151,26 @@ describe('clipboard asset carry', () => {
   })
 })
 
+describe('clipboard emitter carry (0.12.0)', () => {
+  it('lumen/lightOn survive copy → materialize; absent stays absent', () => {
+    const src = doc()
+    const lit = addFurniture(src, item({ catalogItemId: 'floor-lamp', lumen: 900 }))
+    const off = addFurniture(src, item({ catalogItemId: 'floor-lamp', x: 3, lightOn: false }))
+    const plain = addFurniture(src, item({ x: 5 }))
+    const payload = buildPayload(src, getDerived(src), [lit, off, plain])!
+    const got = materializeItems(payload, { x: 10, y: 10 })
+    expect(got.find((p) => p.lumen === 900)).toBeTruthy()
+    expect(got.find((p) => p.lightOn === false)).toBeTruthy()
+    const plainParams = got.find((p) => p.catalogItemId === 'tv-wall')!
+    expect('lumen' in plainParams).toBe(false)
+    expect('lightOn' in plainParams).toBe(false)
+    // paste lands them back on instances
+    const dst = doc()
+    const pastedId = addFurniture(dst, got.find((p) => p.lumen === 900)!)
+    expect(dst.furniture[pastedId]!.lumen).toBe(900)
+  })
+})
+
 describe('imageIngest pure helpers', () => {
   it('splitDataUrl round-trips assetDataUrl and rejects junk', () => {
     const url = assetDataUrl(JPEG)

@@ -94,6 +94,24 @@ export interface CatalogItem {
    * texture maps cleanly. Absent = the item takes no image.
    */
   imageSlot?: string
+  /**
+   * Light-emitting item (0.12.0, realistic lighting). `at` is the light's
+   * anchor in ITEM-LOCAL meters (x right, front −y, z up from the item's
+   * own floor) — it rides the instance transform, scales with the mesh,
+   * and the renderer negates x when mirrored (realizeItem mirrors geometry
+   * only). `slot` names the part that glows emissive while lit — must be
+   * a declared materials slot (conformance-pinned). `defaultLumen` seeds
+   * instances without a stored `lumen`. 'spot' points straight down
+   * (ceiling fixtures); 'point' radiates (shades, sconces). `color`
+   * absent = the palette's warm default.
+   */
+  emitter?: {
+    kind: 'point' | 'spot'
+    at: [number, number, number]
+    slot: string
+    defaultLumen: number
+    color?: string
+  }
   /** Procedural 3D parts (see builder.ts). */
   build3d: (b: Builder, dims: Dims) => void
   /** FUTURE: presence switches the 3D renderer to a GLTF loader. */

@@ -64,6 +64,7 @@ export interface DocState {
   detachFurniture: (id: FurnitureId) => void
   setMaterialOverride: (id: FurnitureId, slot: string, value: string | undefined) => void
   setFurnitureMeta: (id: FurnitureId, patch: Parameters<typeof furniture.setFurnitureMeta>[2]) => void
+  setFurnitureLight: (id: FurnitureId, patch: Parameters<typeof furniture.setFurnitureLight>[2]) => void
   duplicateFurniture: (ids: readonly FurnitureId[]) => FurnitureId[]
   alignFurniture: (ids: readonly FurnitureId[], edge: furniture.AlignEdge) => void
   distributeFurniture: (ids: readonly FurnitureId[], axis: 'x' | 'y') => void
@@ -140,6 +141,7 @@ export const useDocStore = create<DocState>()(
           setMaterialOverride: (id, slot, value) =>
             mutate((d) => furniture.setMaterialOverride(d, id, slot, value)),
           setFurnitureMeta: (id, patch) => mutate((d) => furniture.setFurnitureMeta(d, id, patch)),
+          setFurnitureLight: (id, patch) => mutate((d) => furniture.setFurnitureLight(d, id, patch)),
           duplicateFurniture: (ids) => mutate((d) => furniture.duplicateFurniture(d, ids)),
           alignFurniture: (ids, edge) => mutate((d) => furniture.alignFurniture(d, ids, edge)),
           distributeFurniture: (ids, axis) => mutate((d) => furniture.distributeFurniture(d, ids, axis)),

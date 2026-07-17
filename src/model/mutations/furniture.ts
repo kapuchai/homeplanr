@@ -37,6 +37,9 @@ export interface AddFurnitureParams {
   /** Window attachment at placement (v6 curtains) — caller supplies the
    * already-derived x/y/rotation/size; the pipeline keeps them synced. */
   attachedOpeningId?: OpeningId
+  /** v6 emitter state (0.12.0 UI) — carried by paste so copies keep it. */
+  lumen?: number
+  lightOn?: boolean
 }
 
 export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): FurnitureId {
@@ -60,6 +63,8 @@ export function addFurniture(doc: ProjectDocument, params: AddFurnitureParams): 
     ...(params.materialOverrides ? { materialOverrides: { ...params.materialOverrides } } : {}),
     ...(params.asset ? { assetId: addAsset(doc, params.asset) } : {}),
     ...(params.attachedOpeningId ? { attachedOpeningId: params.attachedOpeningId } : {}),
+    ...(params.lumen !== undefined ? { lumen: params.lumen } : {}),
+    ...(params.lightOn !== undefined ? { lightOn: params.lightOn } : {}),
   }
   return id
 }
@@ -152,6 +157,32 @@ export function setFurnitureMeta(
     const trimmed = patch.notes?.trim()
     if (trimmed) f.notes = trimmed
     else delete f.notes
+  }
+}
+
+/**
+ * Emitter state (0.12.0 UI for the v6 lumen/lightOn fields). Key presence
+ * = intent (the setFurnitureMeta convention). ABSENT lightOn means ON — a
+ * placed lamp glows at night out of the box — so `true` DELETES the field
+ * (files stay clean) and only `false` is stored. Absent lumen falls back
+ * to the catalog emitter's defaultLumen at render; invalid values clear
+ * rather than store junk (the v6 validator keeps finite > 0 only).
+ */
+export function setFurnitureLight(
+  doc: ProjectDocument,
+  id: FurnitureId,
+  patch: { lumen?: number | undefined; lightOn?: boolean | undefined },
+): void {
+  const f = doc.furniture[id]
+  if (!f) return
+  if ('lumen' in patch) {
+    const v = patch.lumen
+    if (v !== undefined && Number.isFinite(v) && v > 0) f.lumen = Math.round(v)
+    else delete f.lumen
+  }
+  if ('lightOn' in patch) {
+    if (patch.lightOn === false) f.lightOn = false
+    else delete f.lightOn
   }
 }
 

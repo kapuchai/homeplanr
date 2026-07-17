@@ -1,14 +1,16 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import {
   PMREMGenerator,
   ACESFilmicToneMapping,
   Color,
+  Object3D,
   Shape,
   type BufferGeometry,
   type DirectionalLight,
   type MeshStandardMaterial,
+  type Vector3,
 } from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { useDocStore } from '../store/docStore'
@@ -36,12 +38,14 @@ import {
 } from './mesh/fitCamera'
 import { useAppSettings } from '../store/appSettings'
 import {
+  emissiveSlotMaterial,
   floorMaterial,
   furnitureSlotMaterial,
   itemMaterial,
   sceneMaterial,
   wallFaceMaterial,
 } from './sceneMaterials'
+import { EMITTER_DEFAULT_COLOR } from '../catalog/palette'
 import { useArtMaterial } from './artTexture'
 import { WalkControls } from './walk/WalkControls'
 import { useWalkStore } from './walk/walkStore'
@@ -52,7 +56,7 @@ import { hiddenWallIds, sameWallSet } from './wallOcclusion'
 import { DEG, solarPosition } from './sun'
 import { lightingRamp } from '../theme/sunRamp'
 import { SunArc } from './SunArc'
-import type { WallId } from '../model/ids'
+import type { FurnitureId, WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import { captureAndSave, type CaptureApi } from './screenshot'
 import { CATALOG } from '../catalog'
@@ -60,7 +64,7 @@ import { realizeItem } from '../catalog/realize'
 import type { WallSolid, PatchSolid, RealizedOpening } from '../geometry/wallSolids'
 import { openingStyleSpec } from '../catalog/openingStyles'
 import type { FurnitureInstance, ProjectDocument, Wall } from '../model/types'
-import type { MaterialId } from '../catalog/types'
+import type { CatalogItem, MaterialId } from '../catalog/types'
 import { t } from '../i18n'
 
 /**
@@ -509,8 +513,69 @@ function OpeningFixtures({
   )
 }
 
-function Furniture3D({ f }: { f: FurnitureInstance }) {
+/**
+ * An instance's light (0.12.0, realistic lighting) — a child of the
+ * furniture group in ITEM-LOCAL plan space (z up), so the instance
+ * transform carries it and `at` scales with the mesh; x is negated when
+ * mirrored (realizeItem mirrors geometry only). Intensity is photometric:
+ * lumens → candela via three's .power conventions (point lm/4π, spot
+ * lm/π), decay 2, unlimited range. castShadow rides the 2-nearest budget
+ * at 1024² — the M1 spike cliff is point-light cube maps at ×4/2048.
+ */
+function EmitterLight({
+  emitter,
+  lumen,
+  mirrored,
+  shadowCast,
+}: {
+  emitter: NonNullable<CatalogItem['emitter']>
+  lumen: number
+  mirrored: boolean
+  shadowCast: boolean
+}) {
+  const at: [number, number, number] = [
+    mirrored ? -emitter.at[0] : emitter.at[0],
+    emitter.at[1],
+    emitter.at[2],
+  ]
+  const color = emitter.color ?? EMITTER_DEFAULT_COLOR
+  const spotTarget = useMemo(() => new Object3D(), [])
+  if (emitter.kind === 'spot') {
+    return (
+      <>
+        <spotLight
+          position={at}
+          target={spotTarget}
+          color={color}
+          intensity={lumen / Math.PI}
+          angle={1.1}
+          penumbra={0.5}
+          decay={2}
+          castShadow={shadowCast}
+          shadow-mapSize={[1024, 1024]}
+          shadow-bias={-0.002}
+        />
+        {/* straight down in plan space; mounted so its matrix updates */}
+        <primitive object={spotTarget} position={[at[0], at[1], at[2] - 1]} />
+      </>
+    )
+  }
+  return (
+    <pointLight
+      position={at}
+      color={color}
+      intensity={lumen / (4 * Math.PI)}
+      decay={2}
+      castShadow={shadowCast}
+      shadow-mapSize={[1024, 1024]}
+      shadow-bias={-0.002}
+    />
+  )
+}
+
+function Furniture3D({ f, shadowCast }: { f: FurnitureInstance; shadowCast: boolean }) {
   const item = CATALOG[f.catalogItemId]
+  const realistic = useAppSettings((s) => s.realisticLighting)
   const realized = useMemo(
     () => (item ? realizeItem(item, { mirrored: !!f.mirrored }) : null),
     [item, f.mirrored],
@@ -541,6 +606,8 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
     f.size.d / item.dims.d,
     f.size.h / item.dims.h,
   ]
+  // emitter lit = master toggle AND the instance switch (absent = ON)
+  const lit = realistic && !!item.emitter && (f.lightOn ?? true)
   return (
     <group position={[f.x, f.y, f.elevation]} rotation={[0, 0, f.rotation]} scale={s}>
       {realized.groups.map((g) => (
@@ -550,16 +617,100 @@ function Furniture3D({ f }: { f: FurnitureInstance }) {
           material={
             g.mat === item.imageSlot && artMaterial
               ? artMaterial
-              : furnitureSlotMaterial(
-                  item.materials[g.mat] as MaterialId,
-                  f.materialOverrides?.[g.mat],
-                )
+              : lit && g.mat === item.emitter!.slot
+                ? emissiveSlotMaterial(
+                    item.materials[g.mat] as MaterialId,
+                    f.materialOverrides?.[g.mat],
+                    item.emitter!.color ?? EMITTER_DEFAULT_COLOR,
+                  )
+                : furnitureSlotMaterial(
+                    item.materials[g.mat] as MaterialId,
+                    f.materialOverrides?.[g.mat],
+                  )
           }
           castShadow
         />
       ))}
+      {lit && (
+        <EmitterLight
+          emitter={item.emitter!}
+          lumen={f.lumen ?? item.emitter!.defaultLumen}
+          mirrored={!!f.mirrored}
+          shadowCast={shadowCast}
+        />
+      )}
     </group>
   )
+}
+
+/** Shadow-budget throttle (ms) + caster count — the M1 spike decision. */
+const BUDGET_N = 2
+const BUDGET_MS = 250
+
+/**
+ * Picks the ≤2 lit emitters nearest the camera as shadow casters (M1
+ * budget: 2 × 1024 holds 60fps on WebKitGTK; interior maps never 2048;
+ * everything else renders shadowless — which the spike measured as free).
+ * Runs on rendered frames, throttled — under the demand frameloop no
+ * frames render while nothing changes, and both orbit (controls change)
+ * and walk ('always') do render — plus an effect for instant recompute
+ * when the doc or the toggle changes (a lamp turned on must not wait for
+ * the next camera move).
+ */
+function ShadowBudgetBridge({
+  doc,
+  enabled,
+  onBudget,
+}: {
+  doc: ProjectDocument
+  enabled: boolean
+  onBudget: (ids: Set<FurnitureId>) => void
+}) {
+  const invalidate = useThree((s) => s.invalidate)
+  const camera = useThree((s) => s.camera)
+  const last = useRef(0)
+  const prev = useRef<Set<FurnitureId>>(new Set())
+
+  const compute = (camPos: Vector3) => {
+    const lit: { id: FurnitureId; d2: number }[] = []
+    for (const f of Object.values(doc.furniture)) {
+      const item = CATALOG[f.catalogItemId]
+      if (!item?.emitter || !(f.lightOn ?? true)) continue
+      // plan → world: (x, y) → (x, −y), height ≈ elevation + 1
+      const dx = camPos.x - f.x
+      const dy = camPos.y - (f.elevation + 1)
+      const dz = camPos.z - -f.y
+      lit.push({ id: f.id, d2: dx * dx + dy * dy + dz * dz })
+    }
+    lit.sort((a, b) => a.d2 - b.d2)
+    const next = new Set(lit.slice(0, BUDGET_N).map((e) => e.id))
+    if (next.size === prev.current.size && [...next].every((id) => prev.current.has(id))) return
+    prev.current = next
+    onBudget(next)
+    invalidate()
+  }
+
+  useFrame(({ camera: cam }) => {
+    if (!enabled) return
+    const now = performance.now()
+    if (now - last.current < BUDGET_MS) return
+    last.current = now
+    compute(cam.position)
+  })
+
+  useEffect(() => {
+    if (!enabled) {
+      if (prev.current.size) {
+        prev.current = new Set()
+        onBudget(new Set())
+      }
+      return
+    }
+    compute(camera.position)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, enabled, camera])
+
+  return null
 }
 
 /** Shadow-frustum margin (m) around the scene bbox — classic and SunSky agree. */
@@ -962,6 +1113,7 @@ export function PlannerCanvas() {
   const wallHideMode = useAppSettings((s) => s.wallHideMode)
   const realisticLighting = useAppSettings((s) => s.realisticLighting)
   const [hiddenWalls, setHiddenWalls] = useState<Set<WallId>>(() => new Set())
+  const [shadowIds, setShadowIds] = useState<Set<FurnitureId>>(() => new Set())
   const occluderAnchor = useMemo(() => ({ x: box.cx, y: box.cy }), [box])
   // node → incident walls, for the patch-follows-walls occluder rule: a
   // junction pillar hides only when EVERY wall it bridges is hidden
@@ -1081,6 +1233,7 @@ export function PlannerCanvas() {
         />
         <ThemeBridge3D />
         <ExposureBridge />
+        <ShadowBudgetBridge doc={doc} enabled={realisticLighting} onBudget={setShadowIds} />
         <CaptureBridge apiRef={captureApi} />
         <WalkControls doc={doc} derived={derived} />
         <SceneEnvironment box={box} onGroundClick={handleFloorClick} />
@@ -1128,7 +1281,7 @@ export function PlannerCanvas() {
               <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} />
             ))}
           {Object.values(doc.furniture).map((f) => (
-            <Furniture3D key={f.id} f={f} />
+            <Furniture3D key={f.id} f={f} shadowCast={shadowIds.has(f.id)} />
           ))}
         </group>
       </Canvas>

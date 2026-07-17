@@ -23,6 +23,7 @@ import {
   addFurnitureBatch,
   duplicateFurniture,
   resizeFurniture,
+  setFurnitureLight,
   setFurnitureMeta,
   setMaterialOverride,
   transformFurniture,
@@ -638,6 +639,45 @@ describe('furniture', () => {
     expect(d.furniture[id]!.notes).toBe('IKEA 2026') // untouched key untouched
     setFurnitureMeta(d, id, { notes: '   ' })
     expect('notes' in d.furniture[id]!).toBe(false)
+  })
+
+  it('setFurnitureLight: absent lightOn means ON, true deletes, only false stores; junk lumen clears', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'floor-lamp',
+      x: 1,
+      y: 2,
+      size: { w: 0.35, d: 0.35, h: 1.6 },
+    })
+    setFurnitureLight(d, id, { lumen: 812.4 })
+    expect(d.furniture[id]!.lumen).toBe(812) // whole lumens
+    setFurnitureLight(d, id, { lightOn: false })
+    expect(d.furniture[id]!.lightOn).toBe(false)
+    setFurnitureLight(d, id, { lightOn: true }) // ON is the absent default
+    expect('lightOn' in d.furniture[id]!).toBe(false)
+    expect(d.furniture[id]!.lumen).toBe(812) // untouched key untouched
+    setFurnitureLight(d, id, { lumen: -100 }) // invalid clears
+    expect('lumen' in d.furniture[id]!).toBe(false)
+    setFurnitureLight(d, id, { lumen: undefined, lightOn: undefined }) // explicit clears
+    expect('lumen' in d.furniture[id]!).toBe(false)
+    expect('lightOn' in d.furniture[id]!).toBe(false)
+  })
+
+  it('lumen/lightOn ride add + duplicate', () => {
+    const d = doc()
+    const id = addFurniture(d, {
+      catalogItemId: 'floor-lamp',
+      x: 1,
+      y: 2,
+      size: { w: 0.35, d: 0.35, h: 1.6 },
+      lumen: 1200,
+      lightOn: false,
+    })
+    expect(d.furniture[id]!.lumen).toBe(1200)
+    expect(d.furniture[id]!.lightOn).toBe(false)
+    const [copy] = duplicateFurniture(d, [id])
+    expect(d.furniture[copy!]!.lumen).toBe(1200)
+    expect(d.furniture[copy!]!.lightOn).toBe(false)
   })
 
   it('setMaterialOverride sets, replaces, clears per slot; empty record leaves the doc', () => {

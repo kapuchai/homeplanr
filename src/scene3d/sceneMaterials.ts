@@ -58,6 +58,32 @@ export function furnitureSlotMaterial(
   return m
 }
 
+/**
+ * Lit-emitter slot variant (0.12.0): the furnitureSlotMaterial resolve
+ * rules (default / palette swap / hex recolor) plus an emissive uniform so
+ * the shade/bulb part GLOWS while the instance's light is on. Emissive is
+ * a uniform on the same standard shader — the few-programs invariant
+ * holds. Cache keyed (default|override|emissive), kept for the app
+ * lifetime like every other slot cache.
+ */
+const emissiveCache = new Map<string, MeshStandardMaterial>()
+export function emissiveSlotMaterial(
+  defaultId: MaterialId,
+  override: string | undefined,
+  emissive: string,
+): MeshStandardMaterial {
+  const base = furnitureSlotMaterial(defaultId, override)
+  const key = `${defaultId}|${override ?? ''}|${emissive}`
+  let m = emissiveCache.get(key)
+  if (!m) {
+    m = base.clone()
+    m.emissive.set(emissive)
+    m.emissiveIntensity = 0.85
+    emissiveCache.set(key, m)
+  }
+  return m
+}
+
 const sceneCache = new Map<string, MeshStandardMaterial>()
 export function sceneMaterial(id: keyof typeof SCENE_MATERIALS): MeshStandardMaterial {
   let m = sceneCache.get(id)
