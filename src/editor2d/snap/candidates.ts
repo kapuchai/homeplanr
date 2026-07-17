@@ -1,6 +1,7 @@
 import type { ProjectDocument, FurnitureInstance } from '../../model/types'
 import type { NodeId, WallId } from '../../model/ids'
 import type { DerivedGeometry } from '../../store/derived'
+import type { RigStarts, RoomRig } from '../../model/mutations/roomRig'
 import type { SnapCandidate } from '../../geometry/snapping'
 import type { Vec2 } from '../../geometry/vec'
 import { add, dist, normalize, perp, scale, sub } from '../../geometry/vec'
@@ -130,6 +131,75 @@ export function alignmentGuideCandidates(
     } else if (Math.abs(na.y - nb.y) < 1e-9) {
       emit('y', na.y - half, w.id)
       emit('y', na.y + half, w.id)
+    }
+  }
+  return out
+}
+
+/**
+ * Room-drag snap candidates (0.8.0). The snap SUBJECT is the grab point,
+ * and every candidate is prepositioned by FROZEN start offsets — the list
+ * is constant for the whole gesture, so compute it ONCE at drag-arm.
+ *
+ * - Corner-node candidates: grab positions at which a rig corner lands
+ *   EXACTLY on a stationary node — the PRIMARY weld mechanism (only node
+ *   coincidence merges walls; normalizeGraph has no collinear-overlap
+ *   merge). `display` = the stationary node, so the indicator ring
+ *   renders on the welding corner instead of at the cursor.
+ * - guideX/guideY: grab positions at which an axis-aligned rig wall's
+ *   CENTERLINE becomes collinear with a stationary wall's — release
+ *   T-splits the stationary wall at the rig corners and dedupes the
+ *   coincident fragment into a shared segment. `display` = the stationary
+ *   centerline, so the guide line renders on the target wall.
+ * Non-axis-aligned walls emit no guides (furniture-guide parity); corner
+ * snapping works at any angle.
+ */
+export function roomSnapCandidates(
+  doc: ProjectDocument,
+  rig: RoomRig,
+  starts: RigStarts,
+  grab: Vec2,
+): SnapCandidate[] {
+  const out: SnapCandidate[] = []
+  const rigNodes = new Set<string>(rig.nodeIds)
+  const rigWalls = new Set<string>(rig.wallIds)
+
+  const cornerOffsets = [...starts.nodes.values()].map((p) => sub(p, grab))
+  for (const n of Object.values(doc.nodes)) {
+    if (rigNodes.has(n.id)) continue
+    for (const off of cornerOffsets) {
+      out.push({
+        kind: 'node',
+        point: { x: n.x - off.x, y: n.y - off.y },
+        nodeId: n.id,
+        display: { x: n.x, y: n.y },
+      })
+    }
+  }
+
+  const xOffs = new Set<number>()
+  const yOffs = new Set<number>()
+  for (const id of rig.wallIds) {
+    const w = doc.walls[id]
+    const a = w && starts.nodes.get(w.a)
+    const b = w && starts.nodes.get(w.b)
+    if (!a || !b) continue
+    if (Math.abs(a.x - b.x) < 1e-9) xOffs.add(a.x - grab.x)
+    else if (Math.abs(a.y - b.y) < 1e-9) yOffs.add(a.y - grab.y)
+  }
+  for (const w of Object.values(doc.walls)) {
+    if (rigWalls.has(w.id)) continue
+    const na = doc.nodes[w.a]
+    const nb = doc.nodes[w.b]
+    if (!na || !nb) continue
+    if (Math.abs(na.x - nb.x) < 1e-9) {
+      for (const off of xOffs) {
+        out.push({ kind: 'guideX', value: na.x - off, display: na.x, refIds: [w.id] })
+      }
+    } else if (Math.abs(na.y - nb.y) < 1e-9) {
+      for (const off of yOffs) {
+        out.push({ kind: 'guideY', value: na.y - off, display: na.y, refIds: [w.id] })
+      }
     }
   }
   return out

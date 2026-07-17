@@ -9,9 +9,11 @@ import {
   alignmentGuideCandidates,
   gridCandidate,
   nodeCandidates,
+  roomSnapCandidates,
   wallPointCandidates,
   wallBackCandidate,
 } from '../snap/candidates'
+import type { SnapCandidate } from '../../geometry/snapping'
 import { beginTx, commitTx, abortTx, type TxToken } from '../../store/transactions'
 import { useAppSettings } from '../../store/appSettings'
 import { formatLength } from '../../format/units'
@@ -140,6 +142,9 @@ type DragState =
       grabWorld: Vec2
       /** Last applied delta — the commit re-runs exactly this. */
       lastDelta: Vec2
+      /** Frozen-offset snap candidates (constant for the whole gesture). */
+      candidates: SnapCandidate[]
+      lastSnap: SnapResult | null
     }
 
 export function createSelectTool(): Tool {
@@ -184,6 +189,8 @@ export function createSelectTool(): Tool {
       starts,
       grabWorld: world,
       lastDelta: { x: 0, y: 0 },
+      candidates: roomSnapCandidates(ctx.doc(), rig, starts, world),
+      lastSnap: null,
     }
     ctx.interaction().set({ gestureActive: true, cursorHint: 'grabbing' })
     return true
@@ -669,7 +676,15 @@ export function createSelectTool(): Tool {
         }
 
         case 'room': {
-          const delta = sub(e.world, state.grabWorld)
+          // corner-onto-node candidates are the weld mechanism; centerline
+          // guides make collinear docking exact (T-split + dedupe on commit)
+          const snap = resolveSnap(e.world, state.candidates, {
+            pxToWorld: px,
+            enabled: useAppSettings.getState().snapEnabled && !e.mods.ctrl,
+            ...(state.lastSnap ? { prev: state.lastSnap } : {}),
+          })
+          state.lastSnap = snap
+          const delta = sub(snap.point, state.grabWorld)
           state.lastDelta = delta
           ctx.actions().transformRoomRig(
             state.rig,
@@ -677,7 +692,7 @@ export function createSelectTool(): Tool {
             { delta, angleRad: 0, center: state.grabWorld },
             { mode: 'live' },
           )
-          ctx.interaction().set({ gestureActive: true })
+          ctx.interaction().set({ snap, gestureActive: true })
           return
         }
       }

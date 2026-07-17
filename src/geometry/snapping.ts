@@ -17,7 +17,15 @@ import { segSegIntersection } from './segment'
  */
 
 export type SnapCandidate =
-  | { kind: 'node'; point: Vec2; nodeId: NodeId }
+  | {
+      kind: 'node'
+      point: Vec2
+      nodeId: NodeId
+      /** Where the indicator ring renders when it differs from `point` —
+       * room drags snap the GRAB point to offset candidates while the
+       * weld happens at the stationary node. */
+      display?: Vec2
+    }
   | {
       kind: 'wallPoint'
       point: Vec2

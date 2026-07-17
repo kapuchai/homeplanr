@@ -1694,3 +1694,104 @@ describe('0.8.0 M2: room drag gesture', () => {
     registry.switchTo(ctx, 'select')
   })
 })
+
+describe('0.8.0 M3: room drag snapping', () => {
+  const store = () => useDocStore.getState()
+  const nodes = () => Object.values(store().doc.nodes)
+  const nodeAt = (p: Vec2) => nodes().find((n) => Math.hypot(n.x - p.x, n.y - p.y) < 1e-6)
+  const square = (x0 = 0, y0 = 0, s = 4) =>
+    store().addWallChain([
+      vec(x0, y0),
+      vec(x0 + s, y0),
+      vec(x0 + s, y0 + s),
+      vec(x0, y0 + s),
+      vec(x0, y0),
+    ])
+  const xWallsAt = (x: number) =>
+    Object.values(store().doc.walls).filter(
+      (w) =>
+        Math.abs(store().doc.nodes[w.a]!.x - x) < 1e-6 &&
+        Math.abs(store().doc.nodes[w.b]!.x - x) < 1e-6,
+    )
+
+  it('roomSnapCandidates: corner-node points carry the weld-corner display; guides the centerline', async () => {
+    const { collectRoomRig, captureRigStarts } = await import('../../model/mutations/roomRig')
+    const { roomSnapCandidates } = await import('../snap/candidates')
+    square() // stationary A
+    square(6, 1, 2) // B: 6..8 × 1..3
+    const b = Object.values(store().doc.rooms).find((r) =>
+      r.wallCycle.some((id) => {
+        const w = store().doc.walls[id]!
+        return store().doc.nodes[w.a]!.x >= 6
+      }),
+    )!
+    const info = collectRoomRig(store().doc, b.id)!
+    const starts = captureRigStarts(store().doc, info.rig)
+    const grab = vec(7, 2)
+    const cands = roomSnapCandidates(store().doc, info.rig, starts, grab)
+    // corner (6,1) offset (−1,−1): stationary node (4,0) → grab point (5,1)
+    const corner = cands.find(
+      (c) =>
+        c.kind === 'node' &&
+        Math.abs(c.point.x - 5) < 1e-9 &&
+        Math.abs(c.point.y - 1) < 1e-9,
+    )
+    expect(corner).toBeDefined()
+    expect(corner!.kind === 'node' && corner!.display).toEqual({ x: 4, y: 0 })
+    // B left wall centerline x=6 (offset −1) onto A right wall x=4 → value 5
+    const guide = cands.find(
+      (c) => c.kind === 'guideX' && Math.abs(c.value - 5) < 1e-9,
+    )
+    expect(guide).toBeDefined()
+    expect(guide!.kind === 'guideX' && guide!.display).toBe(4)
+    // no candidates target the rig's own geometry
+    expect(
+      cands.some((c) => c.kind === 'node' && info.rig.nodeIds.includes(c.nodeId as never)),
+    ).toBe(false)
+  })
+
+  it('corner snap welds a near-miss drop edge-to-edge', () => {
+    square() // A: 0..4
+    square(6, 0.3) // B: 6..10 × 0.3..4.3 — misaligned by 0.3
+    expect(walls()).toBe(8)
+    click(vec(7, 2.3)) // select B
+    tool().onPointerDown(pe(vec(7, 2.3)), ctx)
+    tool().onPointerMove(pe(vec(6.5, 2.2)), ctx)
+    tool().onPointerMove(pe(vec(5.03, 2.04)), ctx) // 5cm off the exact dock
+    const snap = useInteractionStore.getState().snap
+    expect(snap?.primary?.kind).toBe('node') // corner candidate captured
+    tool().onPointerUp(pe(vec(5.03, 2.04)), ctx)
+    expect(walls()).toBe(7) // welded despite the near-miss
+    expect(rooms()).toBe(2)
+    expect(nodeAt(vec(4, 0))).toBeDefined()
+    expect(nodeAt(vec(4, 4))).toBeDefined()
+    expect(nodeAt(vec(4.03, 0.04))).toBeUndefined()
+  })
+
+  it('centerline guide makes a collinear dock exact: T-split + shared fragment', () => {
+    square() // A: 0..4
+    store().addWallChain([vec(6, 1), vec(9, 1), vec(9, 3), vec(6, 3), vec(6, 1)])
+    click(vec(7, 2)) // select B
+    tool().onPointerDown(pe(vec(7, 2)), ctx)
+    tool().onPointerMove(pe(vec(6.5, 2)), ctx)
+    tool().onPointerMove(pe(vec(4.97, 2.06)), ctx) // 3cm off collinear
+    const snap = useInteractionStore.getState().snap
+    expect(snap?.axes?.x?.kind === 'guideX' && snap.axes.x.display).toBe(4)
+    tool().onPointerUp(pe(vec(4.97, 2.06)), ctx)
+    expect(xWallsAt(4)).toHaveLength(3) // [0,1.06] [1.06,3.06] shared, [3.06,4]
+    expect(rooms()).toBe(2)
+  })
+
+  it('Ctrl suspends room snapping — the near-miss stays a near-miss', () => {
+    square()
+    square(6, 0.3)
+    click(vec(7, 2.3))
+    tool().onPointerDown(pe(vec(7, 2.3), { ctrl: true }), ctx)
+    tool().onPointerMove(pe(vec(6.5, 2.2), { ctrl: true }), ctx)
+    tool().onPointerMove(pe(vec(5.03, 2.04), { ctrl: true }), ctx)
+    tool().onPointerUp(pe(vec(5.03, 2.04), { ctrl: true }), ctx)
+    expect(walls()).toBe(8) // no weld
+    expect(rooms()).toBe(2)
+    expect(nodeAt(vec(4.03, 0.04))).toBeDefined() // raw drop position kept
+  })
+})

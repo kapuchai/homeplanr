@@ -193,11 +193,12 @@ export function InteractionOverlay() {
   if (snap?.primary) {
     const c = snap.primary
     if (c.kind === 'node') {
+      const at = c.display ?? c.point
       els.push(
         <circle
           key="sn"
-          cx={c.point.x}
-          cy={c.point.y}
+          cx={at.x}
+          cy={at.y}
           r={px(7)}
           fill="none"
           stroke={theme.snap}
