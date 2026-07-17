@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDocument, type ProjectDocument, type WallFinishId } from '../types'
-import type { FurnitureId, NodeId, OpeningId, WallId } from '../ids'
+import type { FurnitureId, NodeId, OpeningId, RoomId, WallId } from '../ids'
 import {
   addWallChain,
   addWallSegment,
@@ -16,6 +16,7 @@ import { runPipeline } from './pipeline'
 import { paintRoomWalls, renameRoom } from './rooms'
 import { addDimension, addLabel, updateAnnotation } from './annotations'
 import { pasteSubgraph } from './paste'
+import { captureRigStarts, collectRoomRig, tearRoomRig, transformRigRigid } from './roomRig'
 import { alignFurniture, distributeFurniture } from './furniture'
 import {
   addFurniture,
@@ -985,5 +986,337 @@ describe('M9 (0.3.0): align / distribute', () => {
     const g2 = xs[2]! - 0.5 - (xs[1]! + 0.5)
     expect(g1).toBeCloseTo(g2, 6)
     distributeFurniture(doc2, [a, b], 'x') // no-op below 3
+  })
+})
+
+describe('0.8.0 M1: room rig — collect / tear / rigid transform', () => {
+  const nodeAt = (d: ProjectDocument, p: Vec2) =>
+    Object.values(d.nodes).find((n) => dist(n, p) < 1e-6)!
+  const wallBetween = (d: ProjectDocument, p: Vec2, q: Vec2) =>
+    Object.values(d.walls).find((w) => {
+      const na = d.nodes[w.a]!
+      const nb = d.nodes[w.b]!
+      return (
+        (dist(na, p) < 1e-6 && dist(nb, q) < 1e-6) ||
+        (dist(na, q) < 1e-6 && dist(nb, p) < 1e-6)
+      )
+    })
+  /** Room owning a wall that touches the node at `p`. */
+  const roomTouching = (d: ProjectDocument, p: Vec2) => {
+    const n = nodeAt(d, p)
+    const wids = new Set(
+      Object.values(d.walls)
+        .filter((w) => w.a === n.id || w.b === n.id)
+        .map((w) => w.id),
+    )
+    return Object.values(d.rooms).find((r) => r.wallCycle.some((id) => wids.has(id)))!
+  }
+
+  /** Two adjacent 4x4 rooms sharing the x=4 divider (7 walls, 8 nodes). */
+  function twoRooms(d: ProjectDocument) {
+    addWallChain(d, [vec(0, 0), vec(4, 0), vec(8, 0), vec(8, 4), vec(4, 4), vec(0, 4), vec(0, 0)])
+    const divider = addWallSegment(d, vec(4, 0), vec(4, 4)).wallId!
+    const left = roomTouching(d, vec(0, 0))
+    const right = roomTouching(d, vec(8, 0))
+    renameRoom(d, left.id, 'Left')
+    renameRoom(d, right.id, 'Right')
+    return { divider, leftId: left.id, rightId: right.id }
+  }
+
+  /** The full gesture at model level: collect → tear → live frame → commit. */
+  function dragRoom(d: ProjectDocument, roomId: RoomId, delta: Vec2, angleRad = 0) {
+    const info = collectRoomRig(d, roomId)
+    expect(info).not.toBeNull()
+    const rig = tearRoomRig(d, info!.rig)
+    const starts = captureRigStarts(d, rig)
+    const center = info!.centroid
+    transformRigRigid(
+      d,
+      rig,
+      starts,
+      { delta: { x: delta.x / 2, y: delta.y / 2 }, angleRad, center },
+      { mode: 'live' },
+    )
+    transformRigRigid(d, rig, starts, { delta, angleRad, center }, { mode: 'commit' })
+    return { info: info!, rig }
+  }
+
+  it('collectRoomRig: null for unknown room; spatial furniture attribution', () => {
+    const d = doc()
+    expect(collectRoomRig(d, 'r_missing' as RoomId)).toBeNull()
+    const { rightId } = twoRooms(d)
+    const inside = addFurniture(d, { catalogItemId: 'test-box', x: 5, y: 2, size: { w: 1, d: 1, h: 1 } })
+    const outside = addFurniture(d, { catalogItemId: 'test-box', x: 3, y: 2, size: { w: 1, d: 1, h: 1 } })
+    const info = collectRoomRig(d, rightId)!
+    expect(info.rig.furnitureIds).toContain(inside)
+    expect(info.rig.furnitureIds).not.toContain(outside)
+    expect(info.rig.wallIds).toHaveLength(4)
+    expect(info.rig.nodeIds).toHaveLength(4)
+  })
+
+  it('divider tear: neighbor keeps the wall AND its door; dragged room gets a bare copy', () => {
+    const d = doc()
+    const { divider, leftId, rightId } = twoRooms(d)
+    const doorId = addOpening(d, { kind: 'door', wallId: divider, t: 0.5 })!
+    d.rooms[rightId]!.floorMaterialId = 'marble'
+    d.rooms[rightId]!.roomType = 'bedroom'
+    dragRoom(d, rightId, vec(2, 0))
+    // neighbor intact: divider survives with the door
+    expect(d.walls[divider]).toBeDefined()
+    expect(d.openings[doorId]).toBeDefined()
+    expect(d.openings[doorId]!.wallId).toBe(divider)
+    expect(Object.keys(d.openings)).toHaveLength(1)
+    expect(d.rooms[leftId]?.name).toBe('Left')
+    expect(d.rooms[leftId]!.wallCycle).toContain(divider)
+    // dragged room: identity + meta survive; its cycle holds the torn copy, not the divider
+    const right = d.rooms[rightId]
+    expect(right?.name).toBe('Right')
+    expect(right?.floorMaterialId).toBe('marble')
+    expect(right?.roomType).toBe('bedroom')
+    expect(right!.wallCycle).not.toContain(divider)
+    // torn copy moved with the room and is bare
+    expect(wallBetween(d, vec(6, 0), vec(6, 4))).toBeDefined()
+    expect(wallCount(d)).toBe(8)
+    expect(nodeCount(d)).toBe(8) // 6 fixture nodes + 2 tear duplicates
+    expect(roomCount(d)).toBe(2)
+    checkInvariants(d)
+  })
+
+  it('live frames never weld: coincident tear duplicates survive until commit', () => {
+    const d = doc()
+    const { rightId } = twoRooms(d)
+    const info = collectRoomRig(d, rightId)!
+    const rig = tearRoomRig(d, info.rig)
+    const starts = captureRigStarts(d, rig)
+    expect(wallCount(d)).toBe(8) // divider + coincident copy
+    expect(nodeCount(d)).toBe(8)
+    transformRigRigid(d, rig, starts, { delta: vec(0, 0), angleRad: 0, center: info.centroid }, { mode: 'live' })
+    expect(wallCount(d)).toBe(8) // still not welded
+    expect(nodeCount(d)).toBe(8)
+    transformRigRigid(d, rig, starts, { delta: vec(1, 0), angleRad: 0, center: info.centroid }, { mode: 'live' })
+    expect(wallCount(d)).toBe(8)
+    expect(nodeCount(d)).toBe(8)
+    // (no checkInvariants here: live docs legitimately hold coincident nodes
+    // until the commit re-run normalizes)
+  })
+
+  it('exact drop-back is a topological no-op (tear dedupes away)', () => {
+    const d = doc()
+    const { divider, leftId, rightId } = twoRooms(d)
+    const doorId = addOpening(d, { kind: 'door', wallId: divider, t: 0.5 })!
+    dragRoom(d, rightId, vec(0, 0))
+    expect(wallCount(d)).toBe(7)
+    expect(nodeCount(d)).toBe(6)
+    expect(roomCount(d)).toBe(2)
+    expect(d.openings[doorId]).toBeDefined()
+    expect(d.rooms[leftId]?.name).toBe('Left')
+    expect(d.rooms[rightId]?.name).toBe('Right')
+    checkInvariants(d)
+  })
+
+  it('sub-MERGE_EPS drag commits as an exact no-op — never a sheared room', () => {
+    const d = doc()
+    const { rightId } = twoRooms(d)
+    const before = new Map(Object.values(d.nodes).map((n) => [n.id, { x: n.x, y: n.y }]))
+    dragRoom(d, rightId, vec(MERGE_EPS / 2, 0))
+    expect(wallCount(d)).toBe(7)
+    expect(nodeCount(d)).toBe(6)
+    for (const n of Object.values(d.nodes)) {
+      const b = before.get(n.id)
+      expect(b, `node ${n.id} survived`).toBeDefined()
+      expect(n.x).toBe(b!.x)
+      expect(n.y).toBe(b!.y)
+    }
+    checkInvariants(d)
+  })
+
+  it('pure translate with no shared geometry keeps every id (no tear)', () => {
+    const d = doc()
+    square(d)
+    const room = firstRoom(d)
+    renameRoom(d, room.id, 'Solo')
+    const cycleBefore = [...room.wallCycle]
+    const f = addFurniture(d, { catalogItemId: 'test-box', x: 1, y: 1, size: { w: 1, d: 1, h: 1 } })
+    dragRoom(d, room.id, vec(2, 3))
+    expect(d.rooms[room.id]?.name).toBe('Solo')
+    expect(d.rooms[room.id]!.wallCycle).toEqual(cycleBefore)
+    expect(nodeAt(d, vec(2, 3))).toBeDefined()
+    expect(nodeAt(d, vec(6, 7))).toBeDefined()
+    expect(d.furniture[f]!.x).toBeCloseTo(3, 9)
+    expect(d.furniture[f]!.y).toBeCloseTo(4, 9)
+    checkInvariants(d)
+  })
+
+  it('slide along the neighbor: collinear overlap resolves into a shared segment', () => {
+    const d = doc()
+    const { divider, leftId, rightId } = twoRooms(d)
+    const doorId = addOpening(d, { kind: 'door', wallId: divider, t: 0.5 })!
+    dragRoom(d, rightId, vec(0, 1))
+    expect(roomCount(d)).toBe(2)
+    expect(d.rooms[leftId]?.name).toBe('Left')
+    expect(d.rooms[rightId]?.name).toBe('Right')
+    expect(d.openings[doorId]).toBeDefined() // door stayed on the stationary side
+    // x=4 boundary: left-only [0,1], shared [1,4], right-only [4,5]
+    const xWalls = Object.values(d.walls).filter(
+      (w) => Math.abs(d.nodes[w.a]!.x - 4) < 1e-6 && Math.abs(d.nodes[w.b]!.x - 4) < 1e-6,
+    )
+    expect(xWalls).toHaveLength(3)
+    checkInvariants(d)
+  })
+
+  it('partial-overlap docking: neighbor wall T-splits and the middle fragment is shared', () => {
+    const d = doc()
+    square(d) // 4x4 room A
+    renameRoom(d, firstRoom(d).id, 'A')
+    addWallChain(d, [vec(6, 1), vec(9, 1), vec(9, 3), vec(6, 3), vec(6, 1)])
+    const b = roomTouching(d, vec(9, 1))
+    renameRoom(d, b.id, 'B')
+    dragRoom(d, b.id, vec(-2, 0))
+    expect(roomCount(d)).toBe(2)
+    expect(Object.values(d.rooms).map((r) => r.name).sort()).toEqual(['A', 'B'])
+    const xWalls = Object.values(d.walls).filter(
+      (w) => Math.abs(d.nodes[w.a]!.x - 4) < 1e-6 && Math.abs(d.nodes[w.b]!.x - 4) < 1e-6,
+    )
+    expect(xWalls).toHaveLength(3) // [0,1], [1,3] shared, [3,4]
+    const shared = wallBetween(d, vec(4, 1), vec(4, 3))!
+    const bRoom = Object.values(d.rooms).find((r) => r.name === 'B')!
+    expect(bRoom.wallCycle).toContain(shared.id)
+    checkInvariants(d)
+  })
+
+  it('full edge-to-edge weld: rig wall dedupes away, its door re-hosts onto the kept wall', () => {
+    const d = doc()
+    square(d) // A: 0..4
+    const aRight = wallBetween(d, vec(4, 0), vec(4, 4))!
+    addWallChain(d, [vec(6, 0), vec(10, 0), vec(10, 4), vec(6, 4), vec(6, 0)])
+    const b = roomTouching(d, vec(10, 0))
+    const bLeft = wallBetween(d, vec(6, 0), vec(6, 4))!
+    const doorId = addOpening(d, { kind: 'door', wallId: bLeft.id, t: 0.5 })!
+    dragRoom(d, b.id, vec(-2, 0))
+    expect(d.walls[aRight.id]).toBeDefined()
+    expect(d.walls[bLeft.id]).toBeUndefined() // demoted rig wall lost the dedupe
+    expect(d.openings[doorId]).toBeDefined()
+    expect(d.openings[doorId]!.wallId).toBe(aRight.id) // door migrated to the kept wall
+    expect(wallCount(d)).toBe(7)
+    expect(roomCount(d)).toBe(2)
+    checkInvariants(d)
+  })
+
+  it("weld conflict: a rig door that can't near-exactly fit next to a kept door drops", () => {
+    const d = doc()
+    square(d)
+    const aRight = wallBetween(d, vec(4, 0), vec(4, 4))!
+    const keptDoor = addOpening(d, { kind: 'door', wallId: aRight.id, t: 0.5 })!
+    addWallChain(d, [vec(6, 0), vec(10, 0), vec(10, 4), vec(6, 4), vec(6, 0)])
+    const b = roomTouching(d, vec(10, 0))
+    const bLeft = wallBetween(d, vec(6, 0), vec(6, 4))!
+    const rigDoor = addOpening(d, { kind: 'door', wallId: bLeft.id, t: 0.5 })!
+    dragRoom(d, b.id, vec(-2, 0))
+    expect(d.openings[keptDoor]).toBeDefined()
+    expect(d.openings[rigDoor]).toBeUndefined() // same-slot demoted door drops, never evicts
+    expect(Object.keys(d.openings)).toHaveLength(1)
+    checkInvariants(d)
+  })
+
+  it('island drag-out: walls + furniture leave wholesale, no phantom hole remains', () => {
+    const d = doc()
+    square(d, 8)
+    addWallChain(d, [vec(3, 3), vec(5, 3), vec(5, 5), vec(3, 5), vec(3, 3)])
+    const outer = Object.values(d.rooms).find((r) => r.holeCycles.length === 1)!
+    const island = Object.values(d.rooms).find((r) => r.id !== outer.id)!
+    renameRoom(d, outer.id, 'Hall')
+    renameRoom(d, island.id, 'Closet')
+    const inIsland = addFurniture(d, { catalogItemId: 'test-box', x: 4, y: 4, size: { w: 0.5, d: 0.5, h: 1 } })
+    const inHall = addFurniture(d, { catalogItemId: 'test-box', x: 1, y: 1, size: { w: 0.5, d: 0.5, h: 1 } })
+    const wallsBefore = wallCount(d)
+    dragRoom(d, island.id, vec(0, 6)) // exits through the south — fully outside
+    expect(wallCount(d)).toBe(wallsBefore) // no tear: container/island never tears
+    expect(d.rooms[outer.id]?.name).toBe('Hall')
+    expect(d.rooms[outer.id]!.holeCycles).toHaveLength(0) // hole regenerated away
+    expect(d.rooms[island.id]?.name).toBe('Closet')
+    expect(d.furniture[inIsland]!.y).toBeCloseTo(10, 9) // rode with the island
+    expect(d.furniture[inHall]!.y).toBeCloseTo(1, 9) // stayed
+    checkInvariants(d)
+  })
+
+  it('container drag: islands ride along — walls, furniture, and identities', () => {
+    const d = doc()
+    square(d, 8)
+    addWallChain(d, [vec(3, 3), vec(5, 3), vec(5, 5), vec(3, 5), vec(3, 3)])
+    const outer = Object.values(d.rooms).find((r) => r.holeCycles.length === 1)!
+    const island = Object.values(d.rooms).find((r) => r.id !== outer.id)!
+    renameRoom(d, outer.id, 'Hall')
+    renameRoom(d, island.id, 'Closet')
+    const inIsland = addFurniture(d, { catalogItemId: 'test-box', x: 4, y: 4, size: { w: 0.5, d: 0.5, h: 1 } })
+    const info = collectRoomRig(d, outer.id)!
+    expect(info.rig.nestedRoomIds).toEqual([island.id])
+    expect(info.rig.wallIds).toHaveLength(8)
+    expect(info.rig.furnitureIds).toContain(inIsland) // hole contents belong to the rig
+    dragRoom(d, outer.id, vec(10, 0))
+    expect(d.rooms[outer.id]?.name).toBe('Hall')
+    expect(d.rooms[outer.id]!.holeCycles).toHaveLength(1)
+    expect(d.rooms[island.id]?.name).toBe('Closet')
+    expect(nodeAt(d, vec(13, 3))).toBeDefined() // island corner moved
+    expect(d.furniture[inIsland]!.x).toBeCloseTo(14, 9)
+    checkInvariants(d)
+  })
+
+  it('rotation: nodes orbit the centroid, openings keep t, furniture composes', () => {
+    const d = doc()
+    addWallChain(d, [vec(0, 0), vec(4, 0), vec(4, 2), vec(0, 2), vec(0, 0)])
+    const room = firstRoom(d)
+    renameRoom(d, room.id, 'Rect')
+    const bottom = wallBetween(d, vec(0, 0), vec(4, 0))!
+    const doorId = addOpening(d, { kind: 'door', wallId: bottom.id, t: 0.25 })!
+    const f = addFurniture(d, { catalogItemId: 'test-box', x: 1, y: 1, size: { w: 0.5, d: 0.5, h: 1 } })
+    dragRoom(d, room.id, vec(0, 0), Math.PI / 2)
+    // 4x2 rect about centroid (2,1) → corners (1,-1),(3,-1),(3,3),(1,3)
+    for (const p of [vec(1, -1), vec(3, -1), vec(3, 3), vec(1, 3)]) {
+      expect(nodeAt(d, p), `corner ${p.x},${p.y}`).toBeDefined()
+    }
+    expect(d.rooms[room.id]?.name).toBe('Rect')
+    expect(d.openings[doorId]).toBeDefined()
+    expect(d.openings[doorId]!.wallId).toBe(bottom.id)
+    expect(d.openings[doorId]!.t).toBeCloseTo(0.25, 9)
+    expect(d.furniture[f]!.x).toBeCloseTo(2, 9)
+    expect(d.furniture[f]!.y).toBeCloseTo(0, 9)
+    expect(d.furniture[f]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+    checkInvariants(d)
+  })
+
+  it('rotating a square room next to its neighbor is topology-stable (tear + reweld)', () => {
+    const d = doc()
+    const { divider, leftId, rightId } = twoRooms(d)
+    const doorId = addOpening(d, { kind: 'door', wallId: divider, t: 0.5 })!
+    const f = addFurniture(d, { catalogItemId: 'test-box', x: 5, y: 1, size: { w: 0.5, d: 0.5, h: 1 } })
+    dragRoom(d, rightId, vec(0, 0), Math.PI / 2)
+    expect(wallCount(d)).toBe(7) // square maps onto itself; tear rewelds
+    expect(nodeCount(d)).toBe(6)
+    expect(roomCount(d)).toBe(2)
+    expect(d.rooms[leftId]?.name).toBe('Left')
+    expect(d.rooms[rightId]?.name).toBe('Right')
+    expect(d.openings[doorId]).toBeDefined()
+    expect(d.openings[doorId]!.wallId).toBe(divider)
+    expect(d.furniture[f]!.x).toBeCloseTo(7, 6)
+    expect(d.furniture[f]!.y).toBeCloseTo(1, 6)
+    expect(d.furniture[f]!.rotation).toBeCloseTo(Math.PI / 2, 9)
+    checkInvariants(d)
+  })
+
+  it('T-junction corner sharing: dragging away duplicates only the junction nodes', () => {
+    const d = doc()
+    square(d) // room A: 0..4
+    renameRoom(d, firstRoom(d).id, 'A')
+    // corridor wall hanging off A's north-east corner
+    addWallSegment(d, vec(4, 4), vec(7, 4))
+    const room = roomTouching(d, vec(0, 0))
+    dragRoom(d, room.id, vec(0, 3))
+    // the stub kept its anchor node at (4,4); the room moved to y∈[3,7]
+    expect(wallBetween(d, vec(4, 4), vec(7, 4))).toBeDefined()
+    expect(nodeAt(d, vec(0, 3))).toBeDefined()
+    expect(nodeAt(d, vec(4, 7))).toBeDefined()
+    expect(d.rooms[room.id]?.name).toBe('A')
+    expect(roomCount(d)).toBe(1)
+    checkInvariants(d)
   })
 })
