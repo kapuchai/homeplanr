@@ -190,7 +190,8 @@ export function tearRoomRig(doc: ProjectDocument, rig: RoomRig): RoomRig {
       height: w.height,
       ...(w.paintFront ? { paintFront: w.paintFront } : {}),
       ...(w.paintBack ? { paintBack: w.paintBack } : {}),
-      ...(w.finish ? { finish: w.finish } : {}),
+      ...(w.finishFront ? { finishFront: w.finishFront } : {}),
+      ...(w.finishBack ? { finishBack: w.finishBack } : {}),
     }
     wallMap.set(id, dup)
   }

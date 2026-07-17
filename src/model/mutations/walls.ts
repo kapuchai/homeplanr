@@ -1,4 +1,4 @@
-import type { ProjectDocument, Wall, WallFinishId, WallNode } from '../types'
+import type { ProjectDocument, Wall, WallNode } from '../types'
 import { DEFAULTS } from '../types'
 import { WALL_PAINT_IDS } from '../../catalog/palette'
 import { newNodeId, newWallId, type AnnotationId, type FurnitureId, type NodeId, type OpeningId, type WallId } from '../ids'
@@ -175,21 +175,33 @@ export function applyWallPaint(
   }
 }
 
-/** Finish rules: brick/concrete/tile assign; 'paint'/undefined/invalid delete. */
-function applyWallFinish(w: Wall, finish: WallFinishId | undefined): void {
+/** Known non-default finish ids (mutation-level gate, paint parity: the
+ * UI writes only known ids; unknown ids arrive via files and are
+ * preserved by the open-registry validator, never by mutations). */
+const KNOWN_FINISH_IDS = new Set<string>(['brick', 'concrete', 'tile'])
+
+/** Per-side finish rules (v5): known non-'paint' ids assign; anything else
+ * deletes. Writes only on actual change (derived-reference stability). */
+export function applyWallFinish(
+  w: Wall,
+  key: 'finishFront' | 'finishBack',
+  finishId: string | undefined,
+): void {
   const next =
-    finish === 'brick' || finish === 'concrete' || finish === 'tile' ? finish : undefined
+    finishId !== undefined && KNOWN_FINISH_IDS.has(finishId) ? finishId : undefined
   if (next === undefined) {
-    if (w.finish !== undefined) delete w.finish
-  } else if (w.finish !== next) {
-    w.finish = next
+    if (w[key] !== undefined) delete w[key]
+  } else if (w[key] !== next) {
+    w[key] = next
   }
 }
 
 export function updateWall(
   doc: ProjectDocument,
   wallId: WallId,
-  patch: Partial<Pick<Wall, 'thickness' | 'height' | 'paintFront' | 'paintBack' | 'finish'>>,
+  patch: Partial<
+    Pick<Wall, 'thickness' | 'height' | 'paintFront' | 'paintBack' | 'finishFront' | 'finishBack'>
+  >,
   opts: { mode?: MutationMode } = {},
 ): void {
   const w = doc.walls[wallId]
@@ -199,7 +211,8 @@ export function updateWall(
   // key-presence checks: an explicit undefined value means "reset to default"
   if ('paintFront' in patch) applyWallPaint(w, 'paintFront', patch.paintFront)
   if ('paintBack' in patch) applyWallPaint(w, 'paintBack', patch.paintBack)
-  if ('finish' in patch) applyWallFinish(w, patch.finish)
+  if ('finishFront' in patch) applyWallFinish(w, 'finishFront', patch.finishFront)
+  if ('finishBack' in patch) applyWallFinish(w, 'finishBack', patch.finishBack)
   runPipeline(doc, opts.mode ?? 'commit')
 }
 
@@ -245,7 +258,8 @@ export function splitWallRaw(
     // both halves are the same physical wall — sides keep their look
     ...(w.paintFront ? { paintFront: w.paintFront } : {}),
     ...(w.paintBack ? { paintBack: w.paintBack } : {}),
-    ...(w.finish ? { finish: w.finish } : {}),
+    ...(w.finishFront ? { finishFront: w.finishFront } : {}),
+    ...(w.finishBack ? { finishBack: w.finishBack } : {}),
   }
   if (demoted?.has(wallId)) demoted.add(bSide)
   w.b = mid // a-side keeps the original id

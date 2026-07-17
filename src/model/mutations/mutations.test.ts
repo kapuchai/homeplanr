@@ -327,30 +327,36 @@ describe('wall paint + finish (updateWall)', () => {
     const d = doc()
     const r = addWallSegment(d, vec(0, 0), vec(4, 0))
     const w = () => d.walls[r.wallId!]!
-    updateWall(d, r.wallId!, { paintFront: 'sage', paintBack: 'charcoal', finish: 'brick' })
+    updateWall(d, r.wallId!, {
+      paintFront: 'sage',
+      paintBack: 'charcoal',
+      finishFront: 'brick',
+      finishBack: 'tile',
+    })
     expect(w().paintFront).toBe('sage')
     expect(w().paintBack).toBe('charcoal')
-    expect(w().finish).toBe('brick')
+    expect(w().finishFront).toBe('brick')
+    expect(w().finishBack).toBe('tile')
     updateWall(d, r.wallId!, { paintFront: 'not-a-paint' }) // invalid → delete
     expect('paintFront' in w()).toBe(false)
     expect(w().paintBack).toBe('charcoal') // untouched key stays
     updateWall(d, r.wallId!, { paintBack: undefined }) // explicit reset → delete
     expect('paintBack' in w()).toBe(false)
-    updateWall(d, r.wallId!, { finish: 'stucco' as WallFinishId }) // invalid → delete
-    expect('finish' in w()).toBe(false)
-    updateWall(d, r.wallId!, { finish: 'tile' })
-    updateWall(d, r.wallId!, { finish: 'paint' }) // 'paint' = default → delete
-    expect('finish' in w()).toBe(false)
+    updateWall(d, r.wallId!, { finishFront: 'stucco' as WallFinishId }) // unknown → delete
+    expect('finishFront' in w()).toBe(false)
+    expect(w().finishBack).toBe('tile') // per-side: the other side stays
+    updateWall(d, r.wallId!, { finishBack: 'paint' }) // 'paint' = default → delete
+    expect('finishBack' in w()).toBe(false)
   })
 
   it('a no-op paint/finish patch keeps document identity under immer', () => {
     const base = produce(doc(), (draft) => {
       const r = addWallSegment(draft, vec(0, 0), vec(4, 0))
-      updateWall(draft, r.wallId!, { paintFront: 'sage', finish: 'brick' })
+      updateWall(draft, r.wallId!, { paintFront: 'sage', finishFront: 'brick' })
     })
     const wallId = Object.keys(base.walls)[0]! as WallId
     const next = produce(base, (draft) =>
-      updateWall(draft, wallId, { paintFront: 'sage', paintBack: 'nope', finish: 'brick' }),
+      updateWall(draft, wallId, { paintFront: 'sage', paintBack: 'nope', finishFront: 'brick' }),
     )
     expect(next).toBe(base)
   })
@@ -871,14 +877,20 @@ describe('0.4.0 M1: paste demotion — existing geometry always wins', () => {
   it('splitting a painted wall keeps paint and finish on BOTH halves', () => {
     const d = doc()
     const r = addWallSegment(d, vec(0, 0), vec(4, 0))
-    updateWall(d, r.wallId!, { paintFront: 'sage', paintBack: 'charcoal', finish: 'brick' })
+    updateWall(d, r.wallId!, {
+      paintFront: 'sage',
+      paintBack: 'charcoal',
+      finishFront: 'brick',
+      finishBack: 'tile',
+    })
     splitWall(d, r.wallId!, 0.5)
     const halves = Object.values(d.walls)
     expect(halves).toHaveLength(2)
     for (const w of halves) {
       expect(w.paintFront).toBe('sage')
       expect(w.paintBack).toBe('charcoal')
-      expect(w.finish).toBe('brick')
+      expect(w.finishFront).toBe('brick')
+      expect(w.finishBack).toBe('tile')
     }
   })
 

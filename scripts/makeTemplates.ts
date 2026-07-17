@@ -14,7 +14,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { emptyDocument, type ProjectDocument } from '../src/model/types'
-import { addWallChain } from '../src/model/mutations/walls'
+import { addWallChain, updateWall } from '../src/model/mutations/walls'
 import { addOpening } from '../src/model/mutations/openings'
 import { renameRoom, setRoomFloorMaterial } from '../src/model/mutations/rooms'
 import { addFurniture } from '../src/model/mutations/furniture'
@@ -80,6 +80,14 @@ function buildStudio(): ProjectDocument {
   renameRoom(doc, bath.r.id, 'Bathroom')
   setRoomFloorMaterial(doc, main.r.id, 'woodFloor')
   setRoomFloorMaterial(doc, bath.r.id, 'ceramicFloor')
+  // native v4/v5 shapes in a committed artifact (goldens freeze only the
+  // OUTGOING version): room types + a per-side finish feature wall
+  main.r.roomType = 'living'
+  bath.r.roomType = 'bathroom'
+  // bathroom partition: tile on the bath-facing back side only
+  updateWall(doc, wallAt(doc, vec(3.8, 0), vec(3.8, 1.9)).id, { finishBack: 'tile' })
+  // interior brick feature wall (west), studio-facing front side
+  updateWall(doc, wallAt(doc, vec(0, 4.6), vec(0, 0)).id, { finishFront: 'brick' })
 
   // entry (south), bathroom door, windows north + east
   addOpening(doc, { kind: 'door', wallId: wallAt(doc, vec(5.6, 4.6), vec(0, 4.6)).id, t: 0.8 })
@@ -134,6 +142,9 @@ function buildOneBedroom(): ProjectDocument {
   setRoomFloorMaterial(doc, living!.r.id, 'woodFloor')
   setRoomFloorMaterial(doc, bedroom!.r.id, 'carpetFloor')
   setRoomFloorMaterial(doc, bathroom!.r.id, 'tileGray')
+  living!.r.roomType = 'living'
+  bedroom!.r.roomType = 'bedroom'
+  bathroom!.r.roomType = 'bathroom'
 
   // entry (south, living side), bedroom + bathroom doors, three windows
   addOpening(doc, { kind: 'door', wallId: wallAt(doc, vec(5.9, 5.8), vec(0, 5.8)).id, t: 0.85 })

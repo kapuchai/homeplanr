@@ -74,9 +74,13 @@ const wallFaceCache = new Map<string, MeshStandardMaterial>()
  */
 export function wallFaceMaterial(
   paintId: string | undefined,
-  finish: WallFinishId | undefined,
+  finishId: string | undefined,
 ): MeshStandardMaterial {
-  const f = finish ?? 'paint'
+  // finish ids are an OPEN registry (v5): unknown ids render as plain
+  // paint — never index the pattern/roughness tables with an unknown key
+  // (that would crash the scene on a forward-compatible file)
+  const f: WallFinishId =
+    finishId === 'brick' || finishId === 'concrete' || finishId === 'tile' ? finishId : 'paint'
   const key = `${f}|${paintId ?? 'default'}`
   let m = wallFaceCache.get(key)
   if (!m) {

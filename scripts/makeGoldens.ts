@@ -17,7 +17,7 @@ import { SCHEMA_VERSION, emptyDocument, type ProjectDocument } from '../src/mode
 import { addWallChain, updateWall } from '../src/model/mutations/walls'
 import { setRoomFloorMaterial } from '../src/model/mutations/rooms'
 import { transformFurniture } from '../src/model/mutations/furniture'
-import { addDimension, addLabel, updateAnnotation } from '../src/model/mutations/annotations'
+import { addArea, addDimension, addLabel, updateAnnotation } from '../src/model/mutations/annotations'
 import { renameProject } from '../src/model/mutations/project'
 import { serializeDocument } from '../src/store/persistence/serialize'
 import { buildFixtureDoc } from '../src/test/fixtureDoc'
@@ -45,31 +45,50 @@ function buildBasic(): ProjectDocument {
 }
 
 /**
- * The fixture apartment plus the v3 surface worth freezing: floor material,
- * per-side wall paint + a finish, a mirrored furniture item, and the v3
- * annotations — an offset dimension plus a rotated resized text label.
- * (The v2-era builder froze `settings.snapEnabled`, which the v2→v3
- * migration removes — each schema bump edits this builder to freeze the
- * OUTGOING version's real feature set.)
+ * The fixture apartment plus the v4 surface worth freezing: floor material,
+ * per-side wall paint + the SINGLE both-faces `finish` (v4 shape — the
+ * v4→v5 migration splits it per-side), a mirrored furniture item, the v3
+ * annotations (offset dimension, rotated resized label) plus a v4 area
+ * annotation, and the v4 batched fields: Room.roomType and
+ * FurnitureInstance.price/notes/materialOverrides (schema-only in v4 — no
+ * mutations existed, so they are frozen by direct assignment, mirroring
+ * the migrations-test roundtrip pattern).
+ * (Each schema bump rewrites this builder to freeze the OUTGOING
+ * version's real feature set — see RUNBOOK.)
  */
+/** The schema version these builders freeze. Bumping SCHEMA_VERSION without
+ * rewriting the builders (RUNBOOK checklist step 1) must fail loudly here —
+ * never mint goldens whose shape doesn't match their version. */
+const BUILDER_VERSION = 4
+
 function buildFull(): ProjectDocument {
+  assert(
+    (SCHEMA_VERSION as number) === BUILDER_VERSION,
+    `builders freeze v${BUILDER_VERSION} but SCHEMA_VERSION is ${SCHEMA_VERSION} — rewrite them first (RUNBOOK schema checklist)`,
+  )
   const doc = buildFixtureDoc()
   doc.id = 'p_golden_full'
   renameProject(doc, 'Golden full')
   const living = Object.values(doc.rooms).find((r) => r.name === 'Living room')
   assert(living, 'full: fixture doc has no room named "Living room"')
   setRoomFloorMaterial(doc, living.id, 'darkFloor')
+  living.roomType = 'living'
   const paintedWall = Object.values(doc.walls)[0]
   assert(paintedWall, 'full: fixture doc has no walls')
   updateWall(doc, paintedWall.id, { paintFront: 'sage', paintBack: 'terracotta', finish: 'brick' })
   const mirroredItem = Object.values(doc.furniture)[0]
   assert(mirroredItem, 'full: fixture doc has no furniture')
   transformFurniture(doc, mirroredItem.id, { mirrored: true })
+  mirroredItem.price = 499
+  mirroredItem.notes = 'Golden notes'
+  mirroredItem.materialOverrides = { fabric: 'oak', legs: '#334455' }
   const dimId = addDimension(doc, vec(0.5, 0.5), vec(3.5, 0.5), 0.35)
   assert(dimId, 'full: dimension annotation rejected')
   const labelId = addLabel(doc, vec(2, 2.5), 'Golden label')
   assert(labelId, 'full: label annotation rejected')
   updateAnnotation(doc, labelId, { rotation: Math.PI / 6, fontSize: 0.2 })
+  const areaId = addArea(doc, [vec(0.6, 0.6), vec(2.4, 0.6), vec(2.4, 1.8), vec(0.6, 1.8)])
+  assert(areaId, 'full: area annotation rejected')
 
   const openings = Object.values(doc.openings)
   assert(openings.some((o) => o.kind === 'door'), 'full: expected a door')
@@ -80,9 +99,16 @@ function buildFull(): ProjectDocument {
     'full: catalog ids present',
   )
   assert(living.floorMaterialId === 'darkFloor', 'full: floor material not set')
+  assert(living.roomType === 'living', 'full: roomType not set')
   assert(doc.walls[paintedWall.id]!.paintFront === 'sage', 'full: paintFront not set')
-  assert(doc.walls[paintedWall.id]!.finish === 'brick', 'full: finish not set')
+  assert(doc.walls[paintedWall.id]!.finish === 'brick', 'full: single v4 finish not set')
   assert(doc.furniture[mirroredItem.id]!.mirrored === true, 'full: mirrored not set')
+  assert(doc.furniture[mirroredItem.id]!.price === 499, 'full: price not frozen')
+  assert(doc.furniture[mirroredItem.id]!.notes === 'Golden notes', 'full: notes not frozen')
+  assert(
+    doc.furniture[mirroredItem.id]!.materialOverrides?.fabric === 'oak',
+    'full: materialOverrides not frozen',
+  )
   const dim = doc.annotations[dimId]
   assert(dim?.kind === 'dimension' && dim.offset === 0.35, 'full: dimension offset not frozen')
   const label = doc.annotations[labelId]
@@ -90,6 +116,8 @@ function buildFull(): ProjectDocument {
     label?.kind === 'label' && label.rotation !== undefined && label.fontSize === 0.2,
     'full: label rotation/fontSize not frozen',
   )
+  const areaAnn = doc.annotations[areaId]
+  assert(areaAnn?.kind === 'area' && areaAnn.points.length === 4, 'full: area not frozen')
   return doc
 }
 

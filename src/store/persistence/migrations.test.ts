@@ -28,6 +28,8 @@ const v2Basic = golden('v2-basic.homeplanr')
 const v2Full = golden('v2-full.homeplanr')
 const v3Basic = golden('v3-basic.homeplanr')
 const v3Full = golden('v3-full.homeplanr')
+const v4Basic = golden('v4-basic.homeplanr')
+const v4Full = golden('v4-full.homeplanr')
 
 const deepFreeze = (o: unknown): void => {
   if (typeof o === 'object' && o !== null) {
@@ -38,7 +40,7 @@ const deepFreeze = (o: unknown): void => {
 
 describe('schema migrations (v1 goldens)', () => {
   it('EVERY historical golden opens silently: current version, healed=false, zero warnings', () => {
-    for (const g of [v1Basic, v1Full, v2Basic, v2Full, v3Basic, v3Full]) {
+    for (const g of [v1Basic, v1Full, v2Basic, v2Full, v3Basic, v3Full, v4Basic, v4Full]) {
       const r = parseDocument(g)
       expect(r.doc.schemaVersion).toBe(SCHEMA_VERSION)
       expect(r.healed).toBe(false)
@@ -60,8 +62,10 @@ describe('schema migrations (v1 goldens)', () => {
     expect(Object.keys(doc.settings)).not.toContain('unitDisplay')
   })
 
-  it('migration steps are pure: frozen v1/v2/v3 inputs are untouched, output is current', () => {
-    for (const g of [v1Full, v2Full, v3Full]) {
+  it('migration steps are pure: frozen v1..v4 inputs are untouched, output is current', () => {
+    // v3Full and v4Full both carry finish:'brick' — the field-SPLITTING
+    // v4→v5 migration must build new wall objects, never mutate frozen input
+    for (const g of [v1Full, v2Full, v3Full, v4Full]) {
       const raw = JSON.parse(g)
       const snapshot = JSON.stringify(raw)
       deepFreeze(raw)
@@ -119,7 +123,8 @@ describe('v2 fields (wall paint/finish, furniture mirror)', () => {
     const wall = Object.values(doc.walls)[0]!
     wall.paintFront = 'sage'
     wall.paintBack = 'limewash-2027' // not in WALL_PAINTS — must survive anyway
-    wall.finish = 'brick'
+    wall.finishFront = 'brick'
+    wall.finishBack = 'microcement-2030' // finish is open too (v5) — survives
     const item = Object.values(doc.furniture)[0]!
     item.mirrored = true
     const r = parseDocument(serializeDocument(doc, '2026-07-12T00:00:00.000Z'))
@@ -128,7 +133,8 @@ describe('v2 fields (wall paint/finish, furniture mirror)', () => {
     const w = r.doc.walls[wall.id]!
     expect(w.paintFront).toBe('sage')
     expect(w.paintBack).toBe('limewash-2027')
-    expect(w.finish).toBe('brick')
+    expect(w.finishFront).toBe('brick')
+    expect(w.finishBack).toBe('microcement-2030')
     expect(r.doc.furniture[item.id]!.mirrored).toBe(true)
   })
 
@@ -145,17 +151,19 @@ describe('v2 fields (wall paint/finish, furniture mirror)', () => {
     const json = JSON.parse(serializeDocument(doc, '2026-07-12T00:00:00.000Z'))
     const wallIds = Object.keys(json.walls) as WallId[]
     const [wa, wb] = [wallIds[0]!, wallIds[1]!]
-    json.walls[wa].finish = 'x'
+    json.walls[wa].finishFront = 5 // non-string junk
     json.walls[wa].paintFront = ''
-    json.walls[wb].finish = 'paint'
+    json.walls[wb].finishFront = 'paint' // the absent-default normalizes away
+    json.walls[wb].finishBack = ''
     const fid = Object.keys(json.furniture)[0]! as FurnitureId
     json.furniture[fid].mirrored = 'yes'
     const r = parseDocument(JSON.stringify(json))
     expect(r.warnings).toHaveLength(0)
     expect(r.healed).toBe(false)
-    expect('finish' in r.doc.walls[wa]!).toBe(false)
+    expect('finishFront' in r.doc.walls[wa]!).toBe(false)
     expect('paintFront' in r.doc.walls[wa]!).toBe(false)
-    expect('finish' in r.doc.walls[wb]!).toBe(false)
+    expect('finishFront' in r.doc.walls[wb]!).toBe(false)
+    expect('finishBack' in r.doc.walls[wb]!).toBe(false)
     expect('mirrored' in r.doc.furniture[fid]!).toBe(false)
   })
 })
@@ -176,7 +184,9 @@ describe('v3: snapEnabled leaves the document; annotations arrive', () => {
     const painted = Object.values(doc.walls).find((w) => w.paintFront)
     expect(painted?.paintFront).toBe('sage')
     expect(painted?.paintBack).toBe('terracotta')
-    expect(painted?.finish).toBe('brick')
+    // the single v2-era finish arrives per-side after the v4→v5 split
+    expect(painted?.finishFront).toBe('brick')
+    expect(painted?.finishBack).toBe('brick')
     expect(Object.values(doc.furniture).some((f) => f.mirrored)).toBe(true)
     expect(Object.values(doc.rooms).some((r) => r.floorMaterialId === 'darkFloor')).toBe(true)
   })
@@ -360,5 +370,76 @@ describe('v4: area annotations + roomType / price / notes / materialOverrides', 
     const carrier = rooms.find((r) => r.roomType === 'bedroom')
     expect(carrier).toBeDefined()
     expect(carrier!.name).toBe('Master')
+  })
+})
+
+describe('v5: per-side wall finish (finishFront/finishBack)', () => {
+  it('v4-full opens clean with every frozen v4 feature intact', () => {
+    const r = parseDocument(v4Full)
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    const living = Object.values(r.doc.rooms).find((room) => room.name === 'Living room')
+    expect(living?.roomType).toBe('living')
+    expect(living?.floorMaterialId).toBe('darkFloor')
+    const item = Object.values(r.doc.furniture).find((f) => f.price !== undefined)!
+    expect(item.price).toBe(499)
+    expect(item.notes).toBe('Golden notes')
+    expect(item.materialOverrides).toEqual({ fabric: 'oak', legs: '#334455' })
+    expect(Object.values(r.doc.annotations).some((a) => a.kind === 'area')).toBe(true)
+  })
+
+  it("the golden's single finish:'brick' arrives split onto BOTH sides, old key gone", () => {
+    const raw = JSON.parse(v4Full)
+    const brickKey = Object.keys(raw.walls).find((k) => raw.walls[k].finish === 'brick')!
+    expect(brickKey).toBeDefined()
+    const { doc } = parseDocument(v4Full)
+    const w = doc.walls[brickKey as WallId]!
+    expect(w.finishFront).toBe('brick')
+    expect(w.finishBack).toBe('brick')
+    expect('finish' in w).toBe(false)
+  })
+
+  it('unknown finish strings migrate preserved (open registry); junk drops silently', () => {
+    const raw = JSON.parse(v4Basic)
+    const keys = Object.keys(raw.walls)
+    raw.walls[keys[0]!].finish = 'weathered-brick-2030' // future patch id
+    raw.walls[keys[1]!].finish = 'paint' // absent-default
+    raw.walls[keys[2]!].finish = 5 // junk
+    raw.walls[keys[3]!].finish = '' // junk
+    const r = validateParsedObject(raw)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.healed).toBe(false)
+    const w0 = r.doc.walls[keys[0]! as WallId]!
+    expect(w0.finishFront).toBe('weathered-brick-2030')
+    expect(w0.finishBack).toBe('weathered-brick-2030')
+    for (const k of keys.slice(1)) {
+      expect('finishFront' in r.doc.walls[k as WallId]!).toBe(false)
+      expect('finishBack' in r.doc.walls[k as WallId]!).toBe(false)
+    }
+  })
+
+  it('per-side values roundtrip at v5 — different sides stay different', () => {
+    const { doc } = parseDocument(v4Basic)
+    const wall = Object.values(doc.walls)[0]!
+    wall.finishFront = 'tile'
+    wall.finishBack = 'concrete'
+    const r = parseDocument(serializeDocument(doc, '2026-07-17T00:00:00.000Z'))
+    expect(r.healed).toBe(false)
+    expect(r.warnings).toHaveLength(0)
+    expect(r.doc.walls[wall.id]!.finishFront).toBe('tile')
+    expect(r.doc.walls[wall.id]!.finishBack).toBe('concrete')
+  })
+
+  it('a v4 recovery blob decodes through the migration chokepoint', () => {
+    const json = JSON.stringify({
+      v: 1,
+      filePath: null,
+      docId: 'x',
+      savedAt: 1,
+      doc: JSON.parse(v4Basic),
+    })
+    const blob = decodeRecovery(json)
+    expect(blob).not.toBeNull()
+    expect(blob!.doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })

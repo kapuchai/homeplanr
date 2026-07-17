@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "id": "p_template_studio",
   "name": "Studio 25 m²",
   "createdAt": "2026-07-16T00:00:00.000Z",
@@ -10,104 +10,106 @@
     "defaultWallHeight": 2.5
   },
   "nodes": {
-    "n_Sou8-DpeAq": {
-      "id": "n_Sou8-DpeAq",
+    "n_as4DOVPB2S": {
+      "id": "n_as4DOVPB2S",
       "x": 0,
       "y": 0
     },
-    "n_jI4MlzQa-T": {
-      "id": "n_jI4MlzQa-T",
+    "n_3XlT3iz0ro": {
+      "id": "n_3XlT3iz0ro",
       "x": 5.6,
       "y": 0
     },
-    "n_S7gI6h2hAG": {
-      "id": "n_S7gI6h2hAG",
+    "n_HO3EaxZb7Q": {
+      "id": "n_HO3EaxZb7Q",
       "x": 5.6,
       "y": 4.6
     },
-    "n_b3gbzS9_hB": {
-      "id": "n_b3gbzS9_hB",
+    "n_UeOfR1SCQQ": {
+      "id": "n_UeOfR1SCQQ",
       "x": 0,
       "y": 4.6
     },
-    "n_4Vd2VK2MLy": {
-      "id": "n_4Vd2VK2MLy",
+    "n_bXzS6-txA4": {
+      "id": "n_bXzS6-txA4",
       "x": 3.8,
       "y": 0
     },
-    "n_2_x9VnN32W": {
-      "id": "n_2_x9VnN32W",
+    "n_2NNVV5zr7z": {
+      "id": "n_2NNVV5zr7z",
       "x": 3.8,
       "y": 1.9
     },
-    "n_3LuKArKjVv": {
-      "id": "n_3LuKArKjVv",
+    "n_uKguZ4JBhC": {
+      "id": "n_uKguZ4JBhC",
       "x": 5.6,
       "y": 1.9
     }
   },
   "walls": {
-    "w_UX_Jt2UiPk": {
-      "id": "w_UX_Jt2UiPk",
-      "a": "n_Sou8-DpeAq",
-      "b": "n_4Vd2VK2MLy",
+    "w_ZdOs7QQlWj": {
+      "id": "w_ZdOs7QQlWj",
+      "a": "n_as4DOVPB2S",
+      "b": "n_bXzS6-txA4",
       "thickness": 0.15,
       "height": 2.5
     },
-    "w_aX6oaWn3Qg": {
-      "id": "w_aX6oaWn3Qg",
-      "a": "n_jI4MlzQa-T",
-      "b": "n_3LuKArKjVv",
+    "w__0jk7gYRRX": {
+      "id": "w__0jk7gYRRX",
+      "a": "n_3XlT3iz0ro",
+      "b": "n_uKguZ4JBhC",
       "thickness": 0.15,
       "height": 2.5
     },
-    "w_aEcqlGUyUp": {
-      "id": "w_aEcqlGUyUp",
-      "a": "n_S7gI6h2hAG",
-      "b": "n_b3gbzS9_hB",
+    "w_a7THCzBuBX": {
+      "id": "w_a7THCzBuBX",
+      "a": "n_HO3EaxZb7Q",
+      "b": "n_UeOfR1SCQQ",
       "thickness": 0.15,
       "height": 2.5
     },
-    "w_M2euncbUIA": {
-      "id": "w_M2euncbUIA",
-      "a": "n_b3gbzS9_hB",
-      "b": "n_Sou8-DpeAq",
+    "w_6SHaU1HLgv": {
+      "id": "w_6SHaU1HLgv",
+      "a": "n_UeOfR1SCQQ",
+      "b": "n_as4DOVPB2S",
+      "thickness": 0.15,
+      "height": 2.5,
+      "finishFront": "brick"
+    },
+    "w_N1gXpnfsqS": {
+      "id": "w_N1gXpnfsqS",
+      "a": "n_bXzS6-txA4",
+      "b": "n_2NNVV5zr7z",
+      "thickness": 0.15,
+      "height": 2.5,
+      "finishBack": "tile"
+    },
+    "w_ADNLZv_tsa": {
+      "id": "w_ADNLZv_tsa",
+      "a": "n_2NNVV5zr7z",
+      "b": "n_uKguZ4JBhC",
       "thickness": 0.15,
       "height": 2.5
     },
-    "w_H_TNx9MK--": {
-      "id": "w_H_TNx9MK--",
-      "a": "n_4Vd2VK2MLy",
-      "b": "n_2_x9VnN32W",
+    "w_84hwtNrJbM": {
+      "id": "w_84hwtNrJbM",
+      "a": "n_bXzS6-txA4",
+      "b": "n_3XlT3iz0ro",
       "thickness": 0.15,
       "height": 2.5
     },
-    "w_wuBT_-FneU": {
-      "id": "w_wuBT_-FneU",
-      "a": "n_2_x9VnN32W",
-      "b": "n_3LuKArKjVv",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_GYGUVK7JUh": {
-      "id": "w_GYGUVK7JUh",
-      "a": "n_4Vd2VK2MLy",
-      "b": "n_jI4MlzQa-T",
-      "thickness": 0.15,
-      "height": 2.5
-    },
-    "w_veAu4hmCzq": {
-      "id": "w_veAu4hmCzq",
-      "a": "n_3LuKArKjVv",
-      "b": "n_S7gI6h2hAG",
+    "w_MhppbunWWT": {
+      "id": "w_MhppbunWWT",
+      "a": "n_uKguZ4JBhC",
+      "b": "n_HO3EaxZb7Q",
       "thickness": 0.15,
       "height": 2.5
     }
   },
   "openings": {
-    "o_k1wuAizAYw": {
-      "id": "o_k1wuAizAYw",
-      "wallId": "w_aEcqlGUyUp",
+    "o_LEYyNF0HE6": {
+      "id": "o_LEYyNF0HE6",
+      "wallId": "w_a7THCzBuBX",
       "t": 0.7999999999999999,
       "kind": "door",
       "width": 0.9,
@@ -115,9 +117,9 @@
       "hinge": "a",
       "swing": "front"
     },
-    "o_ngFqCv5YHy": {
-      "id": "o_ngFqCv5YHy",
-      "wallId": "w_H_TNx9MK--",
+    "o_k-KrUM5NA9": {
+      "id": "o_k-KrUM5NA9",
+      "wallId": "w_N1gXpnfsqS",
       "t": 0.5499999999999999,
       "kind": "door",
       "width": 0.9,
@@ -125,18 +127,18 @@
       "hinge": "a",
       "swing": "front"
     },
-    "o_IBVfOkJRMi": {
-      "id": "o_IBVfOkJRMi",
-      "wallId": "w_UX_Jt2UiPk",
+    "o_85M0OOj_Nm": {
+      "id": "o_85M0OOj_Nm",
+      "wallId": "w_ZdOs7QQlWj",
       "t": 0.4,
       "kind": "window",
       "width": 1.2,
       "height": 1.2,
       "sillHeight": 0.9
     },
-    "o_zQ8xRaRN3z": {
-      "id": "o_zQ8xRaRN3z",
-      "wallId": "w_veAu4hmCzq",
+    "o_4Dswelojht": {
+      "id": "o_4Dswelojht",
+      "wallId": "w_MhppbunWWT",
       "t": 0.5,
       "kind": "window",
       "width": 1.2,
@@ -145,36 +147,38 @@
     }
   },
   "rooms": {
-    "r_2ic7DPFtNy": {
-      "id": "r_2ic7DPFtNy",
+    "r_d81YbaLW5_": {
+      "id": "r_d81YbaLW5_",
       "wallCycle": [
-        "w_UX_Jt2UiPk",
-        "w_H_TNx9MK--",
-        "w_wuBT_-FneU",
-        "w_veAu4hmCzq",
-        "w_aEcqlGUyUp",
-        "w_M2euncbUIA"
+        "w_ZdOs7QQlWj",
+        "w_N1gXpnfsqS",
+        "w_ADNLZv_tsa",
+        "w_MhppbunWWT",
+        "w_a7THCzBuBX",
+        "w_6SHaU1HLgv"
       ],
       "holeCycles": [],
       "name": "Studio",
-      "floorMaterialId": "woodFloor"
+      "floorMaterialId": "woodFloor",
+      "roomType": "living"
     },
-    "r_OuLPRo9r-I": {
-      "id": "r_OuLPRo9r-I",
+    "r_lGelpkNN8P": {
+      "id": "r_lGelpkNN8P",
       "wallCycle": [
-        "w_aX6oaWn3Qg",
-        "w_wuBT_-FneU",
-        "w_H_TNx9MK--",
-        "w_GYGUVK7JUh"
+        "w__0jk7gYRRX",
+        "w_ADNLZv_tsa",
+        "w_N1gXpnfsqS",
+        "w_84hwtNrJbM"
       ],
       "holeCycles": [],
       "name": "Bathroom",
-      "floorMaterialId": "ceramicFloor"
+      "floorMaterialId": "ceramicFloor",
+      "roomType": "bathroom"
     }
   },
   "furniture": {
-    "f_hKPyMC8cGF": {
-      "id": "f_hKPyMC8cGF",
+    "f_-MSKjGW9xQ": {
+      "id": "f_-MSKjGW9xQ",
       "catalogItemId": "bed-double",
       "x": 1.05,
       "y": 1.25,
@@ -186,8 +190,8 @@
       },
       "elevation": 0
     },
-    "f_9YOfNeuFri": {
-      "id": "f_9YOfNeuFri",
+    "f_dbS3Z-ZXNi": {
+      "id": "f_dbS3Z-ZXNi",
       "catalogItemId": "nightstand",
       "x": 2.15,
       "y": 0.4,
@@ -199,8 +203,8 @@
       },
       "elevation": 0
     },
-    "f_cDTBXc0sS_": {
-      "id": "f_cDTBXc0sS_",
+    "f_CnW7kPiTnP": {
+      "id": "f_CnW7kPiTnP",
       "catalogItemId": "wardrobe",
       "x": 0.45,
       "y": 3.05,
@@ -212,8 +216,8 @@
       },
       "elevation": 0
     },
-    "f_bmPA3i5gLO": {
-      "id": "f_bmPA3i5gLO",
+    "f_5rOBQZyUTt": {
+      "id": "f_5rOBQZyUTt",
       "catalogItemId": "sofa-2",
       "x": 2.45,
       "y": 3.15,
@@ -225,8 +229,8 @@
       },
       "elevation": 0
     },
-    "f_BMKcflpDyu": {
-      "id": "f_BMKcflpDyu",
+    "f_zbmLUdp4ld": {
+      "id": "f_zbmLUdp4ld",
       "catalogItemId": "coffee-table",
       "x": 2.45,
       "y": 2.35,
@@ -238,8 +242,8 @@
       },
       "elevation": 0
     },
-    "f_tb5WNvFsCo": {
-      "id": "f_tb5WNvFsCo",
+    "f_dfUJC3qeAl": {
+      "id": "f_dfUJC3qeAl",
       "catalogItemId": "fridge",
       "x": 5.15,
       "y": 2.45,
@@ -251,8 +255,8 @@
       },
       "elevation": 0
     },
-    "f_ldZIUxk_nD": {
-      "id": "f_ldZIUxk_nD",
+    "f_tbvrgYtFzK": {
+      "id": "f_tbvrgYtFzK",
       "catalogItemId": "kitchen-sink",
       "x": 5.15,
       "y": 3.3,
@@ -264,8 +268,8 @@
       },
       "elevation": 0
     },
-    "f_5xu0infqBz": {
-      "id": "f_5xu0infqBz",
+    "f_NcsZCRqLkn": {
+      "id": "f_NcsZCRqLkn",
       "catalogItemId": "stove",
       "x": 5.15,
       "y": 4.05,
@@ -277,8 +281,8 @@
       },
       "elevation": 0
     },
-    "f_u1r3wR9yCa": {
-      "id": "f_u1r3wR9yCa",
+    "f__YvENT9qfw": {
+      "id": "f__YvENT9qfw",
       "catalogItemId": "dining-table-round",
       "x": 4.05,
       "y": 3.3,
@@ -290,8 +294,8 @@
       },
       "elevation": 0
     },
-    "f_hrfYf3Jfy3": {
-      "id": "f_hrfYf3Jfy3",
+    "f_Wcbof8NN9Z": {
+      "id": "f_Wcbof8NN9Z",
       "catalogItemId": "dining-chair",
       "x": 4.05,
       "y": 2.6,
@@ -303,8 +307,8 @@
       },
       "elevation": 0
     },
-    "f_sDsXwq4XdL": {
-      "id": "f_sDsXwq4XdL",
+    "f_NP_pcAB7Si": {
+      "id": "f_NP_pcAB7Si",
       "catalogItemId": "dining-chair",
       "x": 4.05,
       "y": 4,
@@ -316,8 +320,8 @@
       },
       "elevation": 0
     },
-    "f_FcFJ9PMH4Y": {
-      "id": "f_FcFJ9PMH4Y",
+    "f_kBu1N0v5PL": {
+      "id": "f_kBu1N0v5PL",
       "catalogItemId": "toilet",
       "x": 5.2,
       "y": 0.45,
@@ -329,8 +333,8 @@
       },
       "elevation": 0
     },
-    "f_T9xJT6FN8g": {
-      "id": "f_T9xJT6FN8g",
+    "f_EH23_5wRV_": {
+      "id": "f_EH23_5wRV_",
       "catalogItemId": "washbasin",
       "x": 4.35,
       "y": 0.35,
@@ -342,8 +346,8 @@
       },
       "elevation": 0
     },
-    "f__CAVlTObox": {
-      "id": "f__CAVlTObox",
+    "f_U8Dx8wRz4M": {
+      "id": "f_U8Dx8wRz4M",
       "catalogItemId": "shower",
       "x": 5.1,
       "y": 1.4,
@@ -357,8 +361,8 @@
     }
   },
   "annotations": {
-    "a_t5Wfg-f1tv": {
-      "id": "a_t5Wfg-f1tv",
+    "a_xu9y4ioYlh": {
+      "id": "a_xu9y4ioYlh",
       "kind": "dimension",
       "a": {
         "x": 0,

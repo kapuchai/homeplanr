@@ -86,6 +86,28 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   // roomType / price / notes / materialOverrides fields, all handled by the
   // validator) — identity bump, no data moves.
   3: (raw) => ({ ...raw, schemaVersion: 4 }),
+  // v4 → v5: the both-faces `finish` splits into finishFront/finishBack
+  // (paint parity). The first field-SPLITTING migration: new wall objects
+  // only (inputs may be frozen — purity is load-bearing). Any non-empty
+  // string except 'paint' (the absent-default) copies to BOTH sides —
+  // unknown ids are preserved, consistent with the now-open registry;
+  // junk (numbers/objects/'') just drops the field.
+  4: (raw) => {
+    if (!isObj(raw.walls)) return { ...raw, schemaVersion: 5 }
+    const walls: Record<string, unknown> = {}
+    for (const [key, v] of Object.entries(raw.walls)) {
+      if (!isObj(v)) {
+        walls[key] = v // junk entries pass through; the validator prunes
+        continue
+      }
+      const { finish, ...rest } = v
+      walls[key] =
+        isStr(finish) && finish && finish !== 'paint'
+          ? { ...rest, finishFront: finish, finishBack: finish }
+          : rest
+    }
+    return { ...raw, walls, schemaVersion: 5 }
+  },
 }
 
 export function parseDocument(json: string): ParseResult {
@@ -179,12 +201,17 @@ export function validateParsedObject(raw: unknown): ParseResult {
           height: isFiniteNum(v.height)
             ? Math.min(6, Math.max(0.3, v.height))
             : DEFAULTS.wallHeight,
-          // paint ids stay an open registry: unknown ids are preserved and
-          // the renderer falls back, so patch-release paints roundtrip.
+          // paint AND finish ids are open registries: unknown ids are
+          // preserved and the renderer falls back, so patch-release
+          // additions roundtrip. ('paint' as a finish value is the
+          // absent-default — normalized to absent.)
           ...(isStr(v.paintFront) && v.paintFront ? { paintFront: v.paintFront } : {}),
           ...(isStr(v.paintBack) && v.paintBack ? { paintBack: v.paintBack } : {}),
-          ...(v.finish === 'brick' || v.finish === 'concrete' || v.finish === 'tile'
-            ? { finish: v.finish }
+          ...(isStr(v.finishFront) && v.finishFront && v.finishFront !== 'paint'
+            ? { finishFront: v.finishFront }
+            : {}),
+          ...(isStr(v.finishBack) && v.finishBack && v.finishBack !== 'paint'
+            ? { finishBack: v.finishBack }
             : {}),
         }
       } else {

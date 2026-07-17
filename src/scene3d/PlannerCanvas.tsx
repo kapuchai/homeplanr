@@ -67,10 +67,16 @@ import { t } from '../i18n'
 function WallMeshes({ solid, wall }: { solid: WallSolid; wall: Wall | undefined }) {
   const paintFront = wall?.paintFront
   const paintBack = wall?.paintBack
-  const finish = wall?.finish
+  const finishFront = wall?.finishFront
+  const finishBack = wall?.finishBack
   const meshes = useMemo(() => {
     const out: { geo: BufferGeometry; material: MeshStandardMaterial }[] = []
-    if (paintFront === undefined && paintBack === undefined && finish === undefined) {
+    if (
+      paintFront === undefined &&
+      paintBack === undefined &&
+      finishFront === undefined &&
+      finishBack === undefined
+    ) {
       if (solid.prisms.length) {
         const merged = mergeMeshData(solid.prisms.map((p) => buildPrismMeshData(p)))
         out.push({ geo: toBufferGeometry(merged), material: sceneMaterial('wallPaint') })
@@ -79,16 +85,16 @@ function WallMeshes({ solid, wall }: { solid: WallSolid; wall: Wall | undefined 
     }
     const faces = buildWallFaceMeshData(solid.prisms)
     if (faces.front) {
-      out.push({ geo: toBufferGeometry(faces.front), material: wallFaceMaterial(paintFront, finish) })
+      out.push({ geo: toBufferGeometry(faces.front), material: wallFaceMaterial(paintFront, finishFront) })
     }
     if (faces.back) {
-      out.push({ geo: toBufferGeometry(faces.back), material: wallFaceMaterial(paintBack, finish) })
+      out.push({ geo: toBufferGeometry(faces.back), material: wallFaceMaterial(paintBack, finishBack) })
     }
     if (faces.trim) {
       out.push({ geo: toBufferGeometry(faces.trim), material: sceneMaterial('wallPaint') })
     }
     return out
-  }, [solid, paintFront, paintBack, finish])
+  }, [solid, paintFront, paintBack, finishFront, finishBack])
   useEffect(() => () => meshes.forEach((m) => m.geo.dispose()), [meshes])
   const angle = Math.atan2(solid.frame.dir.y, solid.frame.dir.x)
   return (

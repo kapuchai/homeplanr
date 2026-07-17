@@ -1,4 +1,4 @@
-import type { ProjectDocument, WallFinishId } from '../types'
+import type { ProjectDocument } from '../types'
 import { DEFAULTS } from '../types'
 import {
   newNodeId,
@@ -38,7 +38,8 @@ export interface GraphPayload {
     height: number
     paintFront?: string
     paintBack?: string
-    finish?: WallFinishId
+    finishFront?: string
+    finishBack?: string
   }[]
   openings: {
     wallKey: string
@@ -83,7 +84,8 @@ export function pasteSubgraph(
       height: w.height,
       ...(w.paintFront ? { paintFront: w.paintFront } : {}),
       ...(w.paintBack ? { paintBack: w.paintBack } : {}),
-      ...(w.finish && w.finish !== 'paint' ? { finish: w.finish } : {}),
+      ...(w.finishFront && w.finishFront !== 'paint' ? { finishFront: w.finishFront } : {}),
+      ...(w.finishBack && w.finishBack !== 'paint' ? { finishBack: w.finishBack } : {}),
     }
   }
 

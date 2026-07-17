@@ -12,6 +12,8 @@ export interface WallNode {
   y: number
 }
 
+/** Known finish ids (0.8.0: storage is an OPEN registry like paint —
+ * these are the built-ins; unknown ids roundtrip and render as paint). */
 export type WallFinishId = 'paint' | 'brick' | 'concrete' | 'tile'
 
 export interface Wall {
@@ -31,8 +33,12 @@ export interface Wall {
   paintFront?: string
   /** Paint on the back face (−perp side); WALL_PAINTS id, absent = default. */
   paintBack?: string
-  /** Surface finish on both faces; absent = 'paint'. */
-  finish?: WallFinishId
+  /** Surface finish on the front (+perp) face — v5 splits the old
+   * both-faces `finish` per side, mirroring paint. Open registry ids;
+   * absent = plain paint. */
+  finishFront?: string
+  /** Surface finish on the back (−perp) face; absent = plain paint. */
+  finishBack?: string
 }
 
 export interface OpeningBase {
@@ -151,7 +157,7 @@ export interface ProjectSettings {
 }
 
 export interface ProjectDocument {
-  schemaVersion: 4
+  schemaVersion: 5
   id: string
   name: string
   /** ISO strings. Mutations never touch updatedAt — serialize() stamps it. */
@@ -166,7 +172,7 @@ export interface ProjectDocument {
   annotations: Record<AnnotationId, Annotation>
 }
 
-export const SCHEMA_VERSION = 4 as const
+export const SCHEMA_VERSION = 5 as const
 
 /** Pinned defaults (plan: "DEFAULTS"). All meters. */
 export const DEFAULTS = {

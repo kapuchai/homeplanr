@@ -249,6 +249,49 @@ function PaintSwatchRow({
 }
 
 /**
+ * Per-side finish row (v5): segmented control over the known finishes;
+ * 'paint' = field absent. `current` null = mixed (multi rows). Row hover
+ * previews the side on the 2D badge, like the paint rows.
+ */
+function FinishSegRow({
+  label,
+  current,
+  onPick,
+  hoverSide,
+}: {
+  label: string
+  current: string | null | undefined
+  onPick: (id: WallFinishId) => void
+  hoverSide: 'front' | 'back'
+}) {
+  const setHighlight = useUiStore((s) => s.setHighlightWallSide)
+  useEffect(() => () => setHighlight(null), [setHighlight])
+  return (
+    <div
+      className="prop-row"
+      onMouseEnter={() => setHighlight(hoverSide)}
+      onMouseLeave={() => setHighlight(null)}
+    >
+      <span>{label}</span>
+      <div className="segmented small finish-seg">
+        {WALL_FINISHES.map(([f, name]) => (
+          <button
+            key={f}
+            type="button"
+            className={
+              current === f || (current === undefined && f === 'paint') ? 'active' : ''
+            }
+            onClick={() => onPick(f)}
+          >
+            {t(name)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Homogeneous multi-selections (M4) edit shared fields — each apply loops
  * the mutation inside ONE transaction ⇒ one undo entry. Displayed values
  * come from the first item; mixed paint/finish states show no active swatch.
@@ -273,10 +316,11 @@ function MultiPanel({ selection }: { selection: string[] }) {
 
   if (wallIds.length === selection.length && wallIds.length > 0) {
     const first = doc.walls[wallIds[0]!]!
-    const shared = <K extends 'thickness' | 'height' | 'finish' | 'paintFront' | 'paintBack'>(
+    const shared = <
+      K extends 'thickness' | 'height' | 'finishFront' | 'finishBack' | 'paintFront' | 'paintBack',
+    >(
       k: K,
     ) => (wallIds.every((id) => doc.walls[id]![k] === first[k]) ? first[k] : null)
-    const sharedFinish = shared('finish')
     return (
       // keyed by the id set: a different multi-selection remounts the panel
       // so no focused draft can survive the swap (B1)
@@ -292,21 +336,22 @@ function MultiPanel({ selection }: { selection: string[] }) {
           value={first.height}
           onCommit={(v) => batch(() => wallIds.forEach((id) => a.updateWall(id, { height: v })))}
         />
-        <Row>
-          <span>{t('props.finish')}</span>
-          <div className="segmented small finish-seg">
-            {WALL_FINISHES.map(([f, name]) => (
-              <button
-                key={f}
-                type="button"
-                className={(sharedFinish ?? '') === f || (sharedFinish === undefined && f === 'paint') ? 'active' : ''}
-                onClick={() => batch(() => wallIds.forEach((id) => a.updateWall(id, { finish: f })))}
-              >
-                {t(name)}
-              </button>
-            ))}
-          </div>
-        </Row>
+        <FinishSegRow
+          label={t('props.finishFront')}
+          current={shared('finishFront')}
+          hoverSide="front"
+          onPick={(f) =>
+            batch(() => wallIds.forEach((id) => a.updateWall(id, { finishFront: f })))
+          }
+        />
+        <FinishSegRow
+          label={t('props.finishBack')}
+          current={shared('finishBack')}
+          hoverSide="back"
+          onPick={(f) =>
+            batch(() => wallIds.forEach((id) => a.updateWall(id, { finishBack: f })))
+          }
+        />
         <PaintSwatchRow
           label={t('props.paintFront')}
           current={shared('paintFront')}
@@ -520,21 +565,18 @@ export function PropertiesPanel() {
           value={wall.height}
           onCommit={(v) => a.updateWall(wall.id, { height: v })}
         />
-        <Row>
-          <span>{t('props.finish')}</span>
-          <div className="segmented small finish-seg">
-            {WALL_FINISHES.map(([f, name]) => (
-              <button
-                key={f}
-                type="button"
-                className={(wall.finish ?? 'paint') === f ? 'active' : ''}
-                onClick={() => a.updateWall(wall.id, { finish: f })}
-              >
-                {t(name)}
-              </button>
-            ))}
-          </div>
-        </Row>
+        <FinishSegRow
+          label={t('props.finishFront')}
+          current={wall.finishFront}
+          hoverSide="front"
+          onPick={(f) => a.updateWall(wall.id, { finishFront: f })}
+        />
+        <FinishSegRow
+          label={t('props.finishBack')}
+          current={wall.finishBack}
+          hoverSide="back"
+          onPick={(f) => a.updateWall(wall.id, { finishBack: f })}
+        />
         <PaintSwatchRow
           label={t('props.paintFront')}
           current={wall.paintFront}

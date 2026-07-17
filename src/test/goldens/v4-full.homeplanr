@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 4,
+  "id": "p_golden_full",
+  "name": "Golden full",
+  "createdAt": "2026-07-11T00:00:00.000Z",
+  "updatedAt": "2026-07-12T00:00:00.000Z",
+  "settings": {
+    "gridSize": 0.1,
+    "defaultWallThickness": 0.15,
+    "defaultWallHeight": 2.5
+  },
+  "nodes": {
+    "n_Umt37SOOsP": {
+      "id": "n_Umt37SOOsP",
+      "x": 0,
+      "y": 0
+    },
+    "n_62WmRkmVVK": {
+      "id": "n_62WmRkmVVK",
+      "x": 8,
+      "y": 0
+    },
+    "n_-xz2-b85id": {
+      "id": "n_-xz2-b85id",
+      "x": 8,
+      "y": 5
+    },
+    "n_2tPdCL4r4x": {
+      "id": "n_2tPdCL4r4x",
+      "x": 0,
+      "y": 5
+    },
+    "n_d_aEkVLVka": {
+      "id": "n_d_aEkVLVka",
+      "x": 5,
+      "y": 0
+    },
+    "n_yAcISToppP": {
+      "id": "n_yAcISToppP",
+      "x": 5,
+      "y": 5
+    },
+    "n_uFvj9Nx5w8": {
+      "id": "n_uFvj9Nx5w8",
+      "x": 9.6,
+      "y": -0.35
+    }
+  },
+  "walls": {
+    "w_tABkhr9kYS": {
+      "id": "w_tABkhr9kYS",
+      "a": "n_Umt37SOOsP",
+      "b": "n_d_aEkVLVka",
+      "thickness": 0.15,
+      "height": 2.5,
+      "paintFront": "sage",
+      "paintBack": "terracotta",
+      "finish": "brick"
+    },
+    "w_-draM8siGi": {
+      "id": "w_-draM8siGi",
+      "a": "n_62WmRkmVVK",
+      "b": "n_-xz2-b85id",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_lYRa8xmTWo": {
+      "id": "w_lYRa8xmTWo",
+      "a": "n_-xz2-b85id",
+      "b": "n_yAcISToppP",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_m8nY_XvgUb": {
+      "id": "w_m8nY_XvgUb",
+      "a": "n_2tPdCL4r4x",
+      "b": "n_Umt37SOOsP",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_MLRO85tKQm": {
+      "id": "w_MLRO85tKQm",
+      "a": "n_d_aEkVLVka",
+      "b": "n_yAcISToppP",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_Dq0QvheBBC": {
+      "id": "w_Dq0QvheBBC",
+      "a": "n_yAcISToppP",
+      "b": "n_2tPdCL4r4x",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_UXXDnR3dPm": {
+      "id": "w_UXXDnR3dPm",
+      "a": "n_d_aEkVLVka",
+      "b": "n_62WmRkmVVK",
+      "thickness": 0.15,
+      "height": 2.5
+    },
+    "w_eow7545rpv": {
+      "id": "w_eow7545rpv",
+      "a": "n_62WmRkmVVK",
+      "b": "n_uFvj9Nx5w8",
+      "thickness": 0.15,
+      "height": 2.5
+    }
+  },
+  "openings": {
+    "o_mUjJcLKDRC": {
+      "id": "o_mUjJcLKDRC",
+      "wallId": "w_MLRO85tKQm",
+      "t": 0.45,
+      "kind": "door",
+      "width": 0.9,
+      "height": 2,
+      "hinge": "a",
+      "swing": "front"
+    },
+    "o_IQ6a1zkLo1": {
+      "id": "o_IQ6a1zkLo1",
+      "wallId": "w_tABkhr9kYS",
+      "t": 0.4,
+      "kind": "window",
+      "width": 1.2,
+      "height": 1.2,
+      "sillHeight": 0.9
+    }
+  },
+  "rooms": {
+    "r_4Ztw39pxdn": {
+      "id": "r_4Ztw39pxdn",
+      "wallCycle": [
+        "w_tABkhr9kYS",
+        "w_MLRO85tKQm",
+        "w_Dq0QvheBBC",
+        "w_m8nY_XvgUb"
+      ],
+      "holeCycles": [],
+      "name": "Living room",
+      "floorMaterialId": "darkFloor",
+      "roomType": "living"
+    },
+    "r_w_dPHLV1Cg": {
+      "id": "r_w_dPHLV1Cg",
+      "wallCycle": [
+        "w_-draM8siGi",
+        "w_lYRa8xmTWo",
+        "w_MLRO85tKQm",
+        "w_UXXDnR3dPm"
+      ],
+      "holeCycles": [],
+      "name": "Bedroom"
+    }
+  },
+  "furniture": {
+    "f_juyD2AAxEz": {
+      "id": "f_juyD2AAxEz",
+      "catalogItemId": "sofa-3",
+      "x": 2.2,
+      "y": 0.75,
+      "rotation": 0,
+      "size": {
+        "w": 2.2,
+        "d": 0.95,
+        "h": 0.85
+      },
+      "elevation": 0,
+      "mirrored": true,
+      "price": 499,
+      "notes": "Golden notes",
+      "materialOverrides": {
+        "fabric": "oak",
+        "legs": "#334455"
+      }
+    },
+    "f_I01HKWR2ux": {
+      "id": "f_I01HKWR2ux",
+      "catalogItemId": "dining-table",
+      "x": 3.2,
+      "y": 3.2,
+      "rotation": 0,
+      "size": {
+        "w": 1.6,
+        "d": 0.9,
+        "h": 0.74
+      },
+      "elevation": 0
+    },
+    "f_lUPqY2cvgY": {
+      "id": "f_lUPqY2cvgY",
+      "catalogItemId": "dining-chair",
+      "x": 3.2,
+      "y": 2.4,
+      "rotation": 0,
+      "size": {
+        "w": 0.45,
+        "d": 0.52,
+        "h": 0.88
+      },
+      "elevation": 0
+    },
+    "f_VG8VXsIgAB": {
+      "id": "f_VG8VXsIgAB",
+      "catalogItemId": "bed-double",
+      "x": 6.5,
+      "y": 2.2,
+      "rotation": 1.5707963267948966,
+      "size": {
+        "w": 1.67,
+        "d": 2.12,
+        "h": 1
+      },
+      "elevation": 0
+    },
+    "f_72WjzrK8IP": {
+      "id": "f_72WjzrK8IP",
+      "catalogItemId": "wardrobe",
+      "x": 6.4,
+      "y": 4.6,
+      "rotation": 3.141592653589793,
+      "size": {
+        "w": 1.5,
+        "d": 0.6,
+        "h": 2.2
+      },
+      "elevation": 0
+    },
+    "f_VJ27WRXKN4": {
+      "id": "f_VJ27WRXKN4",
+      "catalogItemId": "toilet",
+      "x": 7.7,
+      "y": 0.5,
+      "rotation": -1.5707963267948966,
+      "size": {
+        "w": 0.38,
+        "d": 0.65,
+        "h": 0.78
+      },
+      "elevation": 0
+    }
+  },
+  "annotations": {
+    "a_N3AqesC60F": {
+      "id": "a_N3AqesC60F",
+      "kind": "dimension",
+      "a": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "b": {
+        "x": 3.5,
+        "y": 0.5
+      },
+      "offset": 0.35
+    },
+    "a_3JUBnNSo9V": {
+      "id": "a_3JUBnNSo9V",
+      "kind": "label",
+      "x": 2,
+      "y": 2.5,
+      "text": "Golden label",
+      "rotation": 0.5235987755982988,
+      "fontSize": 0.2
+    },
+    "a_qA_Y1J9KmG": {
+      "id": "a_qA_Y1J9KmG",
+      "kind": "area",
+      "points": [
+        {
+          "x": 0.6,
+          "y": 0.6
+        },
+        {
+          "x": 2.4,
+          "y": 0.6
+        },
+        {
+          "x": 2.4,
+          "y": 1.8
+        },
+        {
+          "x": 0.6,
+          "y": 1.8
+        }
+      ]
+    }
+  }
+}
