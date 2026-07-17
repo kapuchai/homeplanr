@@ -42,6 +42,7 @@ import {
 import { useArtMaterial } from './artTexture'
 import { WalkControls } from './walk/WalkControls'
 import { useWalkStore } from './walk/walkStore'
+import { attemptLock } from './walk/pointerLock'
 import { getCollisionSet, validateTeleport } from './walk/collision'
 import { worldToPlan } from './walk/walkMath'
 import { captureAndSave, type CaptureApi } from './screenshot'
@@ -683,13 +684,21 @@ export function PlannerCanvas() {
     e.stopPropagation() // the ray often hits floor + ground disc — act once
     if (e.delta > 4) return // r3f px-move metric: that was a drag, not a click
     const plan = worldToPlan([e.point.x, e.point.y, e.point.z])
-    if (!useAppSettings.getState().collisionEnabled) {
-      walk.requestWalkTo(plan) // collision off: every spot is reachable
+    const target = useAppSettings.getState().collisionEnabled
+      ? validateTeleport(getCollisionSet(doc, derived), plan)
+      : plan // collision off: every spot is reachable
+    if (!target) {
+      walk.setHint(t('view3d.blocked')) // walls or furniture
       return
     }
-    const ok = validateTeleport(getCollisionSet(doc, derived), plan)
-    if (ok) walk.requestWalkTo(ok)
-    else walk.setHint(t('view3d.blocked')) // walls or furniture
+    walk.requestWalkTo(target)
+    // WebKitGTK grants Pointer Lock only from INSIDE the gesture handler
+    // (user check, 0.11.0): the deferred attempt in WalkControls' effect
+    // is refused there, so the entering click requests the lock itself.
+    const canvas = e.nativeEvent.target
+    if (canvas instanceof HTMLCanvasElement) {
+      attemptLock(canvas, useAppSettings.getState().lookMode)
+    }
   }
 
   const applyPreset = (kind: CameraPresetKind) => {

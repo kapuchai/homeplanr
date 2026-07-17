@@ -371,29 +371,33 @@ export function WalkControls({
       drag.current = null
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
     }
+    /** Mirror the lock into the store; while locked, drop any drag armed
+     * by the same press and start the deadman on unproven platforms (a
+     * lock that never emits a single move event is holding the pointer
+     * hostage; a proven-'ok' lock is exempt — an idle mouse emits
+     * nothing). Shared by the change handler AND mount normalization —
+     * mount must NOT run the unlock exit heuristic below. */
+    const syncLockedState = (): boolean => {
+      const locked = isLocked()
+      useWalkStore.getState()._setLocked(locked)
+      if (!locked) return false
+      const d = drag.current
+      drag.current = null
+      if (d && el.hasPointerCapture(d.pointerId)) el.releasePointerCapture(d.pointerId)
+      if (lockVerdict() !== 'ok') {
+        deadmanId = window.setTimeout(() => {
+          deadmanId = null
+          markLockDead()
+          expectedUnlock.current = true
+          dom.exitPointerLock()
+        }, LOCK_DEADMAN_MS)
+      }
+      return true
+    }
     const onLockChange = () => {
       resetLockProbe()
       clearDeadman()
-      const locked = isLocked()
-      useWalkStore.getState()._setLocked(locked)
-      if (locked) {
-        // lock supersedes the drag armed by the same press
-        const d = drag.current
-        drag.current = null
-        if (d && el.hasPointerCapture(d.pointerId)) el.releasePointerCapture(d.pointerId)
-        // unproven platform: a lock that never emits a single move event
-        // is holding the pointer hostage — declare it dead and release
-        // (a proven-'ok' lock is exempt; an idle mouse emits nothing)
-        if (lockVerdict() !== 'ok') {
-          deadmanId = window.setTimeout(() => {
-            deadmanId = null
-            markLockDead()
-            expectedUnlock.current = true
-            dom.exitPointerLock()
-          }, LOCK_DEADMAN_MS)
-        }
-        return
-      }
+      if (syncLockedState()) return
       if (expectedUnlock.current) {
         expectedUnlock.current = false
         return
@@ -411,8 +415,13 @@ export function WalkControls({
     el.addEventListener('pointerup', endDrag)
     el.addEventListener('pointercancel', endDrag)
     dom.addEventListener('pointerlockchange', onLockChange)
-    // walk enter — the arming click's activation usually carries
+    // The entering floor click requests the lock INSIDE its own handler
+    // (WebKitGTK refuses deferred requests — see handleFloorClick); this
+    // deferred attempt is the harmless second chance for lenient engines.
     attemptLock(el, useAppSettings.getState().lookMode)
+    // The click's lock can engage BEFORE this effect attached the
+    // listener — sync the flag instead of trusting the missed event.
+    syncLockedState()
     return () => {
       el.removeEventListener('pointerdown', onPointerDown)
       el.removeEventListener('pointermove', onPointerMove)
