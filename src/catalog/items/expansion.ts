@@ -55,8 +55,12 @@ export const kitchenSink: CatalogItem = {
     b.box('top', { size: [w, 0.12, 0.03], at: [0, d / 2 - 0.06, topZ] })
     b.box('top', { size: [0.07, d - 0.22, 0.03], at: [-w / 2 + 0.035, -0.01, topZ] })
     b.box('top', { size: [0.07, d - 0.22, 0.03], at: [w / 2 - 0.035, -0.01, topZ] })
-    // recessed basin floor, 3cm below the worktop surface
-    b.box('basin', { size: [0.46, 0.38, 0.015], at: [0, -0.01, topZ - 0.015] })
+    // recessed basin floor, ~3cm below the worktop surface. Sits 2mm PROUD
+    // of the counter face: its top would otherwise be exactly coplanar with
+    // the counter's — same-direction faces shrink toward their own centers
+    // under SEAM_EPS and land coincident again (metal/white z-fight,
+    // user-reported 0.12.0)
+    b.box('basin', { size: [0.46, 0.38, 0.015], at: [0, -0.01, topZ - 0.013] })
     b.cylinder('faucet', { r: 0.015, h: h - topZ, at: [0, d / 2 - 0.06, topZ] })
     b.box('faucet', { size: [0.03, 0.1, 0.02], at: [0, d / 2 - 0.115, h - 0.04] })
   },
