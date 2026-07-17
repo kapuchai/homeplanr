@@ -27,6 +27,9 @@ export type UiScale = 0.9 | 1 | 1.1 | 1.25 | 1.5
  * so rooms read from outside (the dollhouse view); 'off' keeps them all.
  * Never active while walking. */
 export type WallHideMode = 'off' | 'hide'
+/** Sun-path season preset (0.12.0) — solstices + the equinox pair stand in
+ * for a full date picker (user decision: seasons, not dates). */
+export type Season = 'equinox' | 'summer' | 'winter'
 
 export interface AppSettings {
   theme: ThemePreference
@@ -61,6 +64,22 @@ export interface AppSettings {
   wallHideMode: WallHideMode
   /** Per-room ceiling slabs in the 3D view (0.11.0). */
   ceilingsEnabled: boolean
+  /** Realistic lighting master toggle (0.12.0) — gates the sun model,
+   * exposure, sky, interior emitters, and emissive materials. Off renders
+   * exactly the pre-0.12.0 scene. Default OFF until 1.0.0. */
+  realisticLighting: boolean
+  /** Tone-mapping exposure under realistic lighting (EXPOSURE_RANGE).
+   * Ignored (forced 1) while realisticLighting is off. */
+  exposure: number
+  /** Sun-model observer position, degrees — defaults: Helsinki. */
+  latitude: number
+  longitude: number
+  /** Building orientation: degrees added to the solar azimuth (0 = plan
+   * north up). Clamped 0–360. */
+  northOffset: number
+  season: Season
+  /** Time of day in fractional hours 0–24 (the 3D-view sun arc). */
+  timeOfDay: number
   /** Side-panel layout (px, clamped to PANEL_LIMITS) + collapse toggles. */
   catalogPanelWidth: number
   propsPanelWidth: number
@@ -95,6 +114,9 @@ export const WHEEL_MODES: readonly WheelMode[] = ['zoom', 'pan']
 export const DIMENSION_LEVELS: readonly DimensionLevel[] = ['off', 'walls', 'openings', 'all']
 export const UI_SCALES: readonly UiScale[] = [0.9, 1, 1.1, 1.25, 1.5]
 export const WALL_HIDE_MODES: readonly WallHideMode[] = ['off', 'hide']
+export const SEASONS: readonly Season[] = ['equinox', 'summer', 'winter']
+/** Exposure slider bounds (Options → Lighting). */
+export const EXPOSURE_RANGE = { min: 0.5, max: 2 } as const
 
 const DEFAULTS: AppSettings = {
   theme: 'system',
@@ -112,6 +134,13 @@ const DEFAULTS: AppSettings = {
   collisionEnabled: true,
   wallHideMode: 'hide',
   ceilingsEnabled: true,
+  realisticLighting: false,
+  exposure: 1,
+  latitude: 60.17,
+  longitude: 24.94,
+  northOffset: 0,
+  season: 'equinox',
+  timeOfDay: 12,
   catalogPanelWidth: PANEL_LIMITS.catalog.def,
   propsPanelWidth: PANEL_LIMITS.props.def,
   catalogPanelCollapsed: false,
@@ -132,6 +161,10 @@ const clampWidth = (value: unknown, lim: { min: number; max: number; def: number
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback
+
+/** Finite number clamped to [min, max]; anything else → def. */
+const clampNum = (value: unknown, min: number, max: number, def: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : def
 
 /** Decode + validate per field; anything unusable → that field's default (never throws). */
 export function parseAppSettings(json: string | null): AppSettings {
@@ -173,6 +206,14 @@ export function parseAppSettings(json: string | null): AppSettings {
       wallHideMode: pick(r.wallHideMode, WALL_HIDE_MODES, DEFAULTS.wallHideMode),
       ceilingsEnabled:
         typeof r.ceilingsEnabled === 'boolean' ? r.ceilingsEnabled : DEFAULTS.ceilingsEnabled,
+      realisticLighting:
+        typeof r.realisticLighting === 'boolean' ? r.realisticLighting : DEFAULTS.realisticLighting,
+      exposure: clampNum(r.exposure, EXPOSURE_RANGE.min, EXPOSURE_RANGE.max, DEFAULTS.exposure),
+      latitude: clampNum(r.latitude, -90, 90, DEFAULTS.latitude),
+      longitude: clampNum(r.longitude, -180, 180, DEFAULTS.longitude),
+      northOffset: clampNum(r.northOffset, 0, 360, DEFAULTS.northOffset),
+      season: pick(r.season, SEASONS, DEFAULTS.season),
+      timeOfDay: clampNum(r.timeOfDay, 0, 24, DEFAULTS.timeOfDay),
       catalogPanelWidth: clampWidth(r.catalogPanelWidth, PANEL_LIMITS.catalog),
       propsPanelWidth: clampWidth(r.propsPanelWidth, PANEL_LIMITS.props),
       catalogPanelCollapsed:
@@ -223,6 +264,13 @@ const persist = (s: AppSettings): void => {
         collisionEnabled: s.collisionEnabled,
         wallHideMode: s.wallHideMode,
         ceilingsEnabled: s.ceilingsEnabled,
+        realisticLighting: s.realisticLighting,
+        exposure: s.exposure,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        northOffset: s.northOffset,
+        season: s.season,
+        timeOfDay: s.timeOfDay,
         catalogPanelWidth: s.catalogPanelWidth,
         propsPanelWidth: s.propsPanelWidth,
         catalogPanelCollapsed: s.catalogPanelCollapsed,
@@ -254,6 +302,16 @@ interface AppSettingsState extends AppSettings {
   setCollisionEnabled: (enabled: boolean) => void
   setWallHideMode: (mode: WallHideMode) => void
   setCeilingsEnabled: (enabled: boolean) => void
+  setRealisticLighting: (enabled: boolean) => void
+  /** Clamped + persisted. Sliders/scrubbers write live via
+   * useAppSettings.setState during a drag and call these on release
+   * (the setPanelWidth precedent — no localStorage churn per move). */
+  setExposure: (exposure: number) => void
+  setLatitude: (latitude: number) => void
+  setLongitude: (longitude: number) => void
+  setNorthOffset: (deg: number) => void
+  setSeason: (season: Season) => void
+  setTimeOfDay: (hours: number) => void
   /** Clamped + persisted. During a drag, write via useAppSettings.setState
    * (no localStorage churn per pointermove) and call this on pointer-up. */
   setPanelWidth: (panel: 'catalog' | 'props', width: number) => void
@@ -284,6 +342,14 @@ export const useAppSettings = create<AppSettingsState>()(
       setCollisionEnabled: (collisionEnabled) => apply({ collisionEnabled }),
       setWallHideMode: (wallHideMode) => apply({ wallHideMode }),
       setCeilingsEnabled: (ceilingsEnabled) => apply({ ceilingsEnabled }),
+      setRealisticLighting: (realisticLighting) => apply({ realisticLighting }),
+      setExposure: (v) =>
+        apply({ exposure: clampNum(v, EXPOSURE_RANGE.min, EXPOSURE_RANGE.max, DEFAULTS.exposure) }),
+      setLatitude: (v) => apply({ latitude: clampNum(v, -90, 90, DEFAULTS.latitude) }),
+      setLongitude: (v) => apply({ longitude: clampNum(v, -180, 180, DEFAULTS.longitude) }),
+      setNorthOffset: (v) => apply({ northOffset: clampNum(v, 0, 360, DEFAULTS.northOffset) }),
+      setSeason: (season) => apply({ season }),
+      setTimeOfDay: (v) => apply({ timeOfDay: clampNum(v, 0, 24, DEFAULTS.timeOfDay) }),
       setPanelWidth: (panel, width) =>
         apply(
           panel === 'catalog'

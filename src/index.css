@@ -642,6 +642,29 @@ body.pointer-locked * {
   color: var(--text-3);
 }
 
+/* Range-slider row (0.12.0 — Options → Lighting exposure). */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-row input[type='range'] {
+  width: calc(var(--ui-scale) * 140px);
+  accent-color: var(--accent);
+}
+
+.slider-row input[type='range']:disabled {
+  opacity: 0.45;
+}
+
+.slider-row .slider-value {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 .modal-buttons {
   display: flex;
   justify-content: flex-end;

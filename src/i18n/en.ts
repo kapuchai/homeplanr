@@ -122,6 +122,11 @@ export const en = {
   'options.wallHiding': 'Hide facing walls',
   'options.ceilings': 'Ceilings',
 
+  // ---- options: lighting (0.12.0) ----
+  'options.section.lighting': 'Lighting (3D)',
+  'options.realisticLighting': 'Realistic lighting',
+  'options.exposure': 'Exposure',
+
   // ---- export dialog + flow ----
   'export.title': 'Export plan',
   'export.format': 'Format',

@@ -3,6 +3,7 @@ import { Modal } from './Modal'
 import {
   ACCENT_IDS,
   DIMENSION_LEVELS,
+  EXPOSURE_RANGE,
   THEME_PREFERENCES,
   UI_SCALES,
   useAppSettings,
@@ -70,6 +71,55 @@ function OnOffRow({
         >
           {t('common.off')}
         </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Range-input row (0.12.0 — the app's first slider). Live drag writes via
+ * `onInput` (the caller uses useAppSettings.setState — no localStorage churn
+ * per move); `onCommit` fires on release/blur with the final value (the
+ * persisting setter — the PanelHandle discipline).
+ */
+function SliderRow({
+  label,
+  min,
+  max,
+  step,
+  value,
+  format,
+  disabled,
+  onInput,
+  onCommit,
+}: {
+  label: string
+  min: number
+  max: number
+  step: number
+  value: number
+  format: (value: number) => string
+  disabled?: boolean
+  onInput: (value: number) => void
+  onCommit: (value: number) => void
+}) {
+  return (
+    <div className="options-row">
+      <span>{label}</span>
+      <div className="slider-row">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          disabled={disabled}
+          aria-label={label}
+          onChange={(e) => onInput(Number(e.target.value))}
+          onPointerUp={(e) => onCommit(Number((e.target as HTMLInputElement).value))}
+          onBlur={(e) => onCommit(Number(e.target.value))}
+        />
+        <span className="slider-value">{format(value)}</span>
       </div>
     </div>
   )
@@ -244,6 +294,25 @@ export function OptionsDialog() {
             label={t('options.ceilings')}
             value={settings.ceilingsEnabled}
             onChange={settings.setCeilingsEnabled}
+          />
+        </section>
+        <section className="options-section">
+          <h4>{t('options.section.lighting')}</h4>
+          <OnOffRow
+            label={t('options.realisticLighting')}
+            value={settings.realisticLighting}
+            onChange={settings.setRealisticLighting}
+          />
+          <SliderRow
+            label={t('options.exposure')}
+            min={EXPOSURE_RANGE.min}
+            max={EXPOSURE_RANGE.max}
+            step={0.05}
+            value={settings.exposure}
+            format={(v) => `${Math.round(v * 100)}%`}
+            disabled={!settings.realisticLighting}
+            onInput={(exposure) => useAppSettings.setState({ exposure })}
+            onCommit={settings.setExposure}
           />
         </section>
         <div className="modal-buttons">

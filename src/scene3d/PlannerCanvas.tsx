@@ -630,6 +630,23 @@ function ThemeBridge3D() {
   return null
 }
 
+/**
+ * Tone-mapping exposure (0.12.0) — an Options slider under realistic
+ * lighting; forced back to 1 when the master toggle is off so the classic
+ * scene stays bit-identical.
+ */
+function ExposureBridge() {
+  const gl = useThree((s) => s.gl)
+  const invalidate = useThree((s) => s.invalidate)
+  const realistic = useAppSettings((s) => s.realisticLighting)
+  const exposure = useAppSettings((s) => s.exposure)
+  useEffect(() => {
+    gl.toneMappingExposure = realistic ? exposure : 1
+    invalidate()
+  }, [gl, invalidate, realistic, exposure])
+  return null
+}
+
 /** Orbit-change throttle for the wall occluder (ms). */
 const OCCLUDER_THROTTLE_MS = 80
 
@@ -942,6 +959,7 @@ export function PlannerCanvas() {
           onHidden={setHiddenWalls}
         />
         <ThemeBridge3D />
+        <ExposureBridge />
         <CaptureBridge apiRef={captureApi} />
         <WalkControls doc={doc} derived={derived} />
         <SceneEnvironment box={box} onGroundClick={handleFloorClick} />

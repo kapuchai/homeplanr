@@ -22,6 +22,13 @@ const DEFAULTS: AppSettings = {
   collisionEnabled: true,
   wallHideMode: 'hide',
   ceilingsEnabled: true,
+  realisticLighting: false,
+  exposure: 1,
+  latitude: 60.17,
+  longitude: 24.94,
+  northOffset: 0,
+  season: 'equinox',
+  timeOfDay: 12,
   catalogPanelWidth: 232,
   propsPanelWidth: 260,
   catalogPanelCollapsed: false,
@@ -59,6 +66,13 @@ describe('parseAppSettings', () => {
       collisionEnabled: false,
       wallHideMode: 'off',
       ceilingsEnabled: false,
+      realisticLighting: true,
+      exposure: 1.4,
+      latitude: 59.33,
+      longitude: 18.06,
+      northOffset: 90,
+      season: 'winter',
+      timeOfDay: 21.5,
       catalogPanelWidth: 300,
       propsPanelWidth: 320,
       catalogPanelCollapsed: true,
@@ -86,6 +100,13 @@ describe('parseAppSettings', () => {
           collisionEnabled: 'no',
           wallHideMode: 'fade',
           ceilingsEnabled: 1,
+          realisticLighting: 'yes',
+          exposure: 'bright',
+          latitude: 200,
+          longitude: -900,
+          northOffset: 9999,
+          season: 'autumn',
+          timeOfDay: 30,
           lastDirSave: '',
           lastDirExport: 5,
         }),
@@ -106,6 +127,13 @@ describe('parseAppSettings', () => {
       collisionEnabled: true, // 'no' → default
       wallHideMode: 'hide', // 'fade' does not exist (yet) → default
       ceilingsEnabled: true, // 1 → default
+      realisticLighting: false, // 'yes' → default
+      exposure: 1, // non-number → default
+      latitude: 90, // out of range → clamped
+      longitude: -180, // out of range → clamped
+      northOffset: 360, // out of range → clamped
+      season: 'equinox', // 'autumn' → default
+      timeOfDay: 24, // out of range → clamped
       catalogPanelWidth: 232,
       propsPanelWidth: 260,
       catalogPanelCollapsed: false,
@@ -186,6 +214,13 @@ describe('useAppSettings persistence', () => {
       collisionEnabled: s.collisionEnabled,
       wallHideMode: s.wallHideMode,
       ceilingsEnabled: s.ceilingsEnabled,
+      realisticLighting: s.realisticLighting,
+      exposure: s.exposure,
+      latitude: s.latitude,
+      longitude: s.longitude,
+      northOffset: s.northOffset,
+      season: s.season,
+      timeOfDay: s.timeOfDay,
       catalogPanelWidth: s.catalogPanelWidth,
       propsPanelWidth: s.propsPanelWidth,
       catalogPanelCollapsed: s.catalogPanelCollapsed,
@@ -213,6 +248,13 @@ describe('useAppSettings persistence', () => {
     s.setCollisionEnabled(false)
     s.setWallHideMode('off')
     s.setCeilingsEnabled(false)
+    s.setRealisticLighting(true)
+    s.setExposure(5) // clamps to 2
+    s.setLatitude(51.51)
+    s.setLongitude(-0.13)
+    s.setNorthOffset(45)
+    s.setSeason('summer')
+    s.setTimeOfDay(6.25)
     s.setPanelWidth('catalog', 999) // clamps to 360
     s.setPanelWidth('props', 300)
     s.setPanelCollapsed('catalog', true)
@@ -239,6 +281,13 @@ describe('useAppSettings persistence', () => {
       collisionEnabled: false,
       wallHideMode: 'off',
       ceilingsEnabled: false,
+      realisticLighting: true,
+      exposure: 2,
+      latitude: 51.51,
+      longitude: -0.13,
+      northOffset: 45,
+      season: 'summer',
+      timeOfDay: 6.25,
       catalogPanelWidth: 360,
       propsPanelWidth: 300,
       catalogPanelCollapsed: true,
