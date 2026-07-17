@@ -117,6 +117,15 @@ export const en = {
   'options.dimsAll': 'All',
   'options.showAnnotations': 'Measurements & labels',
   'options.uiScale': 'Interface scale',
+  'options.section.view3d': '3D view',
+  'options.lookMode': 'Walk look',
+  'options.lookAuto': 'Auto',
+  'options.lookLock': 'Mouse (FPS)',
+  'options.lookDrag': 'Drag',
+  'options.lookSensitivity': 'Look sensitivity',
+  'options.walkCollision': 'Walk collision',
+  'options.wallHiding': 'Hide facing walls',
+  'options.ceilings': 'Ceilings',
 
   // ---- export dialog + flow ----
   'export.title': 'Export plan',

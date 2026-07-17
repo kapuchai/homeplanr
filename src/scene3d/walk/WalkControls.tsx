@@ -5,6 +5,7 @@ import type { ProjectDocument } from '../../model/types'
 import type { DerivedGeometry } from '../../store/derived'
 import type { Vec2 } from '../../geometry/vec'
 import { useUiStore } from '../../store/uiStore'
+import { useAppSettings } from '../../store/appSettings'
 import { useConfirmStore } from '../../app/confirmStore'
 import { useWalkStore } from './walkStore'
 import {
@@ -48,6 +49,7 @@ import {
  * a viewMode switch to 2D and unmount (context-loss epoch remount)
  * restore instantly.
  */
+/** Base look sensitivity — multiplied by the lookSensitivity device pref. */
 const LOOK_SENSITIVITY = 0.0032
 const ENTER_GLIDE_S = 0.65
 const GLIDE_S = 0.5
@@ -329,8 +331,10 @@ export function WalkControls({
       }
     }
     const applyLook = (dx: number, dy: number) => {
-      yaw.current -= dx * LOOK_SENSITIVITY
-      pitch.current = clampPitch(pitch.current - dy * LOOK_SENSITIVITY)
+      // live getState read — a mid-walk Options change applies instantly
+      const sens = LOOK_SENSITIVITY * useAppSettings.getState().lookSensitivity
+      yaw.current -= dx * sens
+      pitch.current = clampPitch(pitch.current - dy * sens)
       camera.rotation.set(pitch.current, yaw.current, 0)
     }
     const onPointerDown = (e: PointerEvent) => {
@@ -338,7 +342,8 @@ export function WalkControls({
       if (isLocked()) return // FPS look: no drag to arm, clicks stay inert
       drag.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY }
       el.setPointerCapture(e.pointerId)
-      attemptLock(el, 'auto') // the press is the user-activation carrier
+      // the press is the user-activation carrier
+      attemptLock(el, useAppSettings.getState().lookMode)
     }
     const onPointerMove = (e: PointerEvent) => {
       if (glide.current) return
@@ -406,7 +411,8 @@ export function WalkControls({
     el.addEventListener('pointerup', endDrag)
     el.addEventListener('pointercancel', endDrag)
     dom.addEventListener('pointerlockchange', onLockChange)
-    attemptLock(el, 'auto') // walk enter — the arming click's activation usually carries
+    // walk enter — the arming click's activation usually carries
+    attemptLock(el, useAppSettings.getState().lookMode)
     return () => {
       el.removeEventListener('pointerdown', onPointerDown)
       el.removeEventListener('pointermove', onPointerMove)
@@ -465,11 +471,14 @@ export function WalkControls({
       return
     }
 
-    // free walking: substepped collision slide in plan space
+    // free walking: substepped collision slide in plan space (the 0.11.0
+    // collision toggle bypasses the resolve entirely — walls stop nothing)
     const dt = Math.min(delta, MAX_FRAME_DT)
     const d = moveDelta(keys.current, yaw.current, dt)
     if (d.x !== 0 || d.y !== 0) {
-      plan.current = resolveMove(getCollisionSet(doc, derived), plan.current, d)
+      plan.current = useAppSettings.getState().collisionEnabled
+        ? resolveMove(getCollisionSet(doc, derived), plan.current, d)
+        : { x: plan.current.x + d.x, y: plan.current.y + d.y }
     }
     camera.position.set(...planToWorld(plan.current, EYE_HEIGHT))
     camera.rotation.set(pitch.current, yaw.current, 0)

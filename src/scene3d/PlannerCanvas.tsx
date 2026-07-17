@@ -683,6 +683,10 @@ export function PlannerCanvas() {
     e.stopPropagation() // the ray often hits floor + ground disc — act once
     if (e.delta > 4) return // r3f px-move metric: that was a drag, not a click
     const plan = worldToPlan([e.point.x, e.point.y, e.point.z])
+    if (!useAppSettings.getState().collisionEnabled) {
+      walk.requestWalkTo(plan) // collision off: every spot is reachable
+      return
+    }
     const ok = validateTeleport(getCollisionSet(doc, derived), plan)
     if (ok) walk.requestWalkTo(ok)
     else walk.setHint(t('view3d.blocked')) // walls or furniture

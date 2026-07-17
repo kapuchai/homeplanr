@@ -19,6 +19,11 @@ const DEFAULTS: AppSettings = {
   showGrid: true,
   autosaveEnabled: false,
   orbitHintSeen: false,
+  collisionEnabled: true,
+  lookMode: 'auto',
+  lookSensitivity: 1,
+  wallHideMode: 'hide',
+  ceilingsEnabled: true,
   catalogPanelWidth: 232,
   propsPanelWidth: 260,
   catalogPanelCollapsed: false,
@@ -53,6 +58,11 @@ describe('parseAppSettings', () => {
       showGrid: false,
       autosaveEnabled: true,
       orbitHintSeen: true,
+      collisionEnabled: false,
+      lookMode: 'lock',
+      lookSensitivity: 1.5,
+      wallHideMode: 'off',
+      ceilingsEnabled: false,
       catalogPanelWidth: 300,
       propsPanelWidth: 320,
       catalogPanelCollapsed: true,
@@ -77,6 +87,11 @@ describe('parseAppSettings', () => {
           uiScale: 2.75,
           dimensionLevel: 'everything',
           snapEnabled: 'off',
+          collisionEnabled: 'no',
+          lookMode: 'gamepad',
+          lookSensitivity: 3,
+          wallHideMode: 'fade',
+          ceilingsEnabled: 1,
           lastDirSave: '',
           lastDirExport: 5,
         }),
@@ -94,6 +109,11 @@ describe('parseAppSettings', () => {
       showGrid: true,
       autosaveEnabled: false,
       orbitHintSeen: false,
+      collisionEnabled: true, // 'no' → default
+      lookMode: 'auto', // 'gamepad' → default
+      lookSensitivity: 1, // off-preset number → default
+      wallHideMode: 'hide', // 'fade' does not exist (yet) → default
+      ceilingsEnabled: true, // 1 → default
       catalogPanelWidth: 232,
       propsPanelWidth: 260,
       catalogPanelCollapsed: false,
@@ -171,6 +191,11 @@ describe('useAppSettings persistence', () => {
       showGrid: s.showGrid,
       autosaveEnabled: s.autosaveEnabled,
       orbitHintSeen: s.orbitHintSeen,
+      collisionEnabled: s.collisionEnabled,
+      lookMode: s.lookMode,
+      lookSensitivity: s.lookSensitivity,
+      wallHideMode: s.wallHideMode,
+      ceilingsEnabled: s.ceilingsEnabled,
       catalogPanelWidth: s.catalogPanelWidth,
       propsPanelWidth: s.propsPanelWidth,
       catalogPanelCollapsed: s.catalogPanelCollapsed,
@@ -195,6 +220,11 @@ describe('useAppSettings persistence', () => {
     s.setShowGrid(false)
     s.setAutosaveEnabled(true)
     s.setOrbitHintSeen(true)
+    s.setCollisionEnabled(false)
+    s.setLookMode('drag')
+    s.setLookSensitivity(0.75)
+    s.setWallHideMode('off')
+    s.setCeilingsEnabled(false)
     s.setPanelWidth('catalog', 999) // clamps to 360
     s.setPanelWidth('props', 300)
     s.setPanelCollapsed('catalog', true)
@@ -218,6 +248,11 @@ describe('useAppSettings persistence', () => {
       showGrid: false,
       autosaveEnabled: true,
       orbitHintSeen: true,
+      collisionEnabled: false,
+      lookMode: 'drag',
+      lookSensitivity: 0.75,
+      wallHideMode: 'off',
+      ceilingsEnabled: false,
       catalogPanelWidth: 360,
       propsPanelWidth: 300,
       catalogPanelCollapsed: true,

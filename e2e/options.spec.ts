@@ -82,3 +82,34 @@ test('a11y baseline (M7): focus trap, Esc + focus restore, ARIA state', async ({
   await expect(page.getByRole('menu')).toBeHidden()
   await expect(fileBtn).toBeFocused()
 })
+
+test('3D view section (0.11.0): toggles persist across reload', async ({ page }) => {
+  await page.goto('/')
+  await openOptions(page)
+  const section = dialog(page).locator('.options-section', { hasText: '3D view' })
+  await expect(section.getByRole('button', { name: 'Auto', exact: true })).toHaveClass(/active/)
+  await expect(section.getByRole('button', { name: '100%', exact: true })).toHaveClass(/active/)
+
+  // flip look mode, sensitivity, and collision; wall hiding + ceilings stay default-on
+  await section.getByRole('button', { name: 'Drag', exact: true }).click()
+  await section.getByRole('button', { name: '150%', exact: true }).click()
+  const collisionRow = section.locator('.options-row', { hasText: 'Walk collision' })
+  await collisionRow.getByRole('button', { name: 'Off', exact: true }).click()
+  await closeOptions(page)
+
+  await page.reload()
+  await openOptions(page)
+  const section2 = dialog(page).locator('.options-section', { hasText: '3D view' })
+  await expect(section2.getByRole('button', { name: 'Drag', exact: true })).toHaveClass(/active/)
+  await expect(section2.getByRole('button', { name: '150%', exact: true })).toHaveClass(/active/)
+  const collisionRow2 = section2.locator('.options-row', { hasText: 'Walk collision' })
+  await expect(collisionRow2.getByRole('button', { name: 'Off', exact: true })).toHaveClass(
+    /active/,
+  )
+
+  // restore defaults so the storage left behind stays neutral
+  await section2.getByRole('button', { name: 'Auto', exact: true }).click()
+  await section2.getByRole('button', { name: '100%', exact: true }).click()
+  await collisionRow2.getByRole('button', { name: 'On', exact: true }).click()
+  await closeOptions(page)
+})
