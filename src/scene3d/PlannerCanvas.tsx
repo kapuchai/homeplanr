@@ -598,6 +598,7 @@ function EmitterLight({
           castShadow={shadowCast}
           shadow-mapSize={[1024, 1024]}
           shadow-bias={-0.002}
+          shadow-normalBias={0.02}
         />
         {/* straight down in plan space; mounted so its matrix updates */}
         <primitive object={spotTarget} position={[at[0], at[1], at[2] - 1]} />
@@ -613,6 +614,7 @@ function EmitterLight({
       castShadow={shadowCast}
       shadow-mapSize={[1024, 1024]}
       shadow-bias={-0.002}
+      shadow-normalBias={0.02}
     />
   )
 }
@@ -882,9 +884,8 @@ function SunSky({ box }: { box: SceneBBox }) {
       dist * Math.sin(altitude),
       -box.cy + dist * Math.cos(altitude) * Math.cos(bearing),
     )
-    const half =
-      (box.diag / 2 + margin3d) *
-      Math.min(3, Math.max(1, 0.9 / Math.max(Math.sin(altitude), 0.3)))
+    const widen = Math.min(3, Math.max(1, 0.9 / Math.max(Math.sin(altitude), 0.3)))
+    const half = (box.diag / 2 + margin3d) * widen
     const cam = l.shadow.camera
     cam.left = -half
     cam.right = half
@@ -893,6 +894,9 @@ function SunSky({ box }: { box: SceneBBox }) {
     cam.near = 1
     cam.far = dist + 3 * box.diag + 20
     cam.updateProjectionMatrix()
+    // texel size grows with the frustum — scale the bias with it or the
+    // coarser map stripes floors/walls with acne that reads as z-fighting
+    l.shadow.normalBias = 0.03 * widen
     l.target.updateMatrixWorld()
     invalidate()
   }, [box, dist, bearing, altitude, invalidate])
@@ -922,7 +926,7 @@ function SunSky({ box }: { box: SceneBBox }) {
         intensity={ramp.sunIntensity}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-normalBias={0.03}
+        // normalBias is effect-owned: it scales with the widened frustum
         target-position={[box.cx, 0, -box.cy]}
       />
       <fog attach="fog" args={[ramp.sky, 2 * box.diag + 10, 6 * box.diag + 30]} />
@@ -948,6 +952,47 @@ function ThemeBridge3D() {
     )
     invalidate()
   }, [theme3d, realistic, invalidate])
+  return null
+}
+
+/**
+ * Shadow-map update gate (0.12.0 perf, user report: orbit stutter under
+ * realistic lighting). three re-renders EVERY shadow map EVERY frame by
+ * default, but shadow maps are LIGHT-space — orbiting and walking are
+ * camera-only and need no shadow pass at all. autoUpdate goes OFF for the
+ * canvas lifetime; the no-deps effect marks maps dirty on every REACT
+ * COMMIT of this component, which happens exactly when shadow-relevant
+ * state changes (doc geometry/furniture via the parent re-render, sun
+ * inputs/toggles via the subscriptions below) and never during pure
+ * camera interaction. A stray extra mark from unrelated ui state is one
+ * cheap shadow pass — the steady-state win is zero shadow passes per
+ * orbit frame.
+ */
+function ShadowUpdateBridge(_props: {
+  doc: ProjectDocument
+  hiddenWalls: Set<WallId>
+  shadowIds: Set<FurnitureId>
+}) {
+  const gl = useThree((s) => s.gl)
+  const invalidate = useThree((s) => s.invalidate)
+  useAppSettings((s) => s.realisticLighting)
+  useAppSettings((s) => s.ceilingsEnabled)
+  useAppSettings((s) => s.latitude)
+  useAppSettings((s) => s.longitude)
+  useAppSettings((s) => s.northOffset)
+  useAppSettings((s) => s.season)
+  useAppSettings((s) => s.timeOfDay)
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false
+    gl.shadowMap.needsUpdate = true
+    return () => {
+      gl.shadowMap.autoUpdate = true
+    }
+  }, [gl])
+  useEffect(() => {
+    gl.shadowMap.needsUpdate = true
+    invalidate()
+  })
   return null
 }
 
@@ -1283,6 +1328,7 @@ export function PlannerCanvas() {
         />
         <ThemeBridge3D />
         <ExposureBridge />
+        <ShadowUpdateBridge doc={doc} hiddenWalls={hiddenWalls} shadowIds={shadowIds} />
         <ShadowBudgetBridge doc={doc} enabled={realisticLighting} onBudget={setShadowIds} />
         <CaptureBridge apiRef={captureApi} />
         <WalkControls doc={doc} derived={derived} />

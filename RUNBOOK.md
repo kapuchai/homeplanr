@@ -510,6 +510,18 @@ export + 3D screenshot, file association + single instance, Linux
   lit emitters cast, at 1024² — interior maps NEVER 2048 and never more
   than 2 casters (point-light cube maps are the cliff: ×4@1024 35fps,
   ×2@2048 19.5fps). The sun keeps its separate 2048 directional map.
+- **Shadow maps render on COMMITS, not frames (0.12.0)**:
+  ShadowUpdateBridge holds `gl.shadowMap.autoUpdate = false` for the
+  canvas lifetime and marks `needsUpdate` on every React commit of
+  itself (its props/subscriptions = the shadow-relevant state: doc,
+  hidden set, budget set, sun inputs, toggles). Orbit/walk are
+  camera-only and render ZERO shadow passes (user-reported resume
+  stutter fix). Anything NEW that changes shadow content must reach the
+  bridge as a prop/subscription — silent staleness is the failure mode.
+  The sun's shadow normalBias is EFFECT-OWNED and scales with the
+  widened low-sun frustum (0.03×widen) — a fixed bias stripes floors
+  with acne that reads as z-fighting; interior lights carry
+  normalBias 0.02 for the same reason.
 - **Emitters are catalog metadata (0.12.0)**: `CatalogItem.emitter` never
   persists; `at` is item-local and the RENDERER negates x when mirrored
   (realizeItem mirrors geometry only). `lightOn` ABSENT means ON —
