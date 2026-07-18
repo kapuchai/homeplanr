@@ -1348,6 +1348,40 @@ function UpperSlabMesh({
 }
 
 /**
+ * Facade closer for UPPER storeys (0.13.0 feedback round 4): the
+ * inter-storey slab is built from ROOM polygons (the walls' inner faces),
+ * so along the facade a SLAB_THICKNESS-tall slot stayed open between the
+ * wall top below and the wall bottom above — walls read disconnected and
+ * interior light leaked out through the band. Every wall footprint +
+ * junction patch of the upper storey extrudes DOWN through the slab band,
+ * closing the facade flush with the storey's own walls.
+ */
+function WallBaseBand({ derived }: { derived: DerivedGeometry }) {
+  const realistic = useAppSettings((s) => s.realisticLighting)
+  const geo = useMemo(() => {
+    const pieces = [
+      ...Object.values(derived.outlines.wallPolygons).map((poly) =>
+        buildPrismMeshData({ polygon: poly, z0: -SLAB_THICKNESS, z1: 0 }),
+      ),
+      ...Object.values(derived.outlines.nodePatches).map((poly) =>
+        buildPrismMeshData({ polygon: poly, z0: -SLAB_THICKNESS, z1: 0 }),
+      ),
+    ]
+    return pieces.length ? toBufferGeometry(mergeMeshData(pieces)) : null
+  }, [derived])
+  useEffect(() => () => geo?.dispose(), [geo])
+  if (!geo) return null
+  return (
+    <mesh
+      geometry={geo}
+      material={sceneMaterial('wallPaint')}
+      castShadow={realistic}
+      receiveShadow
+    />
+  )
+}
+
+/**
  * One storey's scene content (v7) — everything that was the single-level
  * scene, parameterized. The parent wraps each instance in a plan-space
  * `position-z={elevation}` group INSIDE the one rotation seam, so every
@@ -1472,6 +1506,7 @@ function LevelScene({
         Object.values(derived.rooms).map((r) => (
           <UpperSlabMesh key={`slab-${r.roomId}`} room={r} wells={wellsBelow} />
         ))}
+      {upperSlab && <WallBaseBand derived={derived} />}
       {/* active storey: ceilings per the 0.11.0 setting, bare down-facing
           slab (orbit sees in from above). NON-active storeys: ALWAYS
           sealed — ceiling + up-facing lid, regardless of the setting
