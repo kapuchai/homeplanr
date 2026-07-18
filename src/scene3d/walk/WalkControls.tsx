@@ -93,9 +93,13 @@ const freshKeys = (): MoveKeys => ({
 export function WalkControls({
   doc,
   derived,
+  elevation = 0,
 }: {
   doc: LevelDoc
   derived: DerivedGeometry
+  /** The active storey's floor-plane height (v7) — the eye walks at
+   * elevation + EYE_HEIGHT; plan-space movement/collision stay level-local. */
+  elevation?: number
 }) {
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
@@ -139,7 +143,7 @@ export function WalkControls({
       t: 0,
       dur: ENTER_GLIDE_S,
       fromPos: pose.current.position.clone(),
-      toPos: new Vector3(...planToWorld(target, EYE_HEIGHT)),
+      toPos: new Vector3(...planToWorld(target, elevation + EYE_HEIGHT)),
       fromQuat: pose.current.quaternion.clone(),
       toQuat: new Quaternion().setFromEuler(new Euler(eye.pitch, eye.yaw, 0, 'YXZ')),
       endPlan: target,
@@ -152,7 +156,7 @@ export function WalkControls({
       t: 0,
       dur: GLIDE_S,
       fromPos: camera.position.clone(),
-      toPos: new Vector3(...planToWorld(target, EYE_HEIGHT)),
+      toPos: new Vector3(...planToWorld(target, elevation + EYE_HEIGHT)),
       fromQuat: null,
       toQuat: null,
       endPlan: target,
@@ -459,7 +463,7 @@ export function WalkControls({
           finishRestoreRef.current()
         } else {
           if (g.endPlan) plan.current = { x: g.endPlan.x, y: g.endPlan.y }
-          camera.position.set(...planToWorld(plan.current, EYE_HEIGHT))
+          camera.position.set(...planToWorld(plan.current, elevation + EYE_HEIGHT))
           camera.rotation.set(pitch.current, yaw.current, 0)
         }
       }
@@ -487,7 +491,7 @@ export function WalkControls({
         ? resolveMove(getCollisionSet(doc, derived), plan.current, d)
         : { x: plan.current.x + d.x, y: plan.current.y + d.y }
     }
-    camera.position.set(...planToWorld(plan.current, EYE_HEIGHT))
+    camera.position.set(...planToWorld(plan.current, elevation + EYE_HEIGHT))
     camera.rotation.set(pitch.current, yaw.current, 0)
   })
 

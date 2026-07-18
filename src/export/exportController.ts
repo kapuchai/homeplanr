@@ -91,9 +91,8 @@ export async function exportImage(
   if (isTxActive()) return
   const { adapter } = usePersistStore.getState()
   const fullDoc = useDocStore.getState().doc
-  // v7: exports render the ACTIVE level (a per-floor selector lands with
-  // the switcher work)
-  const doc = levelDocOf(fullDoc, useActiveLevel.getState().activeLevelId)
+  // v7: exports render the chosen storey; absent = the active floor
+  const doc = levelDocOf(fullDoc, opts.levelId ?? useActiveLevel.getState().activeLevelId)
   const derived = getDerived(doc)
   const svg = renderPlanSvg(doc, derived, opts)
   if (!svg) {
@@ -150,9 +149,8 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
   if (isTxActive()) return
   const { adapter } = usePersistStore.getState()
   const fullDoc = useDocStore.getState().doc
-  // v7: exports render the ACTIVE level (a per-floor selector lands with
-  // the switcher work)
-  const doc = levelDocOf(fullDoc, useActiveLevel.getState().activeLevelId)
+  // v7: exports render the chosen storey; absent = the active floor
+  const doc = levelDocOf(fullDoc, opts.levelId ?? useActiveLevel.getState().activeLevelId)
   const derived = getDerived(doc)
   const svg = renderPlanSvg(doc, derived, opts)
   if (!svg) {

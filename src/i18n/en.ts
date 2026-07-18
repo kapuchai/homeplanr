@@ -157,6 +157,7 @@ export const en = {
 
   // ---- export dialog + flow ----
   'export.title': 'Export plan',
+  'export.floor': 'Floor',
   'export.format': 'Format',
   'export.scale': 'Scale',
   'export.scaleFit': 'Fit',

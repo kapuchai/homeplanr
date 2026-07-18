@@ -1,4 +1,5 @@
 import { DEFAULTS as MODEL_DEFAULTS, type LevelDoc } from '../model/types'
+import type { LevelId } from '../model/ids'
 import type { DerivedGeometry } from '../store/derived'
 import type { Bounds } from '../geometry/polygon'
 import {
@@ -33,6 +34,10 @@ import { useAppSettings } from '../store/appSettings'
  * model into the y-up chirality the editor renders (viewportMath docblock).
  */
 export interface ExportPlanOptions {
+  /** Which storey to export (v7) — consumed by the export CONTROLLER when
+   * resolving the level view; absent = the active floor. The pure SVG
+   * renderer itself never reads it. */
+  levelId?: LevelId
   /** Draw the document grid under the plan. Default false. */
   includeGrid?: boolean
   /** Paper margin around the content bounds, meters. Default 0.5. */

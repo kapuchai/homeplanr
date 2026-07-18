@@ -1499,7 +1499,7 @@ export function PlannerCanvas() {
           onBudget={setShadowIds}
         />
         <CaptureBridge apiRef={captureApi} />
-        <WalkControls doc={doc} derived={derived} />
+        <WalkControls doc={doc} derived={derived} elevation={activeElevation} />
         <SceneEnvironment box={box} onGroundClick={handleFloorClick} />
         <OrbitControls
           makeDefault

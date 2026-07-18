@@ -89,3 +89,20 @@ test('project notes roundtrip through the File menu', async ({ page }) => {
   await page.getByText('Project notes…').click()
   await expect(page.locator('.notes-text')).toHaveValue('Check loft headroom')
 })
+
+test('export dialog offers a floor choice once a second storey exists', async ({ page }) => {
+  await page.goto('/')
+  await drawRoom(page)
+  await page.getByRole('button', { name: /File/ }).click()
+  await page.getByText('Export…').click()
+  await expect(page.getByRole('dialog')).not.toContainText('Floor 1') // single level: no row
+  await page.keyboard.press('Escape')
+  await switcher(page).getByTitle('Add floor').click()
+  await page.getByRole('button', { name: /File/ }).click()
+  await page.getByText('Export…').click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: 'Floor 2' })).toHaveClass(/active/) // defaults to the active floor
+  await dialog.getByRole('button', { name: 'Floor 1' }).click()
+  await expect(dialog.getByRole('button', { name: 'Floor 1' })).toHaveClass(/active/)
+  await page.keyboard.press('Escape')
+})

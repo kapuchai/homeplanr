@@ -1,5 +1,10 @@
 import { useState } from 'react'
 import { useUiStore } from '../store/uiStore'
+import { useDocStore } from '../store/docStore'
+import { useActiveLevel } from '../store/activeLevel'
+import { resolveLevel } from '../store/levelView'
+import { levelDisplayName } from './levelName'
+import type { LevelId } from '../model/ids'
 import { Modal } from './Modal'
 import { exportImage, exportPdf } from '../export/exportController'
 import type { Orientation, PaperSize } from '../export/paper'
@@ -45,6 +50,12 @@ export function ExportDialog() {
 
 function ExportDialogInner() {
   const setOpen = useUiStore((s) => s.setExportOpen)
+  const levels = useDocStore((s) => s.doc.levels)
+  const activeLevelId = useActiveLevel((s) => s.activeLevelId)
+  const fullDoc = useDocStore.getState().doc
+  const [levelId, setLevelId] = useState<LevelId>(
+    () => resolveLevel(fullDoc, activeLevelId).id,
+  )
   const [format, setFormat] = useState<Format>('png')
   const [scale, setScale] = useState<ScaleChoice>('fit')
   const [includeGrid, setIncludeGrid] = useState(false)
@@ -61,6 +72,7 @@ function ExportDialogInner() {
     const base = {
       includeGrid,
       marginM,
+      levelId,
       ...(scale !== 'fit' ? { scaleDenominator: scale } : {}),
     }
     if (format === 'pdf') {
@@ -95,6 +107,16 @@ function ExportDialogInner() {
       <>
         <h3>{t('export.title')}</h3>
         <section className="options-section">
+          {levels.length > 1 && (
+            <div className="options-row">
+              <span>{t('export.floor')}</span>
+              {seg(
+                levels.map((l, i) => ({ value: l.id, label: levelDisplayName(l, i) })),
+                levelId,
+                setLevelId,
+              )}
+            </div>
+          )}
           <div className="options-row">
             <span>{t('export.format')}</span>
             {seg(FORMATS, format, setFormat)}
