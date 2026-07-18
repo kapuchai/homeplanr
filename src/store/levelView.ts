@@ -41,6 +41,17 @@ export function getActiveLevelDoc(): LevelDoc {
   return levelDocOf(useDocStore.getState().doc, useActiveLevel.getState().activeLevelId)
 }
 
+/** The storey BELOW the active one, or null on the ground floor — the
+ * ghost underlay's data, also the cross-level SNAP source (0.13.0
+ * feedback: walls drawn upstairs must be able to land exactly on the
+ * walls below). */
+export function getLevelBelowDoc(): LevelDoc | null {
+  const doc = useDocStore.getState().doc
+  const active = resolveLevel(doc, useActiveLevel.getState().activeLevelId)
+  const idx = doc.levels.findIndex((l) => l.id === active.id)
+  return idx > 0 ? levelDocOf(doc, doc.levels[idx - 1]!.id) : null
+}
+
 /** Reactive view of the active level — re-renders on doc commits AND on
  * floor switches; identity-stable per (doc, level). */
 export function useActiveLevelDoc(): LevelDoc {

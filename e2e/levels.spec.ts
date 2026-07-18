@@ -106,3 +106,45 @@ test('export dialog offers a floor choice once a second storey exists', async ({
   await expect(dialog.getByRole('button', { name: 'Floor 1' })).toHaveClass(/active/)
   await page.keyboard.press('Escape')
 })
+
+test('arrows navigate floors; Shift+arrow reorders', async ({ page }) => {
+  await page.goto('/')
+  await switcher(page).getByTitle('Add floor').click()
+  await expect(rows(page).first()).toHaveClass(/active/) // on Floor 2
+  await switcher(page).getByTitle(/Floor below/).click()
+  await expect(rows(page).nth(1)).toHaveClass(/active/) // navigated down
+  await expect(rows(page).nth(1)).toHaveText('Floor 1') // order unchanged
+  await switcher(page).getByTitle(/Floor above/).click({ modifiers: ['Shift'] })
+  // reordered: the active (formerly ground) floor moved up the stack
+  await expect(rows(page).first()).toHaveClass(/active/)
+})
+
+test('walls drawn upstairs snap exactly onto the storey below', async ({ page }) => {
+  await page.goto('/')
+  await drawRoom(page, { exact: true }) // off-grid coordinates on purpose
+  const before = await page.evaluate(async () => {
+    const lv = await import('/src/store/levelView.ts')
+    return Object.values(lv.getActiveLevelDoc().nodes).map((n: any) => [n.x, n.y])
+  })
+  await switcher(page).getByTitle('Add floor').click()
+  const canvas = page.locator('svg.editor-canvas')
+  const box = (await canvas.boundingBox())!
+  await page.keyboard.press('w')
+  // click a few px OFF the floor-1 corner nodes — snap must pull onto them
+  await page.mouse.click(box.x + box.width * 0.3 + 4, box.y + box.height * 0.3 + 3)
+  await page.waitForTimeout(350)
+  await page.mouse.click(box.x + box.width * 0.7 - 3, box.y + box.height * 0.3 + 4)
+  await page.waitForTimeout(350)
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  const after = await page.evaluate(async () => {
+    const lv = await import('/src/store/levelView.ts')
+    return Object.values(lv.getActiveLevelDoc().nodes).map((n: any) => [n.x, n.y])
+  })
+  const close = (a: number[], b: number[]) =>
+    Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!) < 1e-6
+  for (const n of after) {
+    expect(before.some((m: number[]) => close(m, n))).toBe(true) // landed EXACTLY on floor 1
+  }
+  expect(after.length).toBeGreaterThanOrEqual(2)
+})

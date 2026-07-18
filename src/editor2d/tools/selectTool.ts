@@ -24,6 +24,7 @@ import {
 import type { SnapCandidate } from '../../geometry/snapping'
 import { beginTx, commitTx, abortTx, type TxToken } from '../../store/transactions'
 import { useAppSettings } from '../../store/appSettings'
+import { getLevelBelowDoc } from '../../store/levelView'
 import { formatLength } from '../../format/units'
 import { CATALOG } from '../../catalog'
 import { resizeHandlePositions, rotateHandlePos, roomPivot, roomRotateHandlePos, HANDLE_RADIUS_PX, RESIZE_CORNERS, RESIZE_HANDLE_RADIUS_PX } from './handles'
@@ -632,11 +633,14 @@ export function createSelectTool(): Tool {
           const node = doc.nodes[state.nodeId]
           if (!node) return
           const incident = new Set(incidentWallIds(doc, state.nodeId))
+          const below = getLevelBelowDoc() // cross-level snap (0.13.0)
           const snap = resolveSnap(
             e.world,
             [
               ...nodeCandidates(doc, new Set([state.nodeId])),
               ...wallPointCandidates(doc, e.world, incident),
+              ...(below ? nodeCandidates(below) : []),
+              ...(below ? wallPointCandidates(below, e.world) : []),
               gridCandidate(doc, 1 / px),
             ],
             {

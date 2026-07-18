@@ -136,11 +136,16 @@ export function LevelSwitcher() {
         >
           {ICON_DUP}
         </button>
+        {/* arrows NAVIGATE (user feedback: a selector's arrows should walk
+            floors, like PgUp/PgDn); Shift+arrow REORDERS the storey */}
         <button
           type="button"
           title={t('levels.upTitle')}
           disabled={activeIdx >= levels.length - 1}
-          onClick={() => a.moveLevel(active.id, 1)}
+          onClick={(e) => {
+            if (e.shiftKey) a.moveLevel(active.id, 1)
+            else setActiveLevel(levels[activeIdx + 1]!.id)
+          }}
         >
           {ICON_UP}
         </button>
@@ -148,7 +153,10 @@ export function LevelSwitcher() {
           type="button"
           title={t('levels.downTitle')}
           disabled={activeIdx <= 0}
-          onClick={() => a.moveLevel(active.id, -1)}
+          onClick={(e) => {
+            if (e.shiftKey) a.moveLevel(active.id, -1)
+            else setActiveLevel(levels[activeIdx - 1]!.id)
+          }}
         >
           {ICON_DOWN}
         </button>

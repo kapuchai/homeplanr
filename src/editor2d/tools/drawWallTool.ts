@@ -10,6 +10,7 @@ import {
 } from '../snap/candidates'
 import { safeUndo } from '../../store/transactions'
 import { useAppSettings } from '../../store/appSettings'
+import { getLevelBelowDoc } from '../../store/levelView'
 import { formatLength } from '../../format/units'
 
 /**
@@ -41,9 +42,14 @@ export function createDrawWallTool(): Tool {
 
   const snapAt = (e: EditorPointerEvent, ctx: ToolContext): SnapResult => {
     const doc = ctx.doc()
+    // cross-level snapping (0.13.0 feedback): the ghosted storey below is
+    // a first-class snap source — upper walls can land EXACTLY on it
+    const below = getLevelBelowDoc()
     const candidates = [
       ...nodeCandidates(doc),
       ...wallPointCandidates(doc, e.world),
+      ...(below ? nodeCandidates(below) : []),
+      ...(below ? wallPointCandidates(below, e.world) : []),
       gridCandidate(doc, 1 / ctx.pxToWorld()),
       ...(chain.anchor ? angleRayCandidates(chain.anchor) : []),
     ]
