@@ -4,7 +4,46 @@ Working notes for future development sessions. The full v1 design rationale
 lives in the original plan; day-to-day, this file + `src/model/README.md`
 (conventions) are what you need.
 
-## State (as of v0.12.0, 2026-07-18)
+## State (as of v0.13.0, 2026-07-18)
+
+0.13.0 "Multi-floor" (schema v6 → **v7** — the STRUCTURAL bump, kept
+clean apart from the additive notes/floorElevation whitelist fields):
+**levels model** (the six entity maps moved into `levels: Level[]`,
+ground first; assets/preview/notes stay top-level; `LevelDoc` = the
+single-level working view whose maps ALIAS one level + doc
+assets/settings — every entity mutation, getDerived, hit test, snap,
+renderer operates on it; docStore's `mutate()` seam hands mutations the
+ACTIVE level's draft view, `mutateDoc()` covers name/settings/preview/
+notes/level ops; activeLevelId is EPHEMERAL in store/activeLevel.ts,
+undo FOLLOWS the changed level, selection prunes against the active
+level), **persistence** (MIGRATIONS[6] wraps v6 docs as one-level
+buildings; per-level validator loops + self-heal; hash covers all
+levels' graph maps; referencedAssetIds scans EVERY level — single-level
+scan would GC other floors' art; v6 goldens minted pre-bump), **floor
+switcher** (top-left overlay both views: add/duplicate[full id-remap
+deep copy]/rename/reorder/delete; PgUp/PgDn before the keymap 3D gate),
+**2D ghost underlay** (level below, walls-only, 0.14 opacity,
+`levelGhostEnabled`), **3D stacking** (per-level plan-space
+`position-z` groups inside the ONE rotation seam; levelElevations =
+stacked max-wall-height + SLAB_THICKNESS 0.3; thick upper slabs; floors
+ABOVE active hidden by default, `showFloorsAbove` Options row; only the
+ACTIVE storey gets occluder hiding/shadow ghosts/emitter lights/shadow
+budget/floor clicks; single-storey renders BIT-IDENTICAL to 0.12.0 —
+baseline-pinned), **walk at elevation** (eye = level elevation +
+EYE_HEIGHT; collision stays level-local), **stairs & ladders**
+(`structure` category, `connectsLevels`; stairwell carves DERIVED from
+footprint rects — ceiling of own level + floor/slab above,
+re-triangulated per room, straddling rects skipped; walk teleport zones
+front-of-run ↔ top-strip with an anti-bounce latch; `symbol2d` opt-in
+hook appends the 2D run arrow AFTER the derived body), **per-floor
+exports** (ExportDialog floor row via ExportPlanOptions.levelId) +
+per-floor plan stats + active-floor save preview, **project notes**
+(0.15.0 pull-forward: doc.notes + File-menu modal), **elevated room
+floors** (Room.floorElevation ≤2m: podium slab + skirt, furniture +
+collision bands ride it; walker height unchanged — ramps class CUT with
+P10 walkable stairs, still on the backlog).
+
+
 
 0.12.0 "Lighting" (NO schema bump — v6 already carried `lumen`/`lightOn`;
 `CatalogItem.emitter` is compile-time metadata): **realistic-lighting
@@ -230,7 +269,7 @@ export + 3D screenshot, file association + single instance, Linux
 |---|---|
 | Dev (native window, HMR) | `npm run tauri dev` |
 | Dev (browser only) | `npm run dev` |
-| Unit tests (879) | `npm test` |
+| Unit tests (987) | `npm test` |
 | E2E smoke | `npx playwright test --project=chromium` (webkit only works in CI — Arch lacks its Ubuntu-named host libs) |
 | Visual baselines (local rig) | `npx playwright test --project=chromium e2e/visual.spec.ts` — add `--update-snapshots` to rebaseline, then EYEBALL the new PNGs |
 | Native smoke (Tier 1) | `npm run smoke:native` — needs a FRESH release binary (`npm run tauri build -- --no-bundle`), `~/.cargo/bin/tauri-driver`, and no running homeplanr instance |
@@ -533,6 +572,39 @@ export + 3D screenshot, file association + single instance, Linux
   [realistic]-keyed effect and SunSky owns the value under realistic —
   React runs child effects before parent effects, so an unconditional
   parent-side write clobbers the ramp (the night-rendered-as-day bug).
+
+- **Levels are THE document structure (0.13.0, v7)**: entity records live
+  in `doc.levels[]`; `LevelDoc` views ALIAS a level's maps + doc
+  assets/settings. Mutations are LevelDoc-typed and reach the active
+  level ONLY through docStore's `mutate()` seam — never write a
+  LevelDoc's own top-level properties (doc-scoped fields go through
+  `mutateDoc`). Views must stay identity-stable per (doc, level) —
+  `levelView.ts` caches them; getDerived keys on VIEW identity with
+  per-level `prev` state. No production code may reassign an entity map
+  (`doc.walls = …`) — the aliasing write-through depends on it.
+- **activeLevelId is session state, never document data** (the
+  snapEnabled precedent): switching floors must not dirty the file or
+  make undo entries. Undo/redo FOLLOW the changed level (transactions
+  diff level references); selection prunes against the ACTIVE level.
+- **referencedAssetIds scans ALL levels** — a single-level scan makes
+  gcAssets eat assets referenced only by another floor at the next save
+  (test-pinned). Asset content is doc-shared: duplicateLevel re-mints
+  every entity id but deliberately KEEPS assetId references.
+- **Single-storey 3D renders bit-identically to 0.12.0**
+  (baseline-pinned): one ground LevelScene in a zero-translation group;
+  unionSceneBBox returns the sole ground part's box BY REFERENCE. Only
+  the ACTIVE storey gets occluder hiding, shadow ghosts, emitter lights,
+  the shadow budget, and floor clicks — a non-active lamp would pour
+  light through slabs (no shadow caster budget there).
+- **Stairwell carves are DERIVED, never stored**: connectsLevels
+  footprint rects carve the own-level ceiling and the above-level
+  floor + slab at render; rects straddling a room boundary are SKIPPED
+  (earcut cannot cross it). Walk transitions are teleport zones with an
+  anti-bounce latch (the descend arrival sits inside the ascend zone).
+- **2D symbols stay derived from build3d** — `symbol2d` is an ADDITIVE
+  annotation hook (stair arrows): it may only append prims after the
+  derived body, rendered through the same SymbolPrim path in editor and
+  export. It must never replace the derived symbol.
 
 ## Schema change checklist (bumping schema N → N+1)
 

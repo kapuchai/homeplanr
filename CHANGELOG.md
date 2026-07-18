@@ -5,6 +5,45 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-07-18
+
+### Added
+
+- **Multiple floors** — plans are buildings now. A floor switcher sits in
+  the top-left corner of both views: add an empty floor, duplicate the
+  current one (the fastest way to start floor 2 from floor 1's outline),
+  rename floors with a double-click, reorder or delete them. PgUp / PgDn
+  switch floors from the keyboard, and undo automatically jumps to the
+  floor it changed
+- **Per-floor editing with a ghost underlay** — the 2D editor always works
+  on one floor; the floor below shows through as a faint outline so upper
+  walls line up with the structure underneath (toggleable in Options →
+  View)
+- **The whole building in 3D** — floors stack at their real heights with
+  proper slabs between storeys. Floors above the active one stay hidden so
+  you can always see into the floor you're working on (pick the top floor
+  to see the whole building, or turn on *Show floors above*); walking
+  happens on the active floor at its real height
+- **Stairs and ladders** — a new *Structure* catalog category: straight,
+  L-shaped and spiral stairs plus a loft ladder. Placing one cuts a real
+  stairwell through the ceiling and the floor above, the 2D symbol carries
+  the classic direction arrow, and in walk mode stepping onto the stair
+  takes you to the other floor (both directions)
+- **Per-floor exports** — the export dialog gets a floor choice once a
+  second storey exists; the plan statistics show a per-floor area
+  breakdown, and the save preview captures the floor you're looking at
+- **Raised room floors** — a *Floor lift* field on every room raises its
+  floor as a podium (loft steps, bathroom platforms); furniture standing
+  in the room rides up with it
+- **Project notes** — File → *Project notes…* opens a simple text pad
+  saved inside the project file
+
+### Changed
+
+- Project files upgrade to schema v7 (floors). Existing plans open
+  silently as one-floor buildings and save in the new format — nothing to
+  do on your side
+
 ## [0.12.0] - 2026-07-18
 
 ### Added
