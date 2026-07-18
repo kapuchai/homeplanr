@@ -21,6 +21,7 @@ import { useSceneDoc } from './useSceneDoc'
 import { levelDocOf } from '../store/levelView'
 import { SLAB_THICKNESS, levelElevations } from '../model/levels'
 import { carveRoomTriangulation, stairwellRects } from './stairwell'
+import { buildStairTransitions } from './walk/stairTransitions'
 import {
   buildCeilingMeshData,
   buildFloorMeshData,
@@ -1427,6 +1428,10 @@ export function PlannerCanvas() {
     [levelParts],
   )
   const pose = useMemo(() => fitCameraPose(box), [box])
+  const stairLinks = useMemo(
+    () => buildStairTransitions(full, doc.levelId),
+    [full, doc.levelId],
+  )
   const [presetReq, setPresetReq] = useState<{ pose: CameraPose; seq: number } | null>(null)
   const orbitHintSeen = useAppSettings((s) => s.orbitHintSeen)
   const [glError, setGlError] = useState<string | null>(null)
@@ -1548,7 +1553,12 @@ export function PlannerCanvas() {
           onBudget={setShadowIds}
         />
         <CaptureBridge apiRef={captureApi} />
-        <WalkControls doc={doc} derived={derived} elevation={activeElevation} />
+        <WalkControls
+          doc={doc}
+          derived={derived}
+          elevation={activeElevation}
+          transitions={stairLinks}
+        />
         <SceneEnvironment box={box} onGroundClick={handleFloorClick} />
         <OrbitControls
           makeDefault

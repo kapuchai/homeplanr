@@ -17,6 +17,9 @@ import {
   resetLockProbe,
 } from './pointerLock'
 import { EYE_HEIGHT, getCollisionSet, resolveMove } from './collision'
+import { pointInPolygon } from '../../geometry/polygon'
+import { useActiveLevel } from '../../store/activeLevel'
+import type { StairTransition } from './stairTransitions'
 import {
   clampPitch,
   eyePoseFor,
@@ -94,12 +97,15 @@ export function WalkControls({
   doc,
   derived,
   elevation = 0,
+  transitions = [],
 }: {
   doc: LevelDoc
   derived: DerivedGeometry
   /** The active storey's floor-plane height (v7) — the eye walks at
    * elevation + EYE_HEIGHT; plan-space movement/collision stay level-local. */
   elevation?: number
+  /** Stair teleport zones available FROM this storey (0.13.0). */
+  transitions?: readonly StairTransition[]
 }) {
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
@@ -111,6 +117,8 @@ export function WalkControls({
   const pose = useRef<SavedPose | null>(null)
   const glide = useRef<Glide | null>(null)
   const plan = useRef<Vec2>({ x: 0, y: 0 })
+  // armed while standing inside any stair zone (see the transition block)
+  const zoneLatch = useRef(true)
   const yaw = useRef(0)
   const pitch = useRef(0)
   const keys = useRef<MoveKeys>(freshKeys())
@@ -491,6 +499,23 @@ export function WalkControls({
         ? resolveMove(getCollisionSet(doc, derived), plan.current, d)
         : { x: plan.current.x + d.x, y: plan.current.y + d.y }
     }
+
+    // stair transitions (0.13.0): stepping into a zone switches storey and
+    // repositions past the stairwell. The latch arms only after the walker
+    // is CLEAR of every zone — the descend arrival sits inside the twin
+    // ascend zone, and without the latch it would bounce straight back.
+    const inAnyZone = transitions.some((tr) => pointInPolygon(plan.current, tr.zone))
+    if (!inAnyZone) zoneLatch.current = false
+    else if (!zoneLatch.current) {
+      const hit = transitions.find((tr) => pointInPolygon(plan.current, tr.zone))!
+      zoneLatch.current = true
+      plan.current = { x: hit.arrival.x, y: hit.arrival.y }
+      camera.position.set(...planToWorld(plan.current, hit.targetElevation + EYE_HEIGHT))
+      camera.rotation.set(pitch.current, yaw.current, 0)
+      useActiveLevel.getState().setActiveLevel(hit.targetLevelId)
+      return
+    }
+
     camera.position.set(...planToWorld(plan.current, elevation + EYE_HEIGHT))
     camera.rotation.set(pitch.current, yaw.current, 0)
   })
