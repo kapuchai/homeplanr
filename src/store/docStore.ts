@@ -96,6 +96,7 @@ export interface DocState {
   // rooms / project
   renameRoom: (id: RoomId, name: string) => void
   setRoomFloorMaterial: (id: RoomId, materialId: string | undefined) => void
+  setRoomFloorElevation: (id: RoomId, elevation: number | undefined) => void
   setRoomType: (id: RoomId, roomType: string | undefined) => void
   paintRoomWalls: (id: RoomId, paintId: string | undefined) => void
   renameProject: (name: string) => void
@@ -191,6 +192,7 @@ export const useDocStore = create<DocState>()(
           updateAnnotation: (id, patch) => mutate((d) => annotations.updateAnnotation(d, id, patch)),
           renameRoom: (id, name) => mutate((d) => rooms.renameRoom(d, id, name)),
           setRoomFloorMaterial: (id, mat) => mutate((d) => rooms.setRoomFloorMaterial(d, id, mat)),
+          setRoomFloorElevation: (id, fe) => mutate((d) => rooms.setRoomFloorElevation(d, id, fe)),
           setRoomType: (id, roomType) => mutate((d) => rooms.setRoomType(d, id, roomType)),
           paintRoomWalls: (id, paintId) => mutate((d) => rooms.paintRoomWalls(d, id, paintId)),
           renameProject: (name) => mutateDoc((d) => project.renameProject(d, name)),

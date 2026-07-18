@@ -21,6 +21,7 @@ import { useSceneDoc } from './useSceneDoc'
 import { levelDocOf } from '../store/levelView'
 import { SLAB_THICKNESS, levelElevations } from '../model/levels'
 import { carveRoomTriangulation, stairwellRects } from './stairwell'
+import { pointInPolygon } from '../geometry/polygon'
 import { buildStairTransitions } from './walk/stairTransitions'
 import {
   buildCeilingMeshData,
@@ -205,14 +206,31 @@ function FloorMesh({
     const carved = carveRoomTriangulation(room, wells)
     return toBufferGeometry(buildFloorMeshData(carved?.tri ?? room.floor))
   }, [room, wells])
+  // v7 podium: a lifted room's slab rises on a side band (walls keep their
+  // full height behind it — the honest v1; wall-face trimming is future)
+  const lift = room.room.floorElevation ?? 0
+  const bandGeo = useMemo(
+    () =>
+      lift > 0
+        ? toBufferGeometry(buildRingSidesMeshData(room.polygon, 0, lift))
+        : null,
+    [room, lift],
+  )
   useEffect(() => () => geo.dispose(), [geo])
+  useEffect(() => () => bandGeo?.dispose(), [bandGeo])
   return (
-    <mesh
-      geometry={geo}
-      material={floorMaterial(room.room.floorMaterialId)}
-      receiveShadow
-      onClick={onClick}
-    />
+    <>
+      <mesh
+        geometry={geo}
+        position-z={lift}
+        material={floorMaterial(room.room.floorMaterialId)}
+        receiveShadow
+        onClick={onClick}
+      />
+      {bandGeo && (
+        <mesh geometry={bandGeo} material={sceneMaterial('wallPaint')} receiveShadow />
+      )}
+    </>
   )
 }
 
@@ -1322,6 +1340,18 @@ function LevelScene({
     return !!incident && incident.length > 0 && incident.every((id) => hiddenWalls.has(id))
   }
   const wallHidden = (id: WallId): boolean => active && hiddenWalls.has(id)
+  // v7 podium: furniture standing in a lifted room rides its floor
+  const liftedRooms = useMemo(
+    () =>
+      Object.values(derived.rooms).filter((r) => (r.room.floorElevation ?? 0) > 0),
+    [derived],
+  )
+  const liftOf = (x: number, y: number): number =>
+    liftedRooms.find(
+      (r) =>
+        pointInPolygon({ x, y }, r.polygon) &&
+        !r.holePolygons.some((h) => pointInPolygon({ x, y }, h)),
+    )?.room.floorElevation ?? 0
   // ceiling height = the room's LOWEST wall (the patch precedent: mixed
   // heights get the safe minimum; degenerate cycles fall back to default)
   const ceilingZ = (room: DerivedRoom): number => {
@@ -1378,12 +1408,9 @@ function LevelScene({
           <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} wells={wellsHere} />
         ))}
       {Object.values(doc.furniture).map((f) => (
-        <Furniture3D
-          key={f.id}
-          f={f}
-          shadowCast={active && shadowIds.has(f.id)}
-          lightsOn={active}
-        />
+        <group key={f.id} position-z={liftOf(f.x, f.y)}>
+          <Furniture3D f={f} shadowCast={active && shadowIds.has(f.id)} lightsOn={active} />
+        </group>
       ))}
     </>
   )

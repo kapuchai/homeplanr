@@ -111,6 +111,22 @@ export function setRoomFloorMaterial(
   else delete room.floorMaterialId
 }
 
+/** Per-room floor lift (v7 podium/loft step) — only positive values are
+ * stored (validator parity: clamp ≤ 2 m; zero/junk clears the field). */
+export function setRoomFloorElevation(
+  doc: LevelDoc,
+  id: RoomId,
+  elevation: number | undefined,
+): void {
+  const room = doc.rooms[id]
+  if (!room) return
+  if (elevation !== undefined && Number.isFinite(elevation) && elevation > 0) {
+    room.floorElevation = Math.min(2, elevation)
+  } else {
+    delete room.floorElevation
+  }
+}
+
 /**
  * Set/clear the room type (0.8.0 — the v4 field gets semantics). Setting a
  * KNOWN type also seeds its suggested floor material, but ONLY when the

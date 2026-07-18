@@ -1171,6 +1171,11 @@ export function PropertiesPanel() {
           current={null}
           onPick={(id) => a.paintRoomWalls(room.id, id)}
         />
+        <LengthField
+          label={t('props.floorHeight')}
+          value={room.floorElevation ?? 0}
+          onCommit={(v) => a.setRoomFloorElevation(room.id, v)}
+        />
         {dr && (
           <Row>
             <span>{t('props.area')}</span>

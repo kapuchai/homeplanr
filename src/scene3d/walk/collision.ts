@@ -134,10 +134,22 @@ export function buildCollisionSet(doc: LevelDoc, derived: DerivedGeometry): Coll
   // `mirrored` reflects the mesh only; the w×d footprint is axis-symmetric.
   // Catalog `passable` items (curtains, blinds) never block regardless of
   // bands — fabric yields; unknown catalog ids fall through to blocking.
+  // v7 elevated room floors LIFT their furniture's vertical extent (the
+  // walker itself stays at the level plane — podiums are visual v1).
+  const liftedRooms = Object.values(derived.rooms).filter(
+    (r) => (r.room.floorElevation ?? 0) > 0,
+  )
+  const liftOf = (fx: number, fy: number): number =>
+    liftedRooms.find(
+      (r) =>
+        pointInPolygon({ x: fx, y: fy }, r.polygon) &&
+        !r.holePolygons.some((h) => pointInPolygon({ x: fx, y: fy }, h)),
+    )?.room.floorElevation ?? 0
   for (const f of Object.values(doc.furniture)) {
     if (CATALOG[f.catalogItemId]?.passable) continue
-    const lo = f.elevation
-    const hi = f.elevation + f.size.h
+    const lift = liftOf(f.x, f.y)
+    const lo = lift + f.elevation
+    const hi = lift + f.elevation + f.size.h
     const inBody = lo < BODY_BAND_HI && hi > BODY_BAND_LO
     const inEye = lo < EYE_BAND_HI && hi > EYE_BAND_LO
     if (!inBody && !inEye) continue

@@ -14,7 +14,7 @@ import {
 } from './walls'
 import { addOpening, findOpeningSlot, rehomeOpening, updateOpening } from './openings'
 import { runPipeline } from './pipeline'
-import { paintRoomWalls, renameRoom, setRoomType } from './rooms'
+import { paintRoomWalls, renameRoom, setRoomFloorElevation, setRoomType } from './rooms'
 import { addDimension, addLabel, updateAnnotation } from './annotations'
 import { pasteSubgraph } from './paste'
 import { captureRigStarts, collectRoomRig, tearRoomRig, transformRigRigid } from './roomRig'
@@ -1598,5 +1598,21 @@ describe('0.8.0 M8: setRoomType + floor suggestion', () => {
     setRoomType(d, room.id, 'observatory-2030') // open registry: stored as-is
     expect(room.roomType).toBe('observatory-2030')
     expect('floorMaterialId' in room).toBe(false) // no suggestion for unknown
+  })
+})
+
+describe('setRoomFloorElevation (v7 podium)', () => {
+  it('stores positive values clamped to 2m; zero/junk clears the field', () => {
+    const d = doc()
+    square(d)
+    const room = firstRoom(d)
+    setRoomFloorElevation(d, room.id, 0.45)
+    expect(room.floorElevation).toBe(0.45)
+    setRoomFloorElevation(d, room.id, 99)
+    expect(room.floorElevation).toBe(2)
+    setRoomFloorElevation(d, room.id, 0)
+    expect('floorElevation' in room).toBe(false)
+    setRoomFloorElevation(d, room.id, Number.NaN)
+    expect('floorElevation' in room).toBe(false)
   })
 })

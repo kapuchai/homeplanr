@@ -158,6 +158,7 @@ export const en = {
   // ---- export dialog + flow ----
   'export.title': 'Export plan',
   'export.floor': 'Floor',
+  'props.floorHeight': 'Floor lift',
   'export.format': 'Format',
   'export.scale': 'Scale',
   'export.scaleFit': 'Fit',
