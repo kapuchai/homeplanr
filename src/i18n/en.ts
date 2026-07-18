@@ -24,6 +24,7 @@ export const en = {
   'common.off': 'Off',
   'common.close': 'Close',
   'common.cancel': 'Cancel',
+  'common.save': 'Save',
 
   // ---- File menu ----
   'menu.file': 'File',
@@ -117,6 +118,24 @@ export const en = {
   'options.dimsAll': 'All',
   'options.showAnnotations': 'Measurements & labels',
   'options.levelGhost': 'Floor-below outline',
+
+  'menu.notes': 'Project notes…',
+  'notes.title': 'Project notes',
+  'notes.placeholder': 'Anything worth remembering about this project…',
+
+  // floor switcher (0.13.0)
+  'levels.floorN': 'Floor {n}',
+  'levels.listAria': 'Floors',
+  'levels.rowTitle': 'Switch floor (double-click to rename)',
+  'levels.renameAria': 'Floor name',
+  'levels.addTitle': 'Add floor',
+  'levels.duplicateTitle': 'Duplicate floor',
+  'levels.upTitle': 'Move floor up',
+  'levels.downTitle': 'Move floor down',
+  'levels.deleteTitle': 'Delete floor',
+  'levels.deleteConfirmTitle': 'Delete floor?',
+  'levels.deleteConfirmMessage': '"{name}" and everything on it will be removed.',
+  'levels.deleteConfirm': 'Delete',
   'options.uiScale': 'Interface scale',
   'options.section.view3d': '3D view',
   'options.walkCollision': 'Walk collision',
@@ -346,6 +365,7 @@ export const en = {
   'shortcuts.does.zoomToSelection': 'Zoom to selection',
   'shortcuts.does.wallDimensions': 'Cycle dimension labels (walls / openings / all)',
   'shortcuts.does.annotations': 'Show/hide measurements & labels',
+  'shortcuts.does.switchFloor': 'Switch floor up / down',
   'shortcuts.does.thisSheet': 'This sheet',
   'shortcuts.does.newProject': 'New project',
   'shortcuts.does.open': 'Open…',

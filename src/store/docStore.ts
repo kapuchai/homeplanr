@@ -22,6 +22,8 @@ import * as annotations from '../model/mutations/annotations'
 import * as paste from '../model/mutations/paste'
 import * as attachment from '../model/mutations/attachment'
 import * as roomRig from '../model/mutations/roomRig'
+import * as levelOps from '../model/mutations/levelOps'
+import type { LevelId } from '../model/ids'
 import type { MutationMode } from '../model/mutations/pipeline'
 
 /**
@@ -100,6 +102,12 @@ export interface DocState {
   updateSettings: (patch: Partial<ProjectSettings>) => void
   /** Project notes (0.15.0 pull-forward): undoable doc-scoped edit. */
   setNotes: (notes: string) => void
+  // storeys (v7) — doc-scoped, all undoable
+  addLevel: () => LevelId
+  duplicateLevel: (id: LevelId) => LevelId | null
+  renameLevel: (id: LevelId, name: string) => void
+  moveLevel: (id: LevelId, delta: 1 | -1) => boolean
+  deleteLevel: (id: LevelId) => boolean
   // document lifecycle
   newDocument: (name?: string) => void
   replaceDocument: (doc: ProjectDocument) => void
@@ -188,6 +196,11 @@ export const useDocStore = create<DocState>()(
           renameProject: (name) => mutateDoc((d) => project.renameProject(d, name)),
           updateSettings: (patch) => mutateDoc((d) => project.updateSettings(d, patch)),
           setNotes: (notes) => mutateDoc((d) => project.setNotes(d, notes)),
+          addLevel: () => mutateDoc((d) => levelOps.addLevel(d)),
+          duplicateLevel: (id) => mutateDoc((d) => levelOps.duplicateLevel(d, id)),
+          renameLevel: (id, name) => mutateDoc((d) => levelOps.renameLevel(d, id, name)),
+          moveLevel: (id, delta) => mutateDoc((d) => levelOps.moveLevel(d, id, delta)),
+          deleteLevel: (id) => mutateDoc((d) => levelOps.deleteLevel(d, id)),
           newDocument: (name = 'Untitled') => {
             useActiveLevel.getState().setActiveLevel(null)
             set((s) => {

@@ -57,6 +57,7 @@ import { hiddenWallIds, sameWallSet } from './wallOcclusion'
 import { DEG, solarPosition } from './sun'
 import { lightingRamp } from '../theme/sunRamp'
 import { SunArc } from './SunArc'
+import { LevelSwitcher } from '../app/LevelSwitcher'
 import type { FurnitureId, WallId } from '../model/ids'
 import type { Vec2 } from '../geometry/vec'
 import { captureAndSave, type CaptureApi } from './screenshot'
@@ -1389,6 +1390,7 @@ export function PlannerCanvas() {
       </Canvas>
       </GlErrorBoundary>
       {realisticLighting && walkMode !== 'walking' && <SunArc />}
+      {walkMode !== 'walking' && <LevelSwitcher />}
       <div className="view3d-controls segmented small">
         {(
           [

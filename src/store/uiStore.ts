@@ -52,6 +52,7 @@ export interface UiState {
   optionsOpen: boolean
   exportOpen: boolean
   helpOpen: boolean
+  notesOpen: boolean
   contextMenu: ContextMenuState | null
   /** Wall side hovered in the paint rows of the properties panel (2D badge ring). */
   highlightWallSide: 'front' | 'back' | null
@@ -67,6 +68,7 @@ export interface UiState {
   setOptionsOpen: (open: boolean) => void
   setExportOpen: (open: boolean) => void
   setHelpOpen: (open: boolean) => void
+  setNotesOpen: (open: boolean) => void
   setContextMenu: (menu: ContextMenuState | null) => void
   setHighlightWallSide: (side: 'front' | 'back' | null) => void
 }
@@ -83,6 +85,7 @@ export const useUiStore = create<UiState>()(
     optionsOpen: false,
     exportOpen: false,
     helpOpen: false,
+    notesOpen: false,
     contextMenu: null,
     highlightWallSide: null,
     setActiveTool: (tool) => set({ activeTool: tool }),
@@ -103,6 +106,7 @@ export const useUiStore = create<UiState>()(
     setOptionsOpen: (open) => set({ optionsOpen: open }),
     setExportOpen: (open) => set({ exportOpen: open }),
     setHelpOpen: (open) => set({ helpOpen: open }),
+    setNotesOpen: (open) => set({ notesOpen: open }),
     setContextMenu: (menu) => set({ contextMenu: menu }),
     setHighlightWallSide: (side) => set({ highlightWallSide: side }),
   })),

@@ -73,6 +73,7 @@ function LevelGhostLayer() {
   if (!enabled || !below || !d) return null
   return (
     <path
+      className="level-ghost"
       d={d}
       fill={theme.wall}
       fillOpacity={0.14}

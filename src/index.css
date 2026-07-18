@@ -1206,3 +1206,102 @@ button:disabled {
   max-height: min(70vh, 480px);
   overflow-y: auto;
 }
+
+/* Floor switcher (0.13.0) — top-left overlay, both views. */
+.level-switcher {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  max-height: 60%;
+  overflow-y: auto;
+}
+
+.level-switcher .level-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.level-switcher .level-rows button {
+  min-width: calc(var(--ui-scale) * 92px);
+  text-align: left;
+  font-size: calc(var(--ui-scale) * 12px);
+  padding: calc(var(--ui-scale) * 3px) calc(var(--ui-scale) * 8px);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.level-switcher .level-rows button:hover {
+  background: var(--hover);
+}
+
+.level-switcher .level-rows button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.level-switcher .level-rename {
+  min-width: calc(var(--ui-scale) * 92px);
+  font-size: calc(var(--ui-scale) * 12px);
+  padding: calc(var(--ui-scale) * 3px) calc(var(--ui-scale) * 8px);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.level-switcher .level-controls {
+  display: flex;
+  gap: 2px;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+
+.level-switcher .level-controls button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--ui-scale) * 3px) 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.level-switcher .level-controls button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.level-switcher .level-controls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Project notes dialog (0.13.0 pull-forward from 0.15.0). */
+.notes-text {
+  width: 100%;
+  resize: vertical;
+  min-height: 140px;
+  font: inherit;
+  font-size: calc(var(--ui-scale) * 13px);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  box-sizing: border-box;
+}

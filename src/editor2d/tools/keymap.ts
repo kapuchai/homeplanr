@@ -29,6 +29,10 @@ import { DIMENSION_LEVELS, useAppSettings } from '../../store/appSettings'
 import { KEY_ZOOM_FACTOR } from '../viewport/viewportMath'
 import type { FurnitureId } from '../../model/ids'
 import type { LevelDoc } from '../../model/types'
+import { useDocStore } from '../../store/docStore'
+import { useActiveLevel } from '../../store/activeLevel'
+import { resolveLevel } from '../../store/levelView'
+import { useWalkStore } from '../../scene3d/walk/walkStore'
 
 /**
  * THE keyboard entry point (plan-pinned):
@@ -173,6 +177,21 @@ export function handleKey(e: KeyInput, ctx: ToolContext, registry: ToolRegistry)
   // shortcut sheet — universal (works in 3D too; the toolbar button does)
   if (key === '?' && !isTxActive()) {
     ui.setHelpOpen(true)
+    return
+  }
+
+  // floor switch (0.13.0) — universal like the file ops (PgUp/PgDn are
+  // unbound elsewhere), but NOT while walking (WalkControls owns walk keys
+  // and a mid-walk floor jump would teleport the player)
+  if ((key === 'PageUp' || key === 'PageDown') && !isTxActive()) {
+    if (useWalkStore.getState().mode === 'walking') return
+    e.preventDefault()
+    const doc = useDocStore.getState().doc
+    const active = resolveLevel(doc, useActiveLevel.getState().activeLevelId)
+    const idx = doc.levels.findIndex((l) => l.id === active.id)
+    const to = idx + (key === 'PageUp' ? 1 : -1)
+    const target = doc.levels[to]
+    if (target) useActiveLevel.getState().setActiveLevel(target.id)
     return
   }
 

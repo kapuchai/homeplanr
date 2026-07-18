@@ -20,6 +20,7 @@ import {
   zoomToFitContent,
 } from './tools/keymap'
 import { EmptyState, StatusHint } from '../app/StatusHint'
+import { LevelSwitcher } from '../app/LevelSwitcher'
 import { ZoomControls } from './ZoomControls'
 import type { EditorPointerEvent } from './tools/toolTypes'
 
@@ -385,6 +386,7 @@ export function Editor2D() {
       <EmptyState />
       <StatusHint />
       <ZoomControls />
+      <LevelSwitcher />
       <ContextMenu />
     </div>
   )

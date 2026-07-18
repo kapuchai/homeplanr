@@ -28,6 +28,7 @@ import { ConfirmDialog } from './app/ConfirmDialog'
 import { ExportDialog } from './app/ExportDialog'
 import { OptionsDialog } from './app/OptionsDialog'
 import { ShortcutHelp } from './app/ShortcutHelp'
+import { NotesDialog } from './app/NotesDialog'
 import { MenuList, type MenuEntry } from './app/MenuList'
 
 // unicode glyphs render inconsistently on WebKitGTK/Windows — inline SVGs
@@ -101,6 +102,10 @@ function FileMenu() {
       label: t('menu.export'),
       separatorBefore: true,
       onSelect: run(() => useUiStore.getState().setExportOpen(true)),
+    },
+    {
+      label: t('menu.notes'),
+      onSelect: run(() => useUiStore.getState().setNotesOpen(true)),
     },
     ...(canRecent && recents.length > 0
       ? recents.map((r, i) => ({
@@ -371,6 +376,7 @@ export default function App() {
       <OptionsDialog />
       <ExportDialog />
       <ShortcutHelp />
+      <NotesDialog />
       <ConfirmDialog />
     </div>
   )

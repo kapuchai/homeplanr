@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDocStore } from '../store/docStore'
-import { useActiveLevelDoc } from '../store/levelView'
+import { levelDocOf, useActiveLevelDoc } from '../store/levelView'
+import { levelDisplayName } from './levelName'
 import { useUiStore } from '../store/uiStore'
 import { useAppSettings } from '../store/appSettings'
 import {
@@ -707,9 +708,10 @@ function MultiPanel({ selection }: { selection: string[] }) {
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection)
   const doc = useActiveLevelDoc()
-  // the ONE doc-scoped read in this panel — previewCustom is deliberately
-  // absent from LevelDoc (the save preview belongs to the building)
+  // doc-scoped reads: previewCustom (the save preview belongs to the
+  // building) and the levels array for the building-wide statistics
   const previewCustom = useDocStore((s) => s.doc.previewCustom)
+  const fullDoc = useDocStore((s) => s.doc)
   const units = useAppSettings((s) => s.units)
   const currency = useAppSettings((s) => s.currency)
   const snapEnabled = useAppSettings((s) => s.snapEnabled)
@@ -1236,8 +1238,21 @@ export function PropertiesPanel() {
         // registry order + an unspecified bucket; total from derived areas.
         // 0.9.0 adds the project cost line (user-picked surface) — priced
         // items only, so price-less projects keep a clean stats block.
-        const drs = Object.values(getDerived(doc).rooms)
-        const priced = Object.values(doc.furniture).filter((f) => f.price !== undefined)
+        // v7: statistics are BUILDING-wide (every level), with a per-floor
+        // area breakdown once a second storey exists.
+        const perLevel = fullDoc.levels.map((level, i) => {
+          const view = levelDocOf(fullDoc, level.id)
+          const rooms = Object.values(getDerived(view).rooms)
+          return {
+            level,
+            i,
+            rooms,
+            area: rooms.reduce((acc, r) => acc + r.areaM2, 0),
+            priced: Object.values(view.furniture).filter((f) => f.price !== undefined),
+          }
+        })
+        const drs = perLevel.flatMap((l) => l.rooms)
+        const priced = perLevel.flatMap((l) => l.priced)
         const cost = priced.reduce((s, f) => s + f.price!, 0)
         if (!drs.length && !priced.length) return null
         const total = drs.reduce((acc, r) => acc + r.areaM2, 0)
@@ -1267,6 +1282,15 @@ export function PropertiesPanel() {
                 <span className="readonly">{formatArea(total, units)}</span>
               </Row>
             )}
+            {fullDoc.levels.length > 1 &&
+              [...perLevel].reverse().map(({ level, i, area, rooms }) =>
+                rooms.length ? (
+                  <div className="prop-row stat-row" key={level.id}>
+                    <span>{levelDisplayName(level, i)}</span>
+                    <span className="readonly">{formatArea(area, units)}</span>
+                  </div>
+                ) : null,
+              )}
             {rows.map((row) => (
               <div className="prop-row stat-row" key={row.label}>
                 <span>{row.count > 1 ? `${row.label} × ${row.count}` : row.label}</span>
