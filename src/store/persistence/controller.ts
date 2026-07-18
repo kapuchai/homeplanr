@@ -678,6 +678,11 @@ export async function offerRecovery(
 
 // ---------- launch (plan-pinned order) ----------
 export async function launchPersistence(): Promise<void> {
+  // once per app lifetime (StrictMode double-invokes mount effects in dev:
+  // without this the recovery offer queues TWICE and the second modal
+  // blocks clicks behind its backdrop — workflow-audit finding, 0.13.0)
+  if (launchStarted) return
+  launchStarted = true
   const tauri = await isTauriRuntime()
   const adapter = tauri ? createTauriStorage() : createBrowserStorage()
   usePersistStore.setState({ adapter, recents: loadRecents() })
@@ -781,6 +786,7 @@ async function takeLaunchFile(): Promise<string | null> {
 
 // registered ONCE for the app's lifetime — launch may re-run under StrictMode
 let closeGuardInstalled = false
+let launchStarted = false
 let openFileListenerInstalled = false
 function installOpenFileListener(): void {
   if (openFileListenerInstalled) return
@@ -815,7 +821,10 @@ async function isTauriRuntime(): Promise<boolean> {
 // Hot-swapping it creates a SECOND instance while older importers keep the
 // first — clicks write to one store, renderers read another ("switching
 // does nothing" in a long dev session). Decline HMR: edits here always
-// full-reload the page. No-op in production builds.
+// full-reload the page. No-op in production builds. (location.reload,
+// not hot.invalidate(): in this graph every importer is itself an
+// accepting boundary, so invalidation can degrade to a partial
+// re-execution — the exact split it must prevent.)
 if (import.meta.hot) {
-  import.meta.hot.accept(() => import.meta.hot!.invalidate())
+  import.meta.hot.accept(() => window.location.reload())
 }

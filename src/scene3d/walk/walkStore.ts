@@ -71,7 +71,10 @@ export const useWalkStore = create<WalkState>()(
 // Hot-swapping it creates a SECOND instance while older importers keep the
 // first — clicks write to one store, renderers read another ("switching
 // does nothing" in a long dev session). Decline HMR: edits here always
-// full-reload the page. No-op in production builds.
+// full-reload the page. No-op in production builds. (location.reload,
+// not hot.invalidate(): in this graph every importer is itself an
+// accepting boundary, so invalidation can degrade to a partial
+// re-execution — the exact split it must prevent.)
 if (import.meta.hot) {
-  import.meta.hot.accept(() => import.meta.hot!.invalidate())
+  import.meta.hot.accept(() => window.location.reload())
 }

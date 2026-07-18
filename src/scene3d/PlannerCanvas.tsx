@@ -692,6 +692,7 @@ function Furniture3D({
   f,
   shadowCast,
   lightsOn = true,
+  stretchToZ,
 }: {
   f: FurnitureInstance
   shadowCast: boolean
@@ -699,6 +700,10 @@ function Furniture3D({
    * another floor has no shadow caster, so its light would pour through
    * the slab into every level below. */
   lightsOn?: boolean
+  /** Render the item at exactly this height (m) — storey connectors
+   * stretch to the real floor-to-floor gap regardless of stored size
+   * (feedback round 2: stairs follow wall-height / floor-lift changes). */
+  stretchToZ?: number
 }) {
   const item = CATALOG[f.catalogItemId]
   const realistic = useAppSettings((s) => s.realisticLighting)
@@ -730,7 +735,7 @@ function Furniture3D({
   const s: [number, number, number] = [
     f.size.w / item.dims.w,
     f.size.d / item.dims.d,
-    f.size.h / item.dims.h,
+    (stretchToZ ?? f.size.h) / item.dims.h,
   ]
   // emitter lit = master toggle AND active-level AND the instance switch
   const lit = realistic && lightsOn && !!item.emitter && (f.lightOn ?? true)
@@ -1359,6 +1364,7 @@ function LevelScene({
   upperSlab,
   wellsHere,
   wellsBelow,
+  storeyGap,
   hiddenWalls,
   shadowIds,
   realisticLighting,
@@ -1373,6 +1379,10 @@ function LevelScene({
   wellsHere: readonly Vec2[][]
   /** Stairwell rects on the storey BELOW (carve floors + slab). */
   wellsBelow: readonly Vec2[][]
+  /** Vertical gap (m) to the next floor plane — storey connectors stretch
+   * to it so stairs always REACH the floor above (feedback round 2);
+   * absent on the top storey. */
+  storeyGap?: number
   hiddenWalls: Set<WallId>
   shadowIds: Set<FurnitureId>
   realisticLighting: boolean
@@ -1476,11 +1486,23 @@ function LevelScene({
             topCap={!active}
           />
         ))}
-      {Object.values(doc.furniture).map((f) => (
-        <group key={f.id} position-z={liftOf(f.x, f.y)}>
-          <Furniture3D f={f} shadowCast={active && shadowIds.has(f.id)} lightsOn={active} />
-        </group>
-      ))}
+      {Object.values(doc.furniture).map((f) => {
+        const lift = liftOf(f.x, f.y)
+        const stretch =
+          storeyGap !== undefined && CATALOG[f.catalogItemId]?.connectsLevels
+            ? Math.max(0.5, storeyGap - lift)
+            : undefined
+        return (
+          <group key={f.id} position-z={lift}>
+            <Furniture3D
+              f={f}
+              shadowCast={active && shadowIds.has(f.id)}
+              lightsOn={active}
+              {...(stretch !== undefined ? { stretchToZ: stretch } : {})}
+            />
+          </group>
+        )
+      })}
     </>
   )
 }
@@ -1510,6 +1532,13 @@ export function PlannerCanvas() {
         view: levelDocOf(full, level.id),
         wellsHere: wells[index]!,
         wellsBelow: index > 0 ? wells[index - 1]! : [],
+        // connectors on this storey stretch to the REAL gap to the next
+        // floor plane (feedback round 2: stairs must follow wall height /
+        // floor lift changes; the top storey keeps authored heights)
+        storeyGap:
+          index + 1 < full.levels.length
+            ? elevations[index + 1]! - elevations[index]!
+            : undefined,
       }))
       .filter((p) => showFloorsAbove || p.index <= activeIdx)
       .map((p) => ({ ...p, derived: getDerived(p.view) }))
@@ -1523,7 +1552,22 @@ export function PlannerCanvas() {
       ),
     [levelParts],
   )
-  const pose = useMemo(() => fitCameraPose(box), [box])
+  // camera poses CENTER ON THE ACTIVE STOREY (feedback round 2: the fit
+  // target sat 1 m above the GROUND floor, so switching storeys barely
+  // moved the camera vertically) — the whole pose rises by the elevation
+  const elevatePose = (p: CameraPose): CameraPose =>
+    activeElevation === 0
+      ? p
+      : {
+          position: [p.position[0], p.position[1] + activeElevation, p.position[2]],
+          target: [p.target[0], p.target[1] + activeElevation, p.target[2]],
+          maxDistance: p.maxDistance,
+        }
+  const pose = useMemo(
+    () => elevatePose(fitCameraPose(box)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [box, activeElevation],
+  )
   const stairLinks = useMemo(
     () => buildStairTransitions(full, doc.levelId),
     [full, doc.levelId],
@@ -1583,12 +1627,13 @@ export function PlannerCanvas() {
     if (prevLevelRef.current === doc.levelId) return
     prevLevelRef.current = doc.levelId
     if (useWalkStore.getState().mode === 'walking') return
-    setPresetReq((r) => ({ pose: fitCameraPose(box), seq: (r?.seq ?? 0) + 1 }))
+    setPresetReq((r) => ({ pose: elevatePose(fitCameraPose(box)), seq: (r?.seq ?? 0) + 1 }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.levelId, box])
 
   const applyPreset = (kind: CameraPresetKind) => {
     markOrbitHintSeen()
-    setPresetReq((r) => ({ pose: presetPose(box, kind), seq: (r?.seq ?? 0) + 1 }))
+    setPresetReq((r) => ({ pose: elevatePose(presetPose(box, kind)), seq: (r?.seq ?? 0) + 1 }))
   }
 
   const hint =
@@ -1691,6 +1736,7 @@ export function PlannerCanvas() {
                 upperSlab={p.index > 0}
                 wellsHere={p.wellsHere}
                 wellsBelow={p.wellsBelow}
+                {...(p.storeyGap !== undefined ? { storeyGap: p.storeyGap } : {})}
                 hiddenWalls={hiddenWalls}
                 shadowIds={shadowIds}
                 realisticLighting={realisticLighting}
