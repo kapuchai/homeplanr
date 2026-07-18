@@ -86,6 +86,42 @@ export function sceneBBox(doc: LevelDoc, derived: DerivedGeometry): SceneBBox {
   }
 }
 
+/**
+ * Union of per-level boxes at their stacking elevations (v7): plan-XY
+ * union, maxZ = the tallest level top at its offset; the ground plane
+ * stays z=0. A single ground-level part returns ITS box by reference —
+ * single-storey documents keep the exact pre-levels pose (bit-identity).
+ */
+export function unionSceneBBox(parts: readonly { box: SceneBBox; z: number }[]): SceneBBox {
+  if (parts.length === 1 && parts[0]!.z === 0) return parts[0]!.box
+  if (!parts.length) {
+    return { minX: -5, minY: -5, maxX: 5, maxY: 5, minZ: 0, maxZ: 3, cx: 0, cy: 0, diag: Math.hypot(10, 10) }
+  }
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let maxZ = 0
+  for (const { box, z } of parts) {
+    minX = Math.min(minX, box.minX)
+    minY = Math.min(minY, box.minY)
+    maxX = Math.max(maxX, box.maxX)
+    maxY = Math.max(maxY, box.maxY)
+    maxZ = Math.max(maxZ, z + box.maxZ)
+  }
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    minZ: 0,
+    maxZ,
+    cx: (minX + maxX) / 2,
+    cy: (minY + maxY) / 2,
+    diag: Math.hypot(maxX - minX, maxY - minY),
+  }
+}
+
 export interface CameraPose {
   /** WORLD-space (three.js y-up) camera position + orbit target. */
   position: [number, number, number]

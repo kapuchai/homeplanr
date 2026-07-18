@@ -118,6 +118,7 @@ export const en = {
   'options.dimsAll': 'All',
   'options.showAnnotations': 'Measurements & labels',
   'options.levelGhost': 'Floor-below outline',
+  'options.showFloorsAbove': 'Show floors above',
 
   'menu.notes': 'Project notes…',
   'notes.title': 'Project notes',

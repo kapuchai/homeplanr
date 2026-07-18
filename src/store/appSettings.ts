@@ -66,6 +66,9 @@ export interface AppSettings {
   ceilingsEnabled: boolean
   /** 2D ghost underlay of the level below the active one (v7). */
   levelGhostEnabled: boolean
+  /** 3D: render storeys ABOVE the active one (v7; default off — you can
+   * never see into a floor that has another floor's slab over it). */
+  showFloorsAbove: boolean
   /** Realistic lighting master toggle (0.12.0) — gates the sun model,
    * exposure, sky, interior emitters, and emissive materials. Off renders
    * exactly the pre-0.12.0 scene. Default OFF until 1.0.0. */
@@ -152,6 +155,7 @@ const DEFAULTS: AppSettings = {
   wallHideMode: 'hide',
   ceilingsEnabled: true,
   levelGhostEnabled: true,
+  showFloorsAbove: false,
   realisticLighting: false,
   exposure: 1,
   latitude: 60.17,
@@ -226,6 +230,8 @@ export function parseAppSettings(json: string | null): AppSettings {
         typeof r.ceilingsEnabled === 'boolean' ? r.ceilingsEnabled : DEFAULTS.ceilingsEnabled,
       levelGhostEnabled:
         typeof r.levelGhostEnabled === 'boolean' ? r.levelGhostEnabled : DEFAULTS.levelGhostEnabled,
+      showFloorsAbove:
+        typeof r.showFloorsAbove === 'boolean' ? r.showFloorsAbove : DEFAULTS.showFloorsAbove,
       realisticLighting:
         typeof r.realisticLighting === 'boolean' ? r.realisticLighting : DEFAULTS.realisticLighting,
       exposure: clampNum(r.exposure, EXPOSURE_RANGE.min, EXPOSURE_RANGE.max, DEFAULTS.exposure),
@@ -285,6 +291,7 @@ const persist = (s: AppSettings): void => {
         wallHideMode: s.wallHideMode,
         ceilingsEnabled: s.ceilingsEnabled,
         levelGhostEnabled: s.levelGhostEnabled,
+        showFloorsAbove: s.showFloorsAbove,
         realisticLighting: s.realisticLighting,
         exposure: s.exposure,
         latitude: s.latitude,
@@ -324,6 +331,7 @@ interface AppSettingsState extends AppSettings {
   setWallHideMode: (mode: WallHideMode) => void
   setCeilingsEnabled: (enabled: boolean) => void
   setLevelGhostEnabled: (enabled: boolean) => void
+  setShowFloorsAbove: (show: boolean) => void
   setRealisticLighting: (enabled: boolean) => void
   /** Clamped + persisted. Sliders/scrubbers write live via
    * useAppSettings.setState during a drag and call these on release
@@ -365,6 +373,7 @@ export const useAppSettings = create<AppSettingsState>()(
       setWallHideMode: (wallHideMode) => apply({ wallHideMode }),
       setCeilingsEnabled: (ceilingsEnabled) => apply({ ceilingsEnabled }),
       setLevelGhostEnabled: (levelGhostEnabled) => apply({ levelGhostEnabled }),
+      setShowFloorsAbove: (showFloorsAbove) => apply({ showFloorsAbove }),
       setRealisticLighting: (realisticLighting) => apply({ realisticLighting }),
       setExposure: (v) =>
         apply({ exposure: clampNum(v, EXPOSURE_RANGE.min, EXPOSURE_RANGE.max, DEFAULTS.exposure) }),

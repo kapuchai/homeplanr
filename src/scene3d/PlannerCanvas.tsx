@@ -18,6 +18,8 @@ import { useUiStore } from '../store/uiStore'
 import { useThemeStore } from '../theme/themeStore'
 import { getDerived, type DerivedGeometry, type DerivedRoom } from '../store/derived'
 import { useSceneDoc } from './useSceneDoc'
+import { levelDocOf } from '../store/levelView'
+import { SLAB_THICKNESS, levelElevations } from '../model/levels'
 import {
   buildCeilingMeshData,
   buildFloorMeshData,
@@ -32,6 +34,7 @@ import {
   fitCameraPose,
   presetPose,
   sceneBBox,
+  unionSceneBBox,
   type CameraPose,
   type CameraPresetKind,
   type SceneBBox,
@@ -620,7 +623,18 @@ function EmitterLight({
   )
 }
 
-function Furniture3D({ f, shadowCast }: { f: FurnitureInstance; shadowCast: boolean }) {
+function Furniture3D({
+  f,
+  shadowCast,
+  lightsOn = true,
+}: {
+  f: FurnitureInstance
+  shadowCast: boolean
+  /** v7: emitters light (and glow) only on the ACTIVE storey — a lamp on
+   * another floor has no shadow caster, so its light would pour through
+   * the slab into every level below. */
+  lightsOn?: boolean
+}) {
   const item = CATALOG[f.catalogItemId]
   const realistic = useAppSettings((s) => s.realisticLighting)
   const realized = useMemo(
@@ -653,8 +667,8 @@ function Furniture3D({ f, shadowCast }: { f: FurnitureInstance; shadowCast: bool
     f.size.d / item.dims.d,
     f.size.h / item.dims.h,
   ]
-  // emitter lit = master toggle AND the instance switch (absent = ON)
-  const lit = realistic && !!item.emitter && (f.lightOn ?? true)
+  // emitter lit = master toggle AND active-level AND the instance switch
+  const lit = realistic && lightsOn && !!item.emitter && (f.lightOn ?? true)
   return (
     <group position={[f.x, f.y, f.elevation]} rotation={[0, 0, f.rotation]} scale={s}>
       {realized.groups.map((g) => (
@@ -706,10 +720,14 @@ const BUDGET_MS = 250
  */
 function ShadowBudgetBridge({
   doc,
+  elevationY,
   enabled,
   onBudget,
 }: {
   doc: LevelDoc
+  /** The active storey's floor-plane height (v7) — world Y of an emitter
+   * = level elevation + furniture elevation + ~1 m. */
+  elevationY: number
   enabled: boolean
   onBudget: (ids: Set<FurnitureId>) => void
 }) {
@@ -723,9 +741,9 @@ function ShadowBudgetBridge({
     for (const f of Object.values(doc.furniture)) {
       const item = CATALOG[f.catalogItemId]
       if (!item?.emitter || !(f.lightOn ?? true)) continue
-      // plan → world: (x, y) → (x, −y), height ≈ elevation + 1
+      // plan → world: (x, y) → (x, −y), height ≈ level + elevation + 1
       const dx = camPos.x - f.x
-      const dy = camPos.y - (f.elevation + 1)
+      const dy = camPos.y - (elevationY + f.elevation + 1)
       const dz = camPos.z - -f.y
       lit.push({ id: f.id, d2: dx * dx + dy * dy + dz * dz })
     }
@@ -755,7 +773,7 @@ function ShadowBudgetBridge({
     }
     compute(camera.position)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, enabled, camera])
+  }, [doc, elevationY, enabled, camera])
 
   return null
 }
@@ -1183,10 +1201,182 @@ function markOrbitHintSeen() {
   if (!s.orbitHintSeen) s.setOrbitHintSeen(true)
 }
 
+/**
+ * Thick floor slab under an UPPER storey (v7): the room's outer polygon
+ * extruded from −SLAB_THICKNESS to just under the floor plane (the 1 mm
+ * inset keeps the prism's top cap off the coplanar FloorMesh — the same
+ * z-fight class the kitchen-sink fix killed). Its bottom face lands
+ * exactly on the tallest wall below (elevation stacking = wall height +
+ * slab), so from outside the building reads as walls → slab band →
+ * walls. Wall-island holes stay uncarved in the prism caps (the visible
+ * top is the hole-aware FloorMesh; stair carves re-visit this in P8).
+ */
+function UpperSlabMesh({ room }: { room: DerivedRoom }) {
+  const realistic = useAppSettings((s) => s.realisticLighting)
+  const geo = useMemo(
+    () =>
+      toBufferGeometry(
+        buildPrismMeshData({ polygon: room.polygon, z0: -SLAB_THICKNESS, z1: -0.001 }),
+      ),
+    [room],
+  )
+  useEffect(() => () => geo.dispose(), [geo])
+  return (
+    <mesh
+      geometry={geo}
+      material={sceneMaterial('ceiling')}
+      castShadow={realistic}
+      receiveShadow
+    />
+  )
+}
+
+/**
+ * One storey's scene content (v7) — everything that was the single-level
+ * scene, parameterized. The parent wraps each instance in a plan-space
+ * `position-z={elevation}` group INSIDE the one rotation seam, so every
+ * builder keeps its z-base-0 math. Only the ACTIVE storey gets the
+ * interactive treatments: occluder wall-hiding + shadow ghosts, the
+ * shadow-budget caster set, emitter lights, and walk floor-clicks —
+ * other storeys render plain (their lamps stay dark: an unshadowed
+ * point light would pour through the slabs).
+ */
+function LevelScene({
+  doc,
+  derived,
+  active,
+  upperSlab,
+  hiddenWalls,
+  shadowIds,
+  realisticLighting,
+  ceilingsEnabled,
+  onFloorClick,
+}: {
+  doc: LevelDoc
+  derived: DerivedGeometry
+  active: boolean
+  upperSlab: boolean
+  hiddenWalls: Set<WallId>
+  shadowIds: Set<FurnitureId>
+  realisticLighting: boolean
+  ceilingsEnabled: boolean
+  onFloorClick?: (e: ThreeEvent<MouseEvent>) => void
+}) {
+  // node → incident walls, for the patch-follows-walls occluder rule: a
+  // junction pillar hides only when EVERY wall it bridges is hidden
+  // (else a visible wall's end would lose its cap and show a notch)
+  const nodeWalls = useMemo(() => {
+    const map = new Map<string, WallId[]>()
+    for (const w of Object.values(doc.walls)) {
+      for (const n of [w.a, w.b]) {
+        const list = map.get(n)
+        if (list) list.push(w.id)
+        else map.set(n, [w.id])
+      }
+    }
+    return map
+  }, [doc.walls])
+  const patchHidden = (nodeId: string): boolean => {
+    if (!active) return false
+    const incident = nodeWalls.get(nodeId)
+    return !!incident && incident.length > 0 && incident.every((id) => hiddenWalls.has(id))
+  }
+  const wallHidden = (id: WallId): boolean => active && hiddenWalls.has(id)
+  // ceiling height = the room's LOWEST wall (the patch precedent: mixed
+  // heights get the safe minimum; degenerate cycles fall back to default)
+  const ceilingZ = (room: DerivedRoom): number => {
+    let h = Infinity
+    for (const wid of room.room.wallCycle) {
+      const w = doc.walls[wid]
+      if (w) h = Math.min(h, w.height)
+    }
+    return Number.isFinite(h) ? h : doc.settings.defaultWallHeight
+  }
+  return (
+    <>
+      {Object.values(derived.wallSolids).map((s) => (
+        <WallMeshes
+          key={s.wallId}
+          solid={s}
+          wall={doc.walls[s.wallId]}
+          visible={!wallHidden(s.wallId)}
+          shadowGhost={active && realisticLighting}
+        />
+      ))}
+      {Object.values(derived.wallSolids).map((s) =>
+        s.openings.length ? (
+          <OpeningFixtures
+            key={`fx-${s.wallId}`}
+            doc={doc}
+            solid={s}
+            visible={!wallHidden(s.wallId)}
+          />
+        ) : null,
+      )}
+      {derived.patchSolids.map((p) => (
+        <PatchMesh
+          key={p.nodeId}
+          patch={p}
+          visible={!patchHidden(p.nodeId)}
+          shadowGhost={active && realisticLighting}
+        />
+      ))}
+      {Object.values(derived.rooms).map((r) => (
+        <FloorMesh key={r.roomId} room={r} onClick={active ? onFloorClick : undefined} />
+      ))}
+      {upperSlab &&
+        Object.values(derived.rooms).map((r) => (
+          <UpperSlabMesh key={`slab-${r.roomId}`} room={r} />
+        ))}
+      {ceilingsEnabled &&
+        Object.values(derived.rooms).map((r) => (
+          <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} />
+        ))}
+      {Object.values(doc.furniture).map((f) => (
+        <Furniture3D
+          key={f.id}
+          f={f}
+          shadowCast={active && shadowIds.has(f.id)}
+          lightsOn={active}
+        />
+      ))}
+    </>
+  )
+}
+
 export function PlannerCanvas() {
-  const doc = useSceneDoc()
-  const derived = getDerived(doc)
-  const box = useMemo(() => sceneBBox(doc, derived), [doc, derived])
+  const { full, active: doc } = useSceneDoc()
+  const derived = getDerived(doc) // ACTIVE storey — occluder, walk, budget
+  const showFloorsAbove = useAppSettings((s) => s.showFloorsAbove)
+  // v7 stacking: the storeys the camera sees — everything up to the
+  // active floor, plus the ones above when the setting shows them (you
+  // can never see INTO a storey with another storey's slab over it, so
+  // hide-above is the default editing view; top floor = whole building)
+  const levelParts = useMemo(() => {
+    const activeIdx = Math.max(
+      0,
+      full.levels.findIndex((l) => l.id === doc.levelId),
+    )
+    const elevations = levelElevations(full)
+    return full.levels
+      .map((level, index) => ({
+        level,
+        index,
+        elevation: elevations[index]!,
+        view: levelDocOf(full, level.id),
+      }))
+      .filter((p) => showFloorsAbove || p.index <= activeIdx)
+      .map((p) => ({ ...p, derived: getDerived(p.view) }))
+  }, [full, doc.levelId, showFloorsAbove])
+  const activeElevation =
+    levelParts.find((p) => p.level.id === doc.levelId)?.elevation ?? 0
+  const box = useMemo(
+    () =>
+      unionSceneBBox(
+        levelParts.map((p) => ({ box: sceneBBox(p.view, p.derived), z: p.elevation })),
+      ),
+    [levelParts],
+  )
   const pose = useMemo(() => fitCameraPose(box), [box])
   const [presetReq, setPresetReq] = useState<{ pose: CameraPose; seq: number } | null>(null)
   const orbitHintSeen = useAppSettings((s) => s.orbitHintSeen)
@@ -1211,35 +1401,7 @@ export function PlannerCanvas() {
   const [hiddenWalls, setHiddenWalls] = useState<Set<WallId>>(() => new Set())
   const [shadowIds, setShadowIds] = useState<Set<FurnitureId>>(() => new Set())
   const occluderAnchor = useMemo(() => ({ x: box.cx, y: box.cy }), [box])
-  // node → incident walls, for the patch-follows-walls occluder rule: a
-  // junction pillar hides only when EVERY wall it bridges is hidden
-  // (else a visible wall's end would lose its cap and show a notch)
-  const nodeWalls = useMemo(() => {
-    const map = new Map<string, WallId[]>()
-    for (const w of Object.values(doc.walls)) {
-      for (const n of [w.a, w.b]) {
-        const list = map.get(n)
-        if (list) list.push(w.id)
-        else map.set(n, [w.id])
-      }
-    }
-    return map
-  }, [doc.walls])
-  const patchHidden = (nodeId: string): boolean => {
-    const incident = nodeWalls.get(nodeId)
-    return !!incident && incident.length > 0 && incident.every((id) => hiddenWalls.has(id))
-  }
   const ceilingsEnabled = useAppSettings((s) => s.ceilingsEnabled)
-  // ceiling height = the room's LOWEST wall (the patch precedent: mixed
-  // heights get the safe minimum; degenerate cycles fall back to default)
-  const ceilingZ = (room: DerivedRoom): number => {
-    let h = Infinity
-    for (const wid of room.room.wallCycle) {
-      const w = doc.walls[wid]
-      if (w) h = Math.min(h, w.height)
-    }
-    return Number.isFinite(h) ? h : doc.settings.defaultWallHeight
-  }
 
   // shared by every floor AND the ground disc — walk-mode click-to-go
   const handleFloorClick = (e: ThreeEvent<MouseEvent>) => {
@@ -1330,7 +1492,12 @@ export function PlannerCanvas() {
         <ThemeBridge3D />
         <ExposureBridge />
         <ShadowUpdateBridge doc={doc} hiddenWalls={hiddenWalls} shadowIds={shadowIds} />
-        <ShadowBudgetBridge doc={doc} enabled={realisticLighting} onBudget={setShadowIds} />
+        <ShadowBudgetBridge
+          doc={doc}
+          elevationY={activeElevation}
+          enabled={realisticLighting}
+          onBudget={setShadowIds}
+        />
         <CaptureBridge apiRef={captureApi} />
         <WalkControls doc={doc} derived={derived} />
         <SceneEnvironment box={box} onGroundClick={handleFloorClick} />
@@ -1349,42 +1516,20 @@ export function PlannerCanvas() {
         />
         <CameraPresetApplier request={presetReq} />
         <group rotation-x={-Math.PI / 2}>
-          {Object.values(derived.wallSolids).map((s) => (
-            <WallMeshes
-              key={s.wallId}
-              solid={s}
-              wall={doc.walls[s.wallId]}
-              visible={!hiddenWalls.has(s.wallId)}
-              shadowGhost={realisticLighting}
-            />
-          ))}
-          {Object.values(derived.wallSolids).map((s) =>
-            s.openings.length ? (
-              <OpeningFixtures
-                key={`fx-${s.wallId}`}
-                doc={doc}
-                solid={s}
-                visible={!hiddenWalls.has(s.wallId)}
+          {levelParts.map((p) => (
+            <group key={p.level.id} position-z={p.elevation}>
+              <LevelScene
+                doc={p.view}
+                derived={p.derived}
+                active={p.level.id === doc.levelId}
+                upperSlab={p.index > 0}
+                hiddenWalls={hiddenWalls}
+                shadowIds={shadowIds}
+                realisticLighting={realisticLighting}
+                ceilingsEnabled={ceilingsEnabled}
+                onFloorClick={handleFloorClick}
               />
-            ) : null,
-          )}
-          {derived.patchSolids.map((p) => (
-            <PatchMesh
-              key={p.nodeId}
-              patch={p}
-              visible={!patchHidden(p.nodeId)}
-              shadowGhost={realisticLighting}
-            />
-          ))}
-          {Object.values(derived.rooms).map((r) => (
-            <FloorMesh key={r.roomId} room={r} onClick={handleFloorClick} />
-          ))}
-          {ceilingsEnabled &&
-            Object.values(derived.rooms).map((r) => (
-              <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} />
-            ))}
-          {Object.values(doc.furniture).map((f) => (
-            <Furniture3D key={f.id} f={f} shadowCast={shadowIds.has(f.id)} />
+            </group>
           ))}
         </group>
       </Canvas>

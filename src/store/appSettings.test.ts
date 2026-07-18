@@ -23,6 +23,7 @@ const DEFAULTS: AppSettings = {
   wallHideMode: 'hide',
   ceilingsEnabled: true,
   levelGhostEnabled: true,
+  showFloorsAbove: false,
   realisticLighting: false,
   exposure: 1,
   latitude: 60.17,
@@ -68,6 +69,7 @@ describe('parseAppSettings', () => {
       wallHideMode: 'off',
       ceilingsEnabled: false,
       levelGhostEnabled: false,
+      showFloorsAbove: true,
       realisticLighting: true,
       exposure: 1.4,
       latitude: 59.33,
@@ -103,6 +105,7 @@ describe('parseAppSettings', () => {
           wallHideMode: 'fade',
           ceilingsEnabled: 1,
           levelGhostEnabled: 'yes',
+          showFloorsAbove: 'up',
           realisticLighting: 'yes',
           exposure: 'bright',
           latitude: 200,
@@ -131,6 +134,7 @@ describe('parseAppSettings', () => {
       wallHideMode: 'hide', // 'fade' does not exist (yet) → default
       ceilingsEnabled: true, // 1 → default
       levelGhostEnabled: true, // 'yes' → default
+      showFloorsAbove: false, // 'up' → default
       realisticLighting: false, // 'yes' → default
       exposure: 1, // non-number → default
       latitude: 90, // out of range → clamped
@@ -219,6 +223,7 @@ describe('useAppSettings persistence', () => {
       wallHideMode: s.wallHideMode,
       ceilingsEnabled: s.ceilingsEnabled,
       levelGhostEnabled: s.levelGhostEnabled,
+      showFloorsAbove: s.showFloorsAbove,
       realisticLighting: s.realisticLighting,
       exposure: s.exposure,
       latitude: s.latitude,
@@ -254,6 +259,7 @@ describe('useAppSettings persistence', () => {
     s.setWallHideMode('off')
     s.setCeilingsEnabled(false)
     s.setLevelGhostEnabled(false)
+    s.setShowFloorsAbove(true)
     s.setRealisticLighting(true)
     s.setExposure(5) // clamps to 2
     s.setLatitude(51.51)
@@ -288,6 +294,7 @@ describe('useAppSettings persistence', () => {
       wallHideMode: 'off',
       ceilingsEnabled: false,
       levelGhostEnabled: false,
+      showFloorsAbove: true,
       realisticLighting: true,
       exposure: 2,
       latitude: 51.51,

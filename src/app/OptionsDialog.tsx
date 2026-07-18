@@ -309,6 +309,11 @@ export function OptionsDialog() {
             value={settings.ceilingsEnabled}
             onChange={settings.setCeilingsEnabled}
           />
+          <OnOffRow
+            label={t('options.showFloorsAbove')}
+            value={settings.showFloorsAbove}
+            onChange={settings.setShowFloorsAbove}
+          />
         </section>
         <section className="options-section">
           <h4>{t('options.section.lighting')}</h4>
