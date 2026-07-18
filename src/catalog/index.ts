@@ -5,6 +5,7 @@ import { MORE_ITEMS } from './items/more'
 import { EXPANSION_ITEMS } from './items/expansion'
 import { DECOR_ITEMS } from './items/decor'
 import { KITCHEN_ITEMS } from './items/kitchen'
+import { STRUCTURE_ITEMS } from './items/structure'
 
 export type { CatalogItem, CatalogCategory, Dims, SymbolPrim, MaterialId } from './types'
 
@@ -15,6 +16,7 @@ const ALL: CatalogItem[] = [
   ...EXPANSION_ITEMS,
   ...DECOR_ITEMS,
   ...KITCHEN_ITEMS,
+  ...STRUCTURE_ITEMS,
 ]
 
 export const CATALOG: Record<string, CatalogItem> = Object.fromEntries(
@@ -29,6 +31,7 @@ export const CATEGORY_ORDER: CatalogCategory[] = [
   'bathroom',
   'office',
   'decor',
+  'structure',
 ]
 
 export const CATALOG_BY_CATEGORY: Record<CatalogCategory, CatalogItem[]> = {
@@ -39,5 +42,6 @@ export const CATALOG_BY_CATEGORY: Record<CatalogCategory, CatalogItem[]> = {
   bathroom: [],
   office: [],
   decor: [],
+  structure: [],
 }
 for (const item of ALL) CATALOG_BY_CATEGORY[item.category].push(item)

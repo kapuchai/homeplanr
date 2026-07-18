@@ -68,6 +68,11 @@ export const KEYWORDS: Record<string, readonly string[]> = {
   'mirror-full': ['glass', 'dressing', 'reflection'],
   'ceiling-lamp': ['light', 'lighting', 'pendant'],
   'wall-sconce': ['light', 'lighting', 'lamp'],
+  // structure (0.13.0)
+  'stair-straight': ['staircase', 'steps', 'floor', 'level', 'storey'],
+  'stair-l': ['staircase', 'steps', 'corner', 'floor', 'level', 'storey'],
+  'stair-spiral': ['staircase', 'steps', 'round', 'floor', 'level', 'storey'],
+  ladder: ['attic', 'steps', 'climb', 'floor'],
 }
 
 /**

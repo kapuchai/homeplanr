@@ -16,6 +16,12 @@ const items = Object.values(CATALOG)
 // legitimate class — they get a 0.015m floor instead. All other checks
 // still apply.
 const FLAT_ITEMS = new Set(['rug'])
+/** Storey connectors (0.13.0): full-floor height (walls + slab) — the
+ * 2.5 m furniture cap is category-lifted to 4 m for them. */
+const TALL_ITEMS = new Set(['stair-straight', 'stair-l', 'stair-spiral', 'ladder'])
+/** Deliberately slim footprints (a ladder is rails + rungs) — exempt
+ * from the 60% coverage heuristic. */
+const SLIM_ITEMS = new Set(['ladder'])
 
 function symbolBounds(prims: SymbolPrim[]): { minX: number; minY: number; maxX: number; maxY: number } {
   let minX = Infinity
@@ -104,10 +110,11 @@ describe('catalog conformance', () => {
       it('dims within human-scale bounds', () => {
         expect(item.dims.w).toBeGreaterThanOrEqual(0.2)
         expect(item.dims.w).toBeLessThanOrEqual(3.5)
-        expect(item.dims.d).toBeGreaterThanOrEqual(0.2)
+        expect(item.dims.d).toBeGreaterThanOrEqual(SLIM_ITEMS.has(item.id) ? 0.1 : 0.2)
         expect(item.dims.d).toBeLessThanOrEqual(3.5)
         expect(item.dims.h).toBeGreaterThanOrEqual(FLAT_ITEMS.has(item.id) ? 0.015 : 0.3)
-        expect(item.dims.h).toBeLessThanOrEqual(2.5)
+        if (item.connectsLevels) expect(item.category).toBe('structure')
+        expect(item.dims.h).toBeLessThanOrEqual(TALL_ITEMS.has(item.id) ? 4 : 2.5)
       })
 
       if (item.defaultElevation !== undefined) {
@@ -142,10 +149,12 @@ describe('catalog conformance', () => {
         expect(min[2]).toBeGreaterThanOrEqual(-1e-9)
         expect(max[2]).toBeGreaterThanOrEqual(item.dims.h - 0.02)
         expect(max[2]).toBeLessThanOrEqual(item.dims.h + 0.02)
-        // footprint coverage (bbox heuristic ≥ 60%)
-        const cover =
-          ((max[0] - min[0]) * (max[1] - min[1])) / (item.dims.w * item.dims.d)
-        expect(cover).toBeGreaterThanOrEqual(0.6)
+        // footprint coverage (bbox heuristic ≥ 60%; slim connectors exempt)
+        if (!SLIM_ITEMS.has(item.id)) {
+          const cover =
+            ((max[0] - min[0]) * (max[1] - min[1])) / (item.dims.w * item.dims.d)
+          expect(cover).toBeGreaterThanOrEqual(0.6)
+        }
       })
 
       it('every part references a declared material slot; slots map to the palette', () => {

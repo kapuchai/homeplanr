@@ -33,6 +33,7 @@ export type CatalogCategory =
   | 'bathroom'
   | 'office'
   | 'decor'
+  | 'structure'
 
 /**
  * silhouette + body form the item's footprint layer (0.7.0): one stroke and
@@ -112,6 +113,21 @@ export interface CatalogItem {
     defaultLumen: number
     color?: string
   }
+  /**
+   * Storey connector (0.13.0: stairs, ladders). The instance's footprint
+   * carves a stairwell in the ceiling of ITS level and the floor slab of
+   * the level above (derived at render, never stored), and walk mode
+   * offers a transition between the two floors.
+   */
+  connectsLevels?: true
+  /**
+   * EXTRA hand-authored 2D prims appended AFTER the derived symbol
+   * (0.13.0: the stair direction arrow). Deliberately additive — the
+   * derived-from-parts rule still produces the item's body; this hook may
+   * only annotate, never replace. Rendered through the same SymbolPrim
+   * path in the editor and the SVG export (no new styling twin).
+   */
+  symbol2d?: (dims: Dims) => import('./types').SymbolPrim[]
   /** Procedural 3D parts (see builder.ts). */
   build3d: (b: Builder, dims: Dims) => void
   /** FUTURE: presence switches the 3D renderer to a GLTF loader. */

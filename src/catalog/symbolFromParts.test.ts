@@ -84,10 +84,12 @@ describe('symbolFromParts hints + dedup (M3 0.4.0; footprint layer 0.7.0)', () =
         prims.some((p) => p.role === 'body'),
         entry.id,
       ).toBe(true)
-      // the three layers stay balanced: one silhouette + one body per shape
+      // the three layers stay balanced: one silhouette + one body per
+      // shape; hand-authored symbol2d annotations (0.13.0) ride on top
+      const extra = entry.symbol2d?.(entry.dims).length ?? 0
       const count = (role: string) => prims.filter((p) => p.role === role).length
       expect(count('silhouette'), entry.id).toBe(count('body'))
-      expect(count('outline') + count('detail'), entry.id).toBe(count('body'))
+      expect(count('outline') + count('detail'), entry.id).toBe(count('body') + extra)
     }
   })
 })

@@ -122,7 +122,10 @@ export function symbolFor(item: CatalogItem): SymbolPrim[] {
     bodies.push({ ...p, role: 'body' })
   }
 
-  const prims: SymbolPrim[] = [...silhouettes, ...bodies, ...byKey.values()]
+  // hand-authored annotation prims (0.13.0: stair direction arrows) go
+  // LAST — on top of the derived body, through the same styling path
+  const extra = item.symbol2d?.(item.dims) ?? []
+  const prims: SymbolPrim[] = [...silhouettes, ...bodies, ...byKey.values(), ...extra]
   cache.set(item.id, prims)
   return prims
 }

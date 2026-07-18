@@ -20,10 +20,12 @@ import { getDerived, type DerivedGeometry, type DerivedRoom } from '../store/der
 import { useSceneDoc } from './useSceneDoc'
 import { levelDocOf } from '../store/levelView'
 import { SLAB_THICKNESS, levelElevations } from '../model/levels'
+import { carveRoomTriangulation, stairwellRects } from './stairwell'
 import {
   buildCeilingMeshData,
   buildFloorMeshData,
   buildPrismMeshData,
+  buildRingSidesMeshData,
   buildWallFaceMeshData,
   mergeMeshData,
 } from './mesh/prismGeometry'
@@ -189,12 +191,19 @@ function PatchMesh({
 
 function FloorMesh({
   room,
+  wells = [],
   onClick,
 }: {
   room: DerivedRoom
+  /** Stairwell rects from the level BELOW (0.13.0) — carved out of the
+   * floor so the run below connects through. */
+  wells?: readonly Vec2[][]
   onClick?: (e: ThreeEvent<MouseEvent>) => void
 }) {
-  const geo = useMemo(() => toBufferGeometry(buildFloorMeshData(room.floor)), [room])
+  const geo = useMemo(() => {
+    const carved = carveRoomTriangulation(room, wells)
+    return toBufferGeometry(buildFloorMeshData(carved?.tri ?? room.floor))
+  }, [room, wells])
   useEffect(() => () => geo.dispose(), [geo])
   return (
     <mesh
@@ -218,9 +227,22 @@ function FloorMesh({
  * geometry still casts from above because three's shadow pass renders
  * the REVERSE side by default (shadowSide mapping Front→Back).
  */
-function CeilingMesh({ room, z }: { room: DerivedRoom; z: number }) {
+function CeilingMesh({
+  room,
+  z,
+  wells = [],
+}: {
+  room: DerivedRoom
+  z: number
+  /** Stairwell rects on THIS level (0.13.0) — the ceiling opens over the
+   * run so the climb connects upward. */
+  wells?: readonly Vec2[][]
+}) {
   const realistic = useAppSettings((s) => s.realisticLighting)
-  const geo = useMemo(() => toBufferGeometry(buildCeilingMeshData(room.floor, z)), [room, z])
+  const geo = useMemo(() => {
+    const carved = carveRoomTriangulation(room, wells)
+    return toBufferGeometry(buildCeilingMeshData(carved?.tri ?? room.floor, z))
+  }, [room, z, wells])
   useEffect(() => () => geo.dispose(), [geo])
   return (
     <mesh
@@ -1211,15 +1233,26 @@ function markOrbitHintSeen() {
  * walls. Wall-island holes stay uncarved in the prism caps (the visible
  * top is the hole-aware FloorMesh; stair carves re-visit this in P8).
  */
-function UpperSlabMesh({ room }: { room: DerivedRoom }) {
+function UpperSlabMesh({
+  room,
+  wells = [],
+}: {
+  room: DerivedRoom
+  wells?: readonly Vec2[][]
+}) {
   const realistic = useAppSettings((s) => s.realisticLighting)
-  const geo = useMemo(
-    () =>
-      toBufferGeometry(
-        buildPrismMeshData({ polygon: room.polygon, z0: -SLAB_THICKNESS, z1: -0.001 }),
-      ),
-    [room],
-  )
+  const geo = useMemo(() => {
+    const carved = carveRoomTriangulation(room, wells)
+    const z0 = -SLAB_THICKNESS
+    const z1 = -0.001
+    // underside (hole-aware), outer edge band, and a lining for each shaft
+    const pieces = [
+      buildCeilingMeshData(carved?.tri ?? room.floor, z0),
+      buildRingSidesMeshData(room.polygon, z0, z1),
+      ...(carved?.holes ?? []).map((h) => buildRingSidesMeshData(h, z0, z1, { inward: true })),
+    ]
+    return toBufferGeometry(mergeMeshData(pieces))
+  }, [room, wells])
   useEffect(() => () => geo.dispose(), [geo])
   return (
     <mesh
@@ -1246,6 +1279,8 @@ function LevelScene({
   derived,
   active,
   upperSlab,
+  wellsHere,
+  wellsBelow,
   hiddenWalls,
   shadowIds,
   realisticLighting,
@@ -1256,6 +1291,10 @@ function LevelScene({
   derived: DerivedGeometry
   active: boolean
   upperSlab: boolean
+  /** Stairwell rects on THIS storey (carve its ceilings). */
+  wellsHere: readonly Vec2[][]
+  /** Stairwell rects on the storey BELOW (carve floors + slab). */
+  wellsBelow: readonly Vec2[][]
   hiddenWalls: Set<WallId>
   shadowIds: Set<FurnitureId>
   realisticLighting: boolean
@@ -1322,15 +1361,20 @@ function LevelScene({
         />
       ))}
       {Object.values(derived.rooms).map((r) => (
-        <FloorMesh key={r.roomId} room={r} onClick={active ? onFloorClick : undefined} />
+        <FloorMesh
+          key={r.roomId}
+          room={r}
+          wells={wellsBelow}
+          onClick={active ? onFloorClick : undefined}
+        />
       ))}
       {upperSlab &&
         Object.values(derived.rooms).map((r) => (
-          <UpperSlabMesh key={`slab-${r.roomId}`} room={r} />
+          <UpperSlabMesh key={`slab-${r.roomId}`} room={r} wells={wellsBelow} />
         ))}
       {ceilingsEnabled &&
         Object.values(derived.rooms).map((r) => (
-          <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} />
+          <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} wells={wellsHere} />
         ))}
       {Object.values(doc.furniture).map((f) => (
         <Furniture3D
@@ -1358,12 +1402,17 @@ export function PlannerCanvas() {
       full.levels.findIndex((l) => l.id === doc.levelId),
     )
     const elevations = levelElevations(full)
+    // stairwell rects are computed for EVERY storey before the visibility
+    // filter — a visible floor carves from the (always-visible) one below
+    const wells = full.levels.map((level) => stairwellRects(levelDocOf(full, level.id)))
     return full.levels
       .map((level, index) => ({
         level,
         index,
         elevation: elevations[index]!,
         view: levelDocOf(full, level.id),
+        wellsHere: wells[index]!,
+        wellsBelow: index > 0 ? wells[index - 1]! : [],
       }))
       .filter((p) => showFloorsAbove || p.index <= activeIdx)
       .map((p) => ({ ...p, derived: getDerived(p.view) }))
@@ -1523,6 +1572,8 @@ export function PlannerCanvas() {
                 derived={p.derived}
                 active={p.level.id === doc.levelId}
                 upperSlab={p.index > 0}
+                wellsHere={p.wellsHere}
+                wellsBelow={p.wellsBelow}
                 hiddenWalls={hiddenWalls}
                 shadowIds={shadowIds}
                 realisticLighting={realisticLighting}

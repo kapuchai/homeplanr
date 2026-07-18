@@ -120,6 +120,36 @@ export function buildPrismMeshData(prism: Prism, opts: { bottomCap?: boolean } =
   return toMeshData(acc)
 }
 
+/**
+ * Vertical ring walls along a polygon between z0..z1 (0.13.0: stairwell
+ * shaft linings + upper-slab edges). Follows the prism side convention —
+ * a positive-shoelace ring faces OUTWARD; `inward` reverses the ring so
+ * the quads face its interior (winding and normals flip together).
+ */
+export function buildRingSidesMeshData(
+  polygon: readonly Vec2[],
+  z0: number,
+  z1: number,
+  opts: { inward?: boolean } = {},
+): MeshData {
+  let ring = orientRing([...polygon])
+  if (opts.inward) ring = ring.slice().reverse()
+  const acc = newAccum()
+  const n = ring.length
+  let run = 0
+  for (let i = 0; i < n; i++) {
+    const p1 = ring[i]!
+    const p2 = ring[(i + 1) % n]!
+    const dx = p2.x - p1.x
+    const dy = p2.y - p1.y
+    const len = Math.hypot(dx, dy)
+    if (len < 1e-9) continue
+    emitSideQuad(acc, p1, p2, z0, z1, dy / len, -dx / len, run, run + len)
+    run += len
+  }
+  return toMeshData(acc)
+}
+
 export type WallFaceBucket = 'front' | 'back' | 'trim'
 
 /**
