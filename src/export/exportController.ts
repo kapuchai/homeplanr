@@ -3,6 +3,7 @@ import 'svg2pdf.js'
 import { useDocStore } from '../store/docStore'
 import { levelDocOf } from '../store/levelView'
 import { useActiveLevel } from '../store/activeLevel'
+import { stairwellRects } from '../scene3d/stairwell'
 import { getDerived } from '../store/derived'
 import { isTxActive } from '../store/transactions'
 import { usePersistStore } from '../store/persistence/controller'
@@ -35,6 +36,13 @@ const sanitizeName = (name: string): string => {
 /** Raster density for fixed-scale PNG exports (print-oriented). */
 const SCALED_PNG_DPI = 150
 const RASTER_MAX_PX = 4096
+
+/** Stairwell rects inherited from the storey below the given level (v7). */
+function wellsBelowOf(fullDoc: ReturnType<typeof useDocStore.getState>['doc'], levelId: string) {
+  const idx = fullDoc.levels.findIndex((l) => l.id === levelId)
+  if (idx <= 0) return []
+  return stairwellRects(levelDocOf(fullDoc, fullDoc.levels[idx - 1]!.id))
+}
 
 /**
  * Embedded PDF font (B6, 0.5.0): Noto Sans LGC subset (~95 KB, OFL 1.1 —
@@ -94,7 +102,7 @@ export async function exportImage(
   // v7: exports render the chosen storey; absent = the active floor
   const doc = levelDocOf(fullDoc, opts.levelId ?? useActiveLevel.getState().activeLevelId)
   const derived = getDerived(doc)
-  const svg = renderPlanSvg(doc, derived, opts)
+  const svg = renderPlanSvg(doc, derived, { ...opts, stairwells: wellsBelowOf(fullDoc, doc.levelId) })
   if (!svg) {
     await adapter.message(t('export.nothing.title'), t('export.nothing.message'))
     return
@@ -152,7 +160,7 @@ export async function exportPdf(opts: ExportPdfOptions): Promise<void> {
   // v7: exports render the chosen storey; absent = the active floor
   const doc = levelDocOf(fullDoc, opts.levelId ?? useActiveLevel.getState().activeLevelId)
   const derived = getDerived(doc)
-  const svg = renderPlanSvg(doc, derived, opts)
+  const svg = renderPlanSvg(doc, derived, { ...opts, stairwells: wellsBelowOf(fullDoc, doc.levelId) })
   if (!svg) {
     await adapter.message(t('export.nothing.title'), t('export.nothing.message'))
     return

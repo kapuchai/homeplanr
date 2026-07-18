@@ -1,5 +1,7 @@
 import type { Annotation, Level, Opening, ProjectDocument, Room } from '../types'
 import { emptyLevel } from '../types'
+import { makeLevelDoc } from '../levels'
+import { runPipeline } from './pipeline'
 import {
   newAnnotationId,
   newFurnitureId,
@@ -52,6 +54,7 @@ export function duplicateLevel(doc: ProjectDocument, id: LevelId): LevelId | nul
     ...emptyLevel(newLevelId()),
     ...(src.name !== undefined ? { name: src.name } : {}),
     ...(src.elevation !== undefined ? { elevation: src.elevation } : {}),
+    ...(src.wallHeight !== undefined ? { wallHeight: src.wallHeight } : {}),
   }
   for (const n of Object.values(src.nodes)) {
     const nid = newNodeId()
@@ -106,6 +109,22 @@ export function duplicateLevel(doc: ProjectDocument, id: LevelId): LevelId | nul
 
   doc.levels.splice(idx + 1, 0, level)
   return level.id
+}
+
+/**
+ * Floor-wide wall height (user feedback 0.13.0): stores the storey setting
+ * AND re-heights EVERY wall on the level, then runs the commit pipeline on
+ * its view (openings re-clamp under lower walls, exactly like a per-wall
+ * height edit). Clamp parity with the settings bound [0.3, 6].
+ */
+export function setLevelWallHeight(doc: ProjectDocument, id: LevelId, height: number): void {
+  const level = doc.levels.find((l) => l.id === id)
+  if (!level || !Number.isFinite(height)) return
+  const h = Math.min(6, Math.max(0.3, height))
+  level.wallHeight = h
+  const view = makeLevelDoc(doc, level)
+  for (const w of Object.values(view.walls)) w.height = h
+  runPipeline(view, 'commit')
 }
 
 /** Trimmed rename; empty clears back to the numbered chrome fallback. */

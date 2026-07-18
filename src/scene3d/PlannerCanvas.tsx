@@ -10,7 +10,7 @@ import {
   type BufferGeometry,
   type DirectionalLight,
   type MeshStandardMaterial,
-  type Vector3,
+  Vector3,
 } from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { useDocStore } from '../store/docStore'
@@ -250,26 +250,50 @@ function CeilingMesh({
   room,
   z,
   wells = [],
+  topCap = false,
 }: {
   room: DerivedRoom
   z: number
   /** Stairwell rects on THIS level (0.13.0) — the ceiling opens over the
    * run so the climb connects upward. */
   wells?: readonly Vec2[][]
+  /** Also render an UP-facing lid (0.13.0 feedback fix): NON-ACTIVE
+   * storeys must read as sealed boxes from above — the down-facing
+   * single-sided ceiling alone lets orbit see straight into a lower
+   * storey wherever the floor above doesn't cover it (the "floating
+   * second floor" report). The active storey keeps the bare down-facing
+   * slab so top/high-orbit views still see into it. */
+  topCap?: boolean
 }) {
   const realistic = useAppSettings((s) => s.realisticLighting)
   const geo = useMemo(() => {
     const carved = carveRoomTriangulation(room, wells)
     return toBufferGeometry(buildCeilingMeshData(carved?.tri ?? room.floor, z))
   }, [room, z, wells])
+  const lidGeo = useMemo(() => {
+    if (!topCap) return null
+    const carved = carveRoomTriangulation(room, wells)
+    return toBufferGeometry(buildFloorMeshData(carved?.tri ?? room.floor))
+  }, [room, wells, topCap])
   useEffect(() => () => geo.dispose(), [geo])
+  useEffect(() => () => lidGeo?.dispose(), [lidGeo])
   return (
-    <mesh
-      geometry={geo}
-      material={sceneMaterial('ceiling')}
-      castShadow={realistic}
-      receiveShadow={realistic}
-    />
+    <>
+      <mesh
+        geometry={geo}
+        material={sceneMaterial('ceiling')}
+        castShadow={realistic}
+        receiveShadow={realistic}
+      />
+      {lidGeo && (
+        <mesh
+          geometry={lidGeo}
+          position-z={z + 0.002}
+          material={sceneMaterial('ceiling')}
+          receiveShadow
+        />
+      )}
+    </>
   )
 }
 
@@ -1206,6 +1230,11 @@ function ContextGuard({ onLost }: { onLost: () => void }) {
  * mount, and a preset clicked in that window must apply once it lands (the
  * seq ref keeps it from re-applying afterwards).
  */
+/** Camera glide duration (s) — presets AND floor switches (0.13.0
+ * feedback: smooth camera on storey change). */
+const CAMERA_GLIDE_S = 0.45
+const glideSmooth = (t: number) => t * t * (3 - 2 * t)
+
 function CameraPresetApplier({
   request,
 }: {
@@ -1213,26 +1242,56 @@ function CameraPresetApplier({
 }) {
   const camera = useThree((s) => s.camera)
   const controls = useThree((s) => s.controls) as unknown as {
-    target: { set: (x: number, y: number, z: number) => void }
+    target: { x: number; y: number; z: number; set: (x: number, y: number, z: number) => void }
     update: () => void
     enableDamping: boolean
   } | null
   const invalidate = useThree((s) => s.invalidate)
   const applied = useRef(0)
+  const glide = useRef<{
+    t: number
+    fromPos: Vector3
+    fromTarget: Vector3
+    pose: CameraPose
+  } | null>(null)
   useEffect(() => {
     if (!request || !controls || applied.current === request.seq) return
     applied.current = request.seq
     // flush residual inertia: with damping off, update() consumes the whole
-    // pending delta at once (against the OLD pose, which we overwrite next)
+    // pending delta at once (against the OLD pose the glide starts from)
     const hadDamping = controls.enableDamping
     controls.enableDamping = false
     controls.update()
-    camera.position.set(...request.pose.position)
-    controls.target.set(...request.pose.target)
-    controls.update()
     controls.enableDamping = hadDamping
-    invalidate()
+    glide.current = {
+      t: 0,
+      fromPos: camera.position.clone(),
+      fromTarget: new Vector3(controls.target.x, controls.target.y, controls.target.z),
+      pose: request.pose,
+    }
+    invalidate() // demand frameloop: kick the first glide frame
   }, [request, controls, camera, invalidate])
+  useFrame((_, delta) => {
+    const g = glide.current
+    if (!g || !controls) return
+    g.t += delta / CAMERA_GLIDE_S
+    const k = glideSmooth(Math.min(1, g.t))
+    const [px, py, pz] = g.pose.position
+    const [tx, ty, tz] = g.pose.target
+    camera.position.set(
+      g.fromPos.x + (px - g.fromPos.x) * k,
+      g.fromPos.y + (py - g.fromPos.y) * k,
+      g.fromPos.z + (pz - g.fromPos.z) * k,
+    )
+    controls.target.set(
+      g.fromTarget.x + (tx - g.fromTarget.x) * k,
+      g.fromTarget.y + (ty - g.fromTarget.y) * k,
+      g.fromTarget.z + (tz - g.fromTarget.z) * k,
+    )
+    controls.update()
+    if (g.t >= 1) glide.current = null
+    else invalidate() // keep the demand loop alive until the glide lands
+  })
   return null
 }
 
@@ -1403,9 +1462,19 @@ function LevelScene({
         Object.values(derived.rooms).map((r) => (
           <UpperSlabMesh key={`slab-${r.roomId}`} room={r} wells={wellsBelow} />
         ))}
-      {ceilingsEnabled &&
+      {/* active storey: ceilings per the 0.11.0 setting, bare down-facing
+          slab (orbit sees in from above). NON-active storeys: ALWAYS
+          sealed — ceiling + up-facing lid, regardless of the setting
+          (a lower storey without a top reads as a floating building). */}
+      {(active ? ceilingsEnabled : true) &&
         Object.values(derived.rooms).map((r) => (
-          <CeilingMesh key={`ceil-${r.roomId}`} room={r} z={ceilingZ(r)} wells={wellsHere} />
+          <CeilingMesh
+            key={`ceil-${r.roomId}`}
+            room={r}
+            z={ceilingZ(r)}
+            wells={wellsHere}
+            topCap={!active}
+          />
         ))}
       {Object.values(doc.furniture).map((f) => (
         <group key={f.id} position-z={liftOf(f.x, f.y)}>
@@ -1505,6 +1574,17 @@ export function PlannerCanvas() {
     const canvas = e.nativeEvent.target
     if (canvas instanceof HTMLCanvasElement) attemptLock(canvas)
   }
+
+  // storey switch → glide the orbit camera to the new fit (0.13.0
+  // feedback). Skip the first mount (initial pose is set by <Canvas>) and
+  // walk mode (P9 transitions own the camera there).
+  const prevLevelRef = useRef(doc.levelId)
+  useEffect(() => {
+    if (prevLevelRef.current === doc.levelId) return
+    prevLevelRef.current = doc.levelId
+    if (useWalkStore.getState().mode === 'walking') return
+    setPresetReq((r) => ({ pose: fitCameraPose(box), seq: (r?.seq ?? 0) + 1 }))
+  }, [doc.levelId, box])
 
   const applyPreset = (kind: CameraPresetKind) => {
     markOrbitHintSeen()

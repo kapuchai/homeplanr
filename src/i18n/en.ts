@@ -159,6 +159,7 @@ export const en = {
   'export.title': 'Export plan',
   'export.floor': 'Floor',
   'props.floorHeight': 'Floor lift',
+  'props.wallHeightFloor': 'Wall height (floor)',
   'export.format': 'Format',
   'export.scale': 'Scale',
   'export.scaleFit': 'Fit',

@@ -215,6 +215,12 @@ export interface Level {
    * levels below (max wall height + slab). No UI in 0.13.0; the field
    * exists so split-level never needs a schema break. */
   elevation?: number
+  /** Floor-wide wall height (m) — user feedback 0.13.0: one height per
+   * storey. setLevelWallHeight stores it AND re-heights every wall on the
+   * level; new walls on the level default to it (else the project-wide
+   * settings default). Walls still CARRY height individually (renderers/
+   * solids read the wall), this is the storey's authoritative setting. */
+  wallHeight?: number
   nodes: Record<NodeId, WallNode>
   walls: Record<WallId, Wall>
   openings: Record<OpeningId, Opening>
@@ -236,6 +242,9 @@ export interface Level {
 export interface LevelDoc {
   /** The wrapped level's id — memo/cache key for per-level derived state. */
   levelId: LevelId
+  /** The level's floor-wide wall height (READ-ONLY through the view — a
+   * scalar cannot write through; setLevelWallHeight is doc-scoped). */
+  wallHeight?: number
   settings: ProjectSettings
   nodes: Record<NodeId, WallNode>
   walls: Record<WallId, Wall>

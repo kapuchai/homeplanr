@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDocument } from '../types'
 import { makeLevelDoc } from '../levels'
-import { addLevel, deleteLevel, duplicateLevel, moveLevel, renameLevel } from './levelOps'
-import { addWallChain } from './walls'
+import { addLevel, deleteLevel, duplicateLevel, moveLevel, renameLevel, setLevelWallHeight } from './levelOps'
+import { addWallChain, addWallSegment } from './walls'
 import { addOpening } from './openings'
 import { addFurniture, setFurnitureAsset } from './furniture'
 import { addAsset } from './assets'
@@ -117,5 +117,24 @@ describe('renameLevel / moveLevel / deleteLevel', () => {
     expect(deleteLevel(d, second)).toBe(true)
     expect(d.levels).toHaveLength(1)
     expect(deleteLevel(d, first)).toBe(false)
+  })
+})
+
+describe('setLevelWallHeight (0.13.0 feedback: floor-wide height)', () => {
+  it('stores the storey setting, re-heights every wall, seeds new walls', () => {
+    const { d: full, L } = (() => {
+      const { d, L } = populated()
+      return { d, L }
+    })()
+    setLevelWallHeight(full, full.levels[0]!.id, 3.2)
+    expect(full.levels[0]!.wallHeight).toBe(3.2)
+    for (const w of Object.values(L.walls)) expect(w.height).toBe(3.2)
+    // a NEW wall on the level defaults to the storey height
+    const view = makeLevelDoc(full, full.levels[0]!)
+    const { wallId } = addWallSegment(view, vec(0, 4), vec(2, 4))
+    expect(view.walls[wallId!]!.height).toBe(3.2)
+    // clamp parity with settings bounds
+    setLevelWallHeight(full, full.levels[0]!.id, 99)
+    expect(full.levels[0]!.wallHeight).toBe(6)
   })
 })

@@ -96,7 +96,7 @@ function connectNodes(
     a,
     b,
     thickness: opts.thickness ?? doc.settings.defaultWallThickness,
-    height: opts.height ?? doc.settings.defaultWallHeight,
+    height: opts.height ?? doc.wallHeight ?? doc.settings.defaultWallHeight,
   }
   return { wallId: id, a, b }
 }

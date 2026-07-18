@@ -108,6 +108,9 @@ export interface DocState {
   duplicateLevel: (id: LevelId) => LevelId | null
   renameLevel: (id: LevelId, name: string) => void
   moveLevel: (id: LevelId, delta: 1 | -1) => boolean
+  /** Floor-wide wall height: stores the storey setting + re-heights every
+   * wall on it (user feedback 0.13.0). */
+  setLevelWallHeight: (id: LevelId, height: number) => void
   deleteLevel: (id: LevelId) => boolean
   // document lifecycle
   newDocument: (name?: string) => void
@@ -202,6 +205,7 @@ export const useDocStore = create<DocState>()(
           duplicateLevel: (id) => mutateDoc((d) => levelOps.duplicateLevel(d, id)),
           renameLevel: (id, name) => mutateDoc((d) => levelOps.renameLevel(d, id, name)),
           moveLevel: (id, delta) => mutateDoc((d) => levelOps.moveLevel(d, id, delta)),
+          setLevelWallHeight: (id, h) => mutateDoc((d) => levelOps.setLevelWallHeight(d, id, h)),
           deleteLevel: (id) => mutateDoc((d) => levelOps.deleteLevel(d, id)),
           newDocument: (name = 'Untitled') => {
             useActiveLevel.getState().setActiveLevel(null)

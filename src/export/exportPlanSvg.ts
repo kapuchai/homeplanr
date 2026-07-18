@@ -38,6 +38,11 @@ export interface ExportPlanOptions {
    * resolving the level view; absent = the active floor. The pure SVG
    * renderer itself never reads it. */
   levelId?: LevelId
+  /** Stairwell openings inherited from the storey BELOW (0.13.0): plan
+   * quads drawn as dashed voids with a cross — the classic opening
+   * notation. Supplied by the controller (the pure renderer only sees one
+   * level). */
+  stairwells?: readonly { x: number; y: number }[][]
   /** Draw the document grid under the plan. Default false. */
   includeGrid?: boolean
   /** Paper margin around the content bounds, meters. Default 0.5. */
@@ -220,6 +225,18 @@ export function renderPlanSvg(
     }
   }
   parts.push(...covers, ...symbols)
+
+  // stairwell openings from the storey below (0.13.0) — dashed void +
+  // cross, the editor StairwellLayer's styling twin
+  for (const rect of opts.stairwells ?? []) {
+    const [a, b2, c, d2] = rect
+    if (!a || !b2 || !c || !d2) continue
+    parts.push(
+      `<path d="${polyPath(rect as { x: number; y: number }[])}" fill="none" stroke="${theme.symbolLine}" stroke-width="${HAIRLINE}" stroke-dasharray="${INK_DASH}"/>`,
+    )
+    parts.push(lineEl({ x1: a.x, y1: a.y, x2: c.x, y2: c.y }, theme.symbolLine, HAIRLINE, INK_DASH))
+    parts.push(lineEl({ x1: b2.x, y1: b2.y, x2: d2.x, y2: d2.y }, theme.symbolLine, HAIRLINE, INK_DASH))
+  }
 
   // furniture symbols — the shared furnitureTransform keeps this, the
   // editor (WorldLayers), and the placement ghost pixel-identical

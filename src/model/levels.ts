@@ -57,6 +57,7 @@ export function levelIndex(doc: ProjectDocument, id: LevelId): number {
 export function makeLevelDoc(doc: ProjectDocument, level: Level): LevelDoc {
   return {
     levelId: level.id,
+    ...(level.wallHeight !== undefined ? { wallHeight: level.wallHeight } : {}),
     settings: doc.settings,
     nodes: level.nodes,
     walls: level.walls,

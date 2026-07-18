@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useDocStore } from '../../store/docStore'
 import { useActiveLevel } from '../../store/activeLevel'
 import { levelDocOf, resolveLevel, useActiveLevelDoc } from '../../store/levelView'
+import { stairwellRects } from '../../scene3d/stairwell'
 import { useUiStore } from '../../store/uiStore'
 import { useAppSettings } from '../../store/appSettings'
 import { formatArea } from '../../format/units'
@@ -37,6 +38,7 @@ export function WorldLayers() {
     <>
       <LevelGhostLayer />
       <RoomsLayer derived={derived} />
+      <StairwellLayer />
       <WallsLayer doc={doc} derived={derived} />
       <OpeningsLayer doc={doc} derived={derived} />
       <FurnitureLayer doc={doc} />
@@ -81,6 +83,42 @@ function LevelGhostLayer() {
       stroke="none"
       pointerEvents="none"
     />
+  )
+}
+
+/**
+ * Stairwell openings inherited from the storey BELOW (0.13.0 feedback:
+ * "not visible where the stair leads on the second floor"): each
+ * connector's footprint rect drawn as a dashed void + cross — the classic
+ * plan notation. Styling twin: exportPlanSvg's stairwell block.
+ * stairwellRects lives in scene3d (the 3D carve shares it) but is pure
+ * plan-space math.
+ */
+function StairwellLayer() {
+  const fullDoc = useDocStore((s) => s.doc)
+  const activeLevelId = useActiveLevel((s) => s.activeLevelId)
+  const theme = useThemeStore((s) => s.theme)
+  const active = resolveLevel(fullDoc, activeLevelId)
+  const idx = fullDoc.levels.findIndex((l) => l.id === active.id)
+  const below = idx > 0 ? levelDocOf(fullDoc, fullDoc.levels[idx - 1]!.id) : null
+  const rects = useMemo(() => (below ? stairwellRects(below) : []), [below])
+  if (!rects.length) return null
+  return (
+    <g
+      fill="none"
+      stroke={theme.symbolLine}
+      strokeWidth={1.2}
+      strokeDasharray="5 4"
+      vectorEffect="non-scaling-stroke"
+    >
+      {rects.map((r, i) => (
+        <g key={i}>
+          <path d={polyPath(r)} vectorEffect="non-scaling-stroke" />
+          <line x1={r[0]!.x} y1={r[0]!.y} x2={r[2]!.x} y2={r[2]!.y} vectorEffect="non-scaling-stroke" />
+          <line x1={r[1]!.x} y1={r[1]!.y} x2={r[3]!.x} y2={r[3]!.y} vectorEffect="non-scaling-stroke" />
+        </g>
+      ))}
+    </g>
   )
 }
 

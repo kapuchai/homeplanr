@@ -815,10 +815,12 @@ export function PropertiesPanel() {
           value={wall.thickness}
           onCommit={(v) => a.updateWall(wall.id, { thickness: v })}
         />
+        {/* floor-wide by user decision (0.13.0 feedback): one wall height
+            per storey — editing it re-heights every wall on this floor */}
         <LengthField
-          label={t('props.height')}
+          label={t('props.wallHeightFloor')}
           value={wall.height}
-          onCommit={(v) => a.updateWall(wall.id, { height: v })}
+          onCommit={(v) => a.setLevelWallHeight(doc.levelId, v)}
         />
         <FinishSwatchRow
           label={t('props.finishFront')}
@@ -1238,6 +1240,9 @@ export function PropertiesPanel() {
           ) : null}
         </div>
       </Row>
+      {/* project notes inline (0.13.0 feedback: "more accessible in the
+          right sidebar") — same doc field as File → Project notes… */}
+      <NotesField value={fullDoc.notes ?? ''} onCommit={(v) => a.setNotes(v)} />
       {(() => {
         // plan statistics (0.8.0 roomType semantics): per-type areas in the
         // registry order + an unspecified bucket; total from derived areas.

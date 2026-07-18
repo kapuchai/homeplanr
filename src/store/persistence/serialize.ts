@@ -214,6 +214,9 @@ export function validateParsedObject(raw: unknown): ParseResult {
       if (isFiniteNum(rawLevel.elevation)) {
         level.elevation = Math.min(1000, Math.max(-100, rawLevel.elevation))
       }
+      if (isFiniteNum(rawLevel.wallHeight)) {
+        level.wallHeight = Math.min(6, Math.max(0.3, rawLevel.wallHeight))
+      }
       validateLevelRecords(rawLevel, level, warnings)
       doc.levels.push(level)
     }

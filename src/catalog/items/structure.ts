@@ -118,10 +118,15 @@ export const stairSpiral: CatalogItem = {
     const rOuter = Math.min(w, d) / 2
     const treadLen = rOuter - 0.06
     b.cylinder('pole', { r: 0.05, h, at: [0, 0, 0] })
+    // one full turn over the climb, PHASED so the TOP tread points at the
+    // back (+y) hole edge — the walker steps off onto the upper floor
+    // there (0.13.0 feedback: the top tread must meet the stairwell edge,
+    // not hang mid-air; matches the run-arrow / descend-zone convention)
+    const phase = Math.PI / 2 - ((steps - 1) / steps) * Math.PI * 2
     for (let i = 0; i < steps; i++) {
-      // one full turn over the climb; wedge stand-in: a rotated slat from
-      // the pole outward (rot about z carries the whole box)
-      const a = (i / steps) * Math.PI * 2
+      // wedge stand-in: a rotated slat from the pole outward (rot about z
+      // carries the whole box)
+      const a = phase + (i / steps) * Math.PI * 2
       const cx = (Math.cos(a) * (treadLen + 0.06)) / 2
       const cy = (Math.sin(a) * (treadLen + 0.06)) / 2
       b.box('tread', {

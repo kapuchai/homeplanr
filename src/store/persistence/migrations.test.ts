@@ -814,6 +814,19 @@ describe('v7: storeys — the structural levels wrap (+ notes, floorElevation)',
     expect('floorElevation' in Object.values(lv(v.doc).rooms)[0]!).toBe(false)
   })
 
+  it('level wallHeight roundtrips clamped; junk drops', () => {
+    const base = JSON.parse(serializeDocument(parseDocument(v6Basic).doc, '2026-07-18T00:00:00.000Z'))
+    base.levels[0].wallHeight = 3.1
+    let r = validateParsedObject(base)
+    expect(r.doc.levels[0]!.wallHeight).toBe(3.1)
+    base.levels[0].wallHeight = 99
+    r = validateParsedObject(base)
+    expect(r.doc.levels[0]!.wallHeight).toBe(6) // clamped
+    base.levels[0].wallHeight = 'tall'
+    r = validateParsedObject(base)
+    expect('wallHeight' in r.doc.levels[0]!).toBe(false)
+  })
+
   it('level elevation junk drops; extreme values clamp into [-100, 1000]', () => {
     const base = JSON.parse(serializeDocument(parseDocument(v6Basic).doc, '2026-07-18T00:00:00.000Z'))
     base.levels[0].elevation = 'penthouse'
