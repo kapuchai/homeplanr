@@ -37,3 +37,12 @@ export const useViewportStore = create<ViewportState>()(
       }),
   })),
 )
+
+// Dev-only HMR guard (0.13.0 session lesson): this module holds LIVE STATE.
+// Hot-swapping it creates a SECOND instance while older importers keep the
+// first — clicks write to one store, renderers read another ("switching
+// does nothing" in a long dev session). Decline HMR: edits here always
+// full-reload the page. No-op in production builds.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => import.meta.hot!.invalidate())
+}
